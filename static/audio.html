@@ -1,0 +1,126 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AudioTaller</title><style>
+:root{color-scheme:dark;--bg:#101821;--panel:#182431;--line:#2b3d4e;--mint:#55d6be;--muted:#a7b5c2}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 80% 0,#203342,#101821 50%);color:#edf4f7;font:15px Segoe UI,Arial}header{padding:23px 6vw;border-bottom:1px solid var(--line);font-size:22px;font-weight:bold}main{max-width:1050px;margin:42px auto;padding:0 22px}h1{font-size:34px}h2{margin-top:5px}.muted{color:var(--muted)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px}.wide{grid-column:1/-1}input,select,textarea{width:100%;background:#0e1720;color:white;border:1px solid #35495a;border-radius:8px;padding:11px;margin:6px 0 12px;font:inherit}button{background:var(--mint);border:0;border-radius:8px;padding:10px 15px;font-weight:bold;cursor:pointer;margin:4px}button.alt{background:#2b4051;color:white}label{display:block;color:#cbd6df}.list{display:grid;gap:10px;margin-top:12px}.item{background:#101a24;border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;gap:10px}.hidden{display:none}.back{color:var(--mint);cursor:pointer;margin-bottom:14px}.artist{min-width:155px;min-height:115px;text-align:center;display:grid;place-content:center}.row{display:flex;gap:8px;flex-wrap:wrap}@media(max-width:700px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}}
+
+[hidden]{display:none!important}main{max-width:1350px;margin:24px auto}body{min-height:100vh}.mint,.symbol{color:var(--mint)}.welcome{text-align:center;margin:7vh 0 5vh}.welcome h1{font-size:clamp(30px,5vw,55px)}.action{text-align:center;border-color:var(--mint);padding:30px 18px}.symbol{font-size:48px}.heading,.filters,.form-actions{display:flex;align-items:center;gap:12px}.heading{justify-content:space-between;flex-wrap:wrap}.filters select{width:auto}.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:14px}.tile{padding:0;overflow:hidden}.cover{display:grid;place-items:center;background:linear-gradient(135deg,#153b48,#10212e);height:106px;color:var(--mint);font-size:35px}.cover img,#preview{width:100%;height:100%;object-fit:cover}.tile-body{padding:12px;overflow-wrap:anywhere}.form-actions{justify-content:flex-end;margin-top:12px}#error{color:#ffada9}#preview{max-height:150px}fieldset{border:1px solid var(--line);border-radius:8px;margin:8px 0}nav{margin-bottom:15px}
+
+
+.drop-zone{display:block;border:1px dashed var(--line);border-radius:10px;padding:14px;margin:10px 0;color:var(--muted);background:#101a24}
+.drop-zone.is-dragging{border-color:var(--mint);background:#153b48;color:white}
+.file-status{display:block;overflow-wrap:anywhere}
+.social-links a,.social-preview{color:var(--mint);overflow-wrap:anywhere}.social-links:not(:empty){margin-bottom:16px}.social-links a{padding:5px 8px;border:1px solid var(--line);border-radius:8px}
+.social-badge{display:inline-flex;align-items:center;gap:2px}.social-badge button{margin:0;padding:5px}.social-links .social-icon{display:inline-flex;padding:7px;color:#fff;background:var(--brand,#214557)}.social-icon svg{width:22px;height:22px;display:block}
+.profile-image{width:100%;max-height:220px;object-fit:cover;border-radius:10px}dt{color:var(--muted);margin-top:10px}dd{margin:3px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}#profileMembers fieldset{margin-bottom:14px}
+</style><link rel="stylesheet" href="/static/projects.css"><link rel="stylesheet" href="/static/artists.css">
+<header class="app-brand"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M2 16h4l3-8 4 16 4-21 4 26 4-15 2 2h3"/></svg> AudioTaller</header>
+<aside class="sidebar" aria-label="Navegación">
+  <button aria-label="Inicio" id="sideHome" onclick="go('home')">⌂ <span>Inicio</span></button>
+  <button aria-label="Artistas y proyectos" id="sideArtists" onclick="openArtistManager()">♧ <span>Artistas y proyectos</span></button>
+  <button id="sideArrangements" aria-label="Arreglos" onclick="openArrangements()">♫ <span>Arreglos</span></button>
+  <button aria-label="Biblioteca" disabled title="Pendiente">♫ <span>Biblioteca</span></button>
+  <button aria-label="Recientes" disabled title="Pendiente">◷ <span>Recientes</span></button>
+  <button aria-label="Favoritos" disabled title="Pendiente">☆ <span>Favoritos</span></button>
+  <button aria-label="Configuración" class="side-settings" disabled title="Pendiente">⚙ <span>Configuración</span></button>
+  <small>AudioTaller v0.1.0</small>
+</aside>
+<main>
+<nav id="nav" class="breadcrumbs" hidden aria-label="Ruta de navegación"><button onclick="back()">← Atrás</button><span id="crumbPath"></span></nav>
+<p id="error" role="alert"></p>
+<section id="home">
+  <div class="welcome"><h1>Bienvenidos/as a <span class="mint">AudioTaller</span></h1><p class="muted">Gestión y trazabilidad de tus producciones musicales</p></div>
+  <div class="grid">
+    <article class="card action"><div class="symbol"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="9" r="4"/><path d="M8 27v-4a8 8 0 0 1 16 0v4M2 24v-3a5 5 0 0 1 5-5m23 8v-3a5 5 0 0 0-5-5"/><circle cx="6" cy="11" r="3"/><circle cx="26" cy="11" r="3"/></svg></div><h2>Gestión de artistas</h2><p class="muted">Consultá las fichas y administrá tus artistas.</p><button onclick="go('manager')">Ver artistas</button></article>
+    <article class="card action"><div class="symbol"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M11 23V8l16-4v15M11 12l16-4"/><ellipse cx="7" cy="24" rx="4" ry="3"/><ellipse cx="23" cy="20" rx="4" ry="3"/></svg></div><h2>Gestión de proyectos por artistas</h2><p class="muted">Administrá discos, EP, singles y canciones.</p><button onclick="go('projectManager')">Gestionar proyectos</button></article>
+  </div>
+</section>
+<section id="manager" hidden>
+  <div class="heading"><div><h1 id="managerTitle">Gestión de artistas</h1><p id="managerDescription" class="muted"></p></div><button onclick="editArtist()">＋ Nuevo artista</button></div>
+  <div class="filters"><input id="query" aria-label="Buscar" placeholder="Buscar artista, disco o canción…" oninput="loadLibrary()">
+  <select id="typeFilter" aria-label="Tipo" onchange="loadLibrary()"><option value="">Todos los tipos</option><option>Artista</option><option>Grupo</option><option>Banda</option></select>
+  <select id="sort" aria-label="Orden" onchange="loadLibrary()"><option value="asc">A–Z</option><option value="desc">Z–A</option><option value="new">Más recientes</option><option value="old">Más antiguos</option></select><button class="alt" id="artistGrid" onclick="setArtistView(false)" aria-label="Cuadrícula">▦</button><button class="alt" id="artistList" onclick="setArtistView(true)" aria-label="Lista">☰</button></div>
+  <div id="library" class="tiles"></div><p id="count" class="muted"></p>
+</section>
+<section id="profile" hidden>
+  <div class="project-head">
+    <div id="profileAvatar" class="project-art"></div>
+    <div><h1 id="profileName"></h1><p id="profileCounts" class="muted"></p></div>
+    <div class="row project-actions">
+      <button class="alt" onclick="editArtist(artist.id)">Editar artista</button><button onclick="openArtist(artist.id, true)">Ver proyectos</button>
+      <button onclick="openProjectFromProfile('album')">＋ Generar nuevo disco</button>
+      <button onclick="openProjectFromProfile('song')">＋ Generar nueva canción</button>
+    </div>
+  </div>
+  <div class="grid profile-panels">
+    <article class="card"><img id="profileImage" class="profile-image" hidden alt="Imagen del artista"><h2>Información del artista</h2><dl id="profileMain"></dl><div id="profileSocials" class="row social-links"></div></article>
+    <div class="profile-stack">
+      <article class="card"><div class="heading"><h2>Integrantes y contactos</h2><button class="alt" onclick="editArtist(artist.id, true)">＋ Agregar</button></div><div id="profileMembers"></div></article>
+      <article class="card"><h2>Datos generales</h2><dl id="profileContact"></dl></article>
+    </div>
+  </div>
+</section>
+<section id="editor" hidden>
+  <h1 id="formTitle"></h1>
+  <form id="artistForm" onsubmit="saveArtist(event)">
+    <div class="grid"><div class="card">
+      <h2>Información principal</h2>
+      <label id="photoZone" class="drop-zone">Arrastrá una imagen acá o elegí un archivo (JPG o PNG, hasta 2 MB)<input id="photo" type="file" accept="image/jpeg,image/png"><span id="photoStatus" class="file-status" role="status"></span></label><img id="preview" hidden alt="Imagen del artista">
+      <label>Nombre *<input name="nombre" required maxlength="150"></label>
+      <label>Tipo *<select name="tipo"><option>Artista</option><option>Grupo</option><option>Banda</option></select></label>
+      <label>Formación<input name="formacion"></label>
+      <label>Año de inicio<input name="anio" type="number" min="1" max="9999"></label>
+      <label>Estado<select name="estado"><option>Activo</option><option>En pausa</option><option>Inactivo</option></select></label>
+    </div><div class="card">
+      <div class="heading"><h2>Integrantes y contactos</h2><button type="button" class="alt" onclick="addMember()">＋ Agregar integrante</button></div>
+      <div id="members"></div>
+      <h2>Datos generales</h2>
+      <label>Correos<input name="correos" placeholder="Separados por comas"></label>
+      <label>Teléfonos / WhatsApp<input name="telefonos"></label>
+      <label>Sitio web<input name="web"></label>
+      <h3>Redes sociales</h3><div id="savedSocials" class="row social-links"></div>
+      <div id="socialRows"></div>
+      <label id="legacySocial" hidden>Redes guardadas como texto<input name="redes"></label>
+      <label>Notas<textarea name="notas"></textarea></label>
+    </div></div>
+    <div class="form-actions"><button type="button" class="alt" onclick="back()">Cancelar</button><button id="save">Guardar artista</button></div>
+  </form>
+</section>
+<section id="artistPane" hidden>
+  <div class="project-crumb"><button class="alt" onclick="go('home')">Inicio</button> › <button class="alt" onclick="go('home'); go('projectManager')">Gestión de proyectos</button> › <span id="projectArtistCrumb"></span></div>
+  <div class="project-head">
+    <div id="projectArtistCover" class="project-art"></div>
+    <div><h1 id="artistName"></h1><p id="projectCounts" class="muted"></p><div id="artistSocials" class="row social-links"></div></div>
+    <div class="row project-actions">
+      <button class="alt" onclick="editArtist(artist.id)">Editar artista</button>
+      <button onclick="projectForm('album')">＋ Generar nuevo disco</button>
+      <button onclick="projectForm('song')">＋ Generar nueva canción</button>
+    </div>
+  </div>
+  <div class="filters project-tools">
+    <input id="projectSearch" type="search" aria-label="Buscar proyectos o canciones">
+    <select id="projectType" aria-label="Tipo"><option value="">Todos los proyectos</option><option>Álbum</option><option>EP</option><option>Single</option><option value="loose">Canciones independientes</option></select>
+    <select id="projectOrder" aria-label="Orden"><option value="actualizado">Última modificación</option><option value="creado">Fecha de creación</option><option value="nombre">Nombre A–Z</option></select>
+    <button class="alt" id="projectGrid" aria-label="Cuadrícula" title="Cuadrícula">▦</button>
+    <button class="alt" id="projectList" aria-label="Lista" title="Lista">☰</button>
+  </div>
+  <div class="project-explorer"><div id="projectTiles"></div><article id="projectDetail" class="card"></article></div>
+</section>
+<dialog id="projectDialog" class="card"><form id="projectForm">
+  <h2 id="projectFormTitle"></h2><div id="projectFormFields"></div>
+  <p id="projectFormError" role="alert"></p>
+  <div class="form-actions"><button type="button" class="alt" onclick="document.getElementById('projectDialog').close()">Cancelar</button><button>Guardar</button></div>
+</form></dialog>
+<div id="albumPane" class="card wide" hidden><div class="back" onclick="back()">← Artista</div><h2 id="albumTitle"></h2><div class="row"><input id="songTitle" placeholder="Título de canción"><button onclick="newSong(currentAlbum.id)">＋ Canción</button></div><div id="albumSongs" class="list"></div></div><div id="songPane" class="card wide" hidden><div class="back" onclick="back()">← Canciones</div><h2 id="songHeading"></h2><p class="muted">Flujo de producción</p><div id="stages" class="grid"></div></div>
+<section id="arrangements" hidden>
+  <h1>Arreglos</h1><p class="muted">Escuchá las tomas de una canción sin abrir el DAW.</p>
+  <div class="grid">
+    <article class="card"><h2>Canciones</h2>
+      <input id="arrangementSearch" type="search" aria-label="Buscar canciones" placeholder="Buscar por canción, artista o disco…">
+      <div id="arrangementSongs" class="list"></div>
+    </article>
+    <article class="card"><div class="heading"><h2 id="arrangementTitle">Tomas</h2><button id="refreshTakes" class="alt" hidden>Actualizar</button></div>
+      <p id="arrangementStatus" role="status" class="muted">Elegí una canción para ver sus tomas.</p>
+      <div id="takeTransport" hidden><p id="takeNow" aria-live="polite"></p><audio id="takePlayer" controls preload="none" style="width:100%"></audio></div>
+      <div id="arrangementTakes" class="list"></div>
+    </article>
+  </div>
+</section>
+</main><script src="/static/navigation.js"></script><script src="/static/projects.js"></script><script src="/static/arrangements.js"></script></html>
