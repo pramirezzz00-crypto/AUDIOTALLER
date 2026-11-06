@@ -29,9 +29,10 @@ class ProductionMigrationTest(unittest.TestCase):
             ws=c.get('/api/produccion/song').json
             assert ws['archivos'][0]['nombre']=='anterior.wav'
             assert ws['sesiones'][0]['etapa']=='mezcla'
-            assert len(list(root.glob('test.respaldo-*.sqlite3')))==1
+            backups=len(list(root.glob('test.respaldo-*.sqlite3')))
+            assert backups>=1
             assert c.get('/api/produccion/song').status_code==200
-            assert len(list(root.glob('test.respaldo-*.sqlite3')))==1
+            assert len(list(root.glob('test.respaldo-*.sqlite3')))==backups
             musician=c.post('/api/artistas',json={'nombre':'Músico','tipo':'Músico','perfil':{'roles':['Músico','Arreglista'],'instrumentos':['Voz','Piano'],'especialidades':['Grabación']}})
             assert musician.status_code==201,musician.data
             mid=musician.json['id']

@@ -128,22 +128,54 @@ async function loadGlobalProjects() {
     globalProductions = await api('/api/proyectos');
     renderGlobalProjects();
 }
+const productionStates = ['Idea','En preproducción','En producción','Finalizada','En pausa','Sin estado'];
+const projectTypesSelected = new Set(['discos','sueltas']);
+const projectStatesSelected = new Set(productionStates);
+
+function albumStates(album) {
+    const songs=globalProductions.canciones.filter(song=>song.disco_id===album.id);
+    return [...new Set(songs.length?songs.map(song=>song.estado || 'En producción'):['Sin estado'])];
+}
 function renderGlobalProjects() {
-    const query = projectText($('globalSearch').value.trim());
-    const kind = $('globalKind').value;
-    const albums = kind === 'sueltas' ? [] : globalProductions.discos.filter(album =>
-        projectText([album.nombre, album.artista, projectType(album),
-          ...globalProductions.canciones.filter(song => song.disco_id === album.id).map(song => song.titulo)].join(' ')).includes(query));
-    const songs = kind === 'discos' ? [] : globalProductions.canciones.filter(song =>
-        !song.disco_id && projectText([song.titulo,song.artista].join(' ')).includes(query));
-    $('globalCards').innerHTML = albums.map(album => `<article class="card tile">
-        <button class="artist-open" onclick="openGlobalAlbum('${album.id}','${album.artista_id}')">
-          <span class="cover">${projectImage(album.portada,'◉')}</span><span class="tile-body"><strong>${esc(album.nombre)}</strong>
-          <span>${esc(album.artista)}</span><small>${esc(projectType(album))} · ${trackCount(album.total)}</small></span></button>
-        <button class="alt" onclick="editGlobalAlbum('${album.id}','${album.artista_id}')">Editar proyecto</button></article>`).join('') +
-        songs.map(song => `<article class="card"><h3>♫ ${esc(song.titulo)}</h3><p>${esc(song.artista)} · Canción independiente</p>
-          <button onclick="openSong('${song.id}')">Abrir canción</button></article>`).join('') ||
-        '<p class="muted">No hay proyectos que coincidan.</p>';
+    const query=projectText($('globalSearch').value.trim());
+    const all=[
+        ...globalProductions.discos.map(album=>({...album,entity:'discos',label:album.nombre,states:albumStates(album)})),
+        ...globalProductions.canciones.filter(song=>!song.disco_id).map(song=>({...song,entity:'sueltas',label:song.titulo,states:[song.estado || 'En producción']}))
+    ];
+    const searched=all.filter(item=>projectText([item.label,item.artista,item.entity==='discos'?projectType(item):'Canción independiente',
+        ...globalProductions.canciones.filter(song=>song.disco_id===item.id).map(song=>song.titulo)].join(' ')).includes(query));
+    const typeCounts=type=>searched.filter(item=>item.entity===type && item.states.some(state=>projectStatesSelected.has(state))).length;
+    $('globalTypeFilters').innerHTML=[['discos','Discos'],['sueltas','Canciones sueltas']].map(([key,label])=>
+        `<label class="filter-box"><input type="checkbox" value="${key}" ${projectTypesSelected.has(key)?'checked':''}>
+            ${label} (${typeCounts(key)})</label>`).join('');
+    $('globalTypeFilters').querySelectorAll('input').forEach(input=>input.onchange=()=>{
+        if(input.checked)projectTypesSelected.add(input.value);else projectTypesSelected.delete(input.value);
+        renderGlobalProjects();
+    });
+    const typed=searched.filter(item=>projectTypesSelected.has(item.entity));
+    $('globalStateFilters').innerHTML=productionStates.map((state,index)=>
+        `<label class="filter-box state-filter state-${index}"><input type="checkbox" value="${index}" ${projectStatesSelected.has(state)?'checked':''}>
+            <span class="state-dot"></span>${state} (${typed.filter(item=>item.states.includes(state)).length})</label>`).join('')+
+        '<button type="button" class="alt" id="allProjectStates">Todos los estados</button>';
+    $('globalStateFilters').querySelectorAll('input').forEach(input=>input.onchange=()=>{
+        const state=productionStates[Number(input.value)];
+        if(input.checked)projectStatesSelected.add(state);else projectStatesSelected.delete(state);
+        renderGlobalProjects();
+    });
+    $('allProjectStates').onclick=()=>{
+        productionStates.forEach(state=>projectStatesSelected.add(state));renderGlobalProjects();
+    };
+    const visible=typed.filter(item=>item.states.some(state=>projectStatesSelected.has(state)));
+    const stateBadges=item=>'<div class="row">'+item.states.map(state=>
+        `<small class="state-badge state-${productionStates.indexOf(state)}">${esc(state)}</small>`).join('')+'</div>';
+    $('globalCards').innerHTML=visible.map(item=>item.entity==='discos'?
+        `<article class="card tile"><button class="artist-open" onclick="openGlobalAlbum('${item.id}','${item.artista_id}')">
+          <span class="cover">${projectImage(item.portada,'◉')}</span><span class="tile-body"><strong>${esc(item.nombre)}</strong>
+          <span>${esc(item.artista)}</span><small>${esc(projectType(item))} · ${trackCount(item.total)}</small></span></button>
+          ${stateBadges(item)}<button class="alt" onclick="editGlobalAlbum('${item.id}','${item.artista_id}')">Editar proyecto</button></article>`:
+        `<article class="card"><h3>♫ ${esc(item.titulo)}</h3><p>${esc(item.artista)} · Canción independiente</p>${stateBadges(item)}
+          <button onclick="openSong('${item.id}')">Abrir canción</button></article>`).join('') ||
+        '<p class="muted">No hay proyectos que coincidan con los filtros seleccionados.</p>';
 }
 async function openGlobalAlbum(id, owner) {
     await openArtist(owner, true);
@@ -160,6 +192,7 @@ function formDialog(title, fields, save, prepare) {
     const dialog = $('iterationDialog');
     $('iterationTitle').textContent = title;
     $('iterationSubmit').textContent = 'Guardar';
+    $('iterationSubmit').hidden = false;
     $('iterationFields').innerHTML = fields;
     $('iterationError').textContent = '';
     dialogDirty = false;

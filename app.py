@@ -3,6 +3,8 @@ from contextlib import contextmanager
 from migrations import migrate
 from management import register_management, save_roles
 from production import register_production
+from daw_operations import register_daw_operations
+from folder_migration import register_folder_migration
 from flask import Flask, jsonify, request, send_file
 from itsdangerous import BadSignature, URLSafeSerializer
 from pathlib import Path
@@ -16,7 +18,7 @@ STAGES = ('01. DEMO', '02. MAQUETADO', '03. GRABACIÓN', '04. PRODUCCIÓN')
 @contextmanager
 def db_open():
     DB.parent.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(DB)
+    db = sqlite3.connect(DB, timeout=30)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA foreign_keys=ON")
     db.executescript('''
@@ -268,7 +270,7 @@ def arrangements_takes(sid):
                 subdirs.clear()
                 continue
             seen_dirs.add(current)
-            subdirs[:] = [name for name in subdirs if not (current / name).is_symlink()
+            subdirs[:] = [name for name in subdirs if not name.startswith('.parcial-') and not (current / name).is_symlink()
                           and not (current / name).is_junction()]
             for name in filenames:
                 path = current / name
@@ -302,6 +304,8 @@ def arrangements_audio(token):
 
 register_management(app, db_open)
 register_production(app, db_open, safe_name)
+register_daw_operations(app, db_open, safe_name)
+register_folder_migration(app, db_open, lambda: DB)
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1',port=5000,debug=False)

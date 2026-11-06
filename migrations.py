@@ -26,6 +26,7 @@ def migrate(db, database):
         exists = db.execute("SELECT 1 FROM sqlite_master WHERE name='schema_audio'").fetchone()
         if exists and db.execute('SELECT version FROM schema_audio').fetchone()[0] >= 1:
             migrate_session_selection(db, database)
+            migrate_file_operations(db, database)
             return
         db.execute('BEGIN IMMEDIATE')
         backup = database.with_name(database.stem + '.respaldo-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
@@ -99,6 +100,7 @@ def migrate(db, database):
                 sesion_id TEXT NOT NULL REFERENCES sesiones(id), PRIMARY KEY(cancion_id,etapa))''')
             db.execute('INSERT INTO schema_audio VALUES(2)')
             db.commit()
+            migrate_file_operations(db, database)
         except Exception:
             db.rollback()
             raise
@@ -119,6 +121,33 @@ def migrate_session_selection(db, database):
             cancion_id TEXT REFERENCES canciones(id), etapa TEXT REFERENCES etapas(clave),
             sesion_id TEXT NOT NULL REFERENCES sesiones(id), PRIMARY KEY(cancion_id,etapa))""")
         db.execute('UPDATE schema_audio SET version=2')
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
+def migrate_file_operations(db, database):
+    """Versionado estable, preferencias DAW y operaciones de copia recuperables."""
+    if db.execute('SELECT version FROM schema_audio').fetchone()[0] >= 3:
+        return
+    db.execute('BEGIN IMMEDIATE')
+    backup = database.with_name(database.stem + '.respaldo-operaciones-' +
+                                datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
+    try:
+        with closing(sqlite3.connect(database)) as source, closing(sqlite3.connect(backup)) as target:
+            source.backup(target)
+        db.execute("""CREATE TABLE revision_sesion(
+            sesion_id TEXT PRIMARY KEY REFERENCES sesiones(id), numero INTEGER NOT NULL,
+            grupo TEXT NOT NULL, original_id TEXT REFERENCES sesiones(id), fecha_archivo REAL, criterio TEXT NOT NULL)""")
+        db.execute("""CREATE TABLE preferencias_daw(
+            id TEXT PRIMARY KEY, nombre TEXT NOT NULL, ejecutable TEXT NOT NULL,
+            extension TEXT NOT NULL, plantilla TEXT DEFAULT '')""")
+        db.execute("""CREATE TABLE operaciones_archivo(
+            id TEXT PRIMARY KEY, cancion_id TEXT REFERENCES canciones(id), estado TEXT NOT NULL,
+            datos TEXT NOT NULL, resultado TEXT, error TEXT, copiados INTEGER DEFAULT 0,
+            total INTEGER DEFAULT 0, creado TEXT DEFAULT CURRENT_TIMESTAMP, actualizado TEXT DEFAULT CURRENT_TIMESTAMP)""")
+        db.execute('UPDATE schema_audio SET version=3')
         db.commit()
     except Exception:
         db.rollback()

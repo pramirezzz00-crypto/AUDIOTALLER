@@ -87,10 +87,13 @@ class SessionDiscoveryTest(unittest.TestCase):
     def test_respalda_al_actualizar_desde_version_uno(self):
         with app.db_open() as db:
             db.execute('DROP TABLE sesion_vigente')
+            db.execute('DROP TABLE revision_sesion')
+            db.execute('DROP TABLE preferencias_daw')
+            db.execute('DROP TABLE operaciones_archivo')
             db.execute('UPDATE schema_audio SET version=1')
         before = len(list(self.root.glob('*.respaldo-sesiones-*.sqlite3')))
         with app.db_open() as db:
-            self.assertEqual(db.execute('SELECT version FROM schema_audio').fetchone()[0], 2)
+            self.assertEqual(db.execute('SELECT version FROM schema_audio').fetchone()[0], 3)
         self.assertEqual(len(list(self.root.glob('*.respaldo-sesiones-*.sqlite3'))), before+1)
         with app.db_open() as db:
             self.assertEqual(db.execute('PRAGMA integrity_check').fetchone()[0], 'ok')

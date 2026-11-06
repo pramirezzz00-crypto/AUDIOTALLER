@@ -55,3 +55,17 @@
 .wave-seek{display:block;width:100%;height:90px;cursor:crosshair;background:#081c27;border-radius:7px;touch-action:pan-y}
 .wave-status{font-size:12px;display:block;margin-top:5px;color:var(--muted)}
 @media(max-width:700px){.session-actions{flex-wrap:wrap}.wave-track audio{max-width:none}.macro-panel{padding:12px}}
+
+/* Selección múltiple y estados de las producciones. Un disco puede reunir varios estados. */
+.filter-boxes{margin-bottom:14px}.filter-box{display:flex;align-items:center;gap:8px;padding:10px 13px;border:1px solid var(--line);border-radius:10px;background:#102936;cursor:pointer}
+.filter-box input[type=checkbox]{width:16px;height:16px;margin:0;accent-color:var(--mint)}
+.filter-box:has(input:checked){border-color:var(--mint);background:#153b43}
+.state-0{--state:#d9b971}.state-1{--state:#b799f5}.state-2{--state:#4ed8c1}.state-3{--state:#7ce89a}.state-4{--state:#a9bdca}
+.state-dot{width:8px;height:8px;border-radius:50%;background:var(--state)}
+.state-badge{color:var(--state);border:1px solid var(--state);padding:3px 6px;border-radius:8px;margin:4px}
+.daw-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
+.daw-choice{display:flex;align-items:center;gap:9px;border:1px solid var(--line);padding:9px;border-radius:10px;cursor:pointer}
+.daw-choice input[type=radio]{width:auto;margin:0;accent-color:var(--mint)}
+.daw-choice:has(input:checked){border-color:var(--mint);background:#12434b}.daw-choice small{display:block;color:var(--muted);font-size:10px;overflow-wrap:anywhere}
+
+.state-5{--state:#87919b}

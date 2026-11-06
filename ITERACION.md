@@ -46,3 +46,20 @@ Se comprobó en una ventana pywebview de prueba la navegación Artistas/Proyecto
 - Las mediciones LUFS, true peak y el procesamiento de audio quedan para una integración posterior.
 - Las imágenes de artistas y discos provienen de la base local. Los componentes visuales funcionan con recursos locales.
 - La revisión exhaustiva en diferentes resoluciones y con sesiones reales de cada DAW queda pendiente. La reproducción concreta depende del formato admitido por WebView2.
+
+
+## Sesiones nativas, versiones y copia completa
+
+La columna Versión conserva un número estable por canción, etapa y carpeta de proyecto. Para archivos anteriores se usa la fecha de creación disponible en Windows, con modificación como alternativa y orden de registro para archivos desconectados. Es un orden inferido de archivos, no una lectura del historial propietario del DAW. Las carpetas sin archivo de proyecto muestran un guion.
+
+Nueva versión basada en esta crea una copia exclusiva del archivo junto al original con sufijo _V001, _V002, etc. Un nombre ocupado provoca elegir el siguiente número. Después de guardar se pregunta si se desea abrirla. Las carpetas de medios siguen compartidas con la sesión original.
+
+Nueva sesión detecta DAW locales e iconos desde sus ejecutables. REAPER permite crear un proyecto vacío; Cubase y los otros formatos propietarios requieren una plantilla de proyecto nativo. Cubase 15 proporciona plantillas locales seleccionables. Se puede asociar otro ejecutable y una plantilla personalizada. La sesión se guarda antes de iniciar el DAW.
+
+Incorporar producción a AudioTaller prepara una vista previa de carpetas, cantidad de archivos, tamaño y destino. La copia se ejecuta en segundo plano y verifica contenidos SHA-256 y que los orígenes no hayan cambiado. Copia cada carpeta fuente completa una vez, incluyendo las subcarpetas de audio y documentación. Reasocia las rutas en SQLite únicamente después de verificar y respaldar la base. Un fallo conserva las referencias originales y deja una carpeta parcial identificada. Se puede consultar progreso o reintentar desde el mismo botón.
+
+Las referencias relativas internas se conservan. Las referencias absolutas o medios que estén fuera de las carpetas identificadas pueden requerir relocalizar en el propio DAW. AudioTaller no reescribe las referencias binarias internas de Cubase.
+
+Las nuevas tablas de la migración 3 son revision_sesion, preferencias_daw y operaciones_archivo. La migración realiza un respaldo previo. Los filtros globales permiten combinar discos/canciones sueltas y estados; los estados de un disco se obtienen de sus canciones, por lo que puede figurar en más de un estado. Un disco sin canciones aparece Sin estado.
+
+Las pruebas automatizadas incluyen copias con nombre ocupado, originales conservados, creación con plantilla, proyectos REAPER, copia completa y cancelación ante cambios de archivo. Se verificaron los iconos locales, la apertura de un proyecto vacío en REAPER y los filtros desde la ventana de escritorio. La apertura de plantillas Cubase y la relocalización de una producción real completa requieren todavía una comprobación con el usuario.

@@ -8,6 +8,7 @@ from pathlib import Path
 from flask import jsonify, request, send_file
 from management import required_row
 from migrations import LEGACY_STAGE
+from daw_operations import ensure_revisions
 
 
 # Extensiones de proyecto. El lanzador solo abre archivos de estos tipos mediante Windows.
@@ -24,7 +25,7 @@ def register_production(app, connect, safe_name):
         if not isinstance(data, dict):
             raise ValueError('La solicitud debe contener un objeto de datos.')
         text_fields = ('nombre','titulo','tipo','imagen','portada','etapa','ruta','daw','notas',
-                       'texto','rol','funcion','desde','hasta','estado','metadata','comentario')
+                       'texto','rol','funcion','desde','hasta','estado','metadata','comentario','ejecutable','extension','plantilla','plantilla_manual','daw_id')
         if any(key in data and not isinstance(data[key], str) for key in text_fields):
             raise ValueError('Los campos de texto deben contener texto.')
         if 'perfil' in data and not isinstance(data['perfil'], dict):
@@ -82,14 +83,18 @@ def register_production(app, connect, safe_name):
                         portada=json.loads(album_details['datos']).get('portada', '') if album_details else '',
                         estado=state['estado'] if state else 'En producción',
                         actualizado=state['actualizado'] if state else None)
-            sessions = [dict(row) for row in db.execute("""SELECT s.*, i.nombre,i.principal,i.modo
-                FROM sesiones s LEFT JOIN sesion_info i ON i.id=s.id
+            ensure_revisions(db, sid)
+            sessions = [dict(row) for row in db.execute("""SELECT s.*, i.nombre,i.principal,i.modo,r.numero AS version,r.fecha_archivo,r.criterio
+                FROM sesiones s LEFT JOIN sesion_info i ON i.id=s.id LEFT JOIN revision_sesion r ON r.sesion_id=s.id
                 WHERE s.cancion_id=? ORDER BY s.creado DESC,s.rowid DESC""", (sid,))]
             valid = {row['etapa']:row['sesion_id'] for row in db.execute(
                 'SELECT etapa,sesion_id FROM sesion_vigente WHERE cancion_id=?', (sid,))}
             for session in sessions:
                 session['etapa'] = stage_row(db, session['etapa'])['clave']
                 session['vigente'] = valid.get(session['etapa']) == session['id']
+                if Path(session['ruta']).suffix.lower() not in DAW_PROJECTS:
+                    session['version'] = None
+                    session['criterio'] = 'Sesión de trabajo sin archivo DAW disponible'
                 session['abrible'] = Path(session['ruta']).suffix.lower() in DAW_PROJECTS and Path(session['ruta']).is_file()
                 session['disponible'] = Path(session['ruta']).exists() if session['ruta'] else False
             files = [dict(row) for row in db.execute('SELECT * FROM archivos WHERE cancion_id=? ORDER BY creado DESC', (sid,))]

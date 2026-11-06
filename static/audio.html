@@ -121,7 +121,7 @@
 </form></dialog>
 <div id="albumPane" class="card wide" hidden><div class="back" onclick="back()">← Artista</div><h2 id="albumTitle"></h2><div class="row"><input id="songTitle" placeholder="Título de canción"><button onclick="newSong(currentAlbum.id)">＋ Canción</button></div><div id="albumSongs" class="list"></div></div><section id="songPane" hidden>
   <div class="heading"><h1 id="songHeading"></h1><div>
-    <button class="alt" onclick="editProductionSong()">Editar canción</button>
+    <button class="alt" onclick="editProductionSong()">Editar canción</button><button class="alt" onclick="productionCopyDialog()">Incorporar producción a AudioTaller</button>
     <button onclick="sessionDialog()">Vincular sesión DAW</button>
   </div></div>
   <div id="songSummary" class="card song-summary"></div>
@@ -135,9 +135,9 @@
 <section id="globalProjects" hidden>
   <div class="heading"><div><h1>Proyectos</h1><p class="muted">Todos los discos y canciones de tu biblioteca.</p></div></div>
   <div class="filters"><input id="globalSearch" type="search" placeholder="Buscar disco, canción, artista o tipo…" oninput="renderGlobalProjects()">
-    <select id="globalKind" onchange="renderGlobalProjects()"><option value="">Todos</option><option value="discos">Discos</option><option value="sueltas">Canciones sueltas</option></select>
+
   </div>
-  <div id="globalCards" class="tiles"></div>
+  <div id="globalTypeFilters" class="row filter-boxes"></div><div id="globalStateFilters" class="row filter-boxes" aria-label="Filtrar por estado"></div><div id="globalCards" class="tiles"></div>
 </section>
 <dialog id="iterationDialog" class="card"><form id="iterationForm"><h2 id="iterationTitle"></h2><div id="iterationFields"></div>
   <p id="iterationError" role="alert"></p><div class="form-actions"><button type="button" class="alt" onclick="closeIterationDialog()">Cancelar</button><button id="iterationSubmit">Guardar</button></div>
@@ -156,4 +156,4 @@
     </article>
   </div>
 </section>
-</main><script src="/static/navigation.js"></script><script src="/static/projects.js"></script><script src="/static/arrangements.js"></script><script src="/static/management-ui.js"></script><script src="/static/waveforms.js"></script><script src="/static/workflow.js"></script></html>
+</main><script src="/static/navigation.js"></script><script src="/static/projects.js"></script><script src="/static/arrangements.js"></script><script src="/static/management-ui.js"></script><script src="/static/waveforms.js"></script><script src="/static/workflow.js"></script><script src="/static/session-operations.js"></script></html>

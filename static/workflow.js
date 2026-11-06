@@ -98,23 +98,24 @@ function stageMarkup(stage) {
       <section class="sessions-explorer" aria-label="Sesiones de la etapa">
       <div class="heading"><h3>Sesiones (${sessions.length})</h3><div class="row">
         <button class="alt" onclick="discoverSessionDialog('${stage.clave}')">Buscar sesiones en carpeta</button>
-        <button onclick="sessionDialog('${stage.clave}')">＋ Nueva sesión</button></div></div>
+        <button onclick="newNativeSessionDialog('${stage.clave}')">＋ Nueva sesión</button></div></div>
       <div class="session-scroll"><table class="session-table"><thead><tr>
-        <th>Válida</th><th>Sesión</th><th>DAW</th><th>Estado</th><th>Acciones</th>
+        <th>Válida</th><th>Versión</th><th>Sesión</th><th>DAW</th><th>Estado</th><th>Acciones</th>
       </tr></thead><tbody>
         ${sessions.map(session => `<tr class="session-entry ${session.vigente ? 'valid-session' : ''}" data-session-row="${session.id}"
             onclick="selectStageSession('${stage.clave}','${session.id}')">
           <td onclick="event.stopPropagation()"><input type="checkbox" aria-label="Marcar ${esc(session.nombre)} como sesión válida"
               ${session.vigente ? 'checked' : ''} onchange="setValidSession('${session.id}','${stage.clave}',this.checked)"></td>
+          <td title="${esc(session.criterio)}">${session.version ? 'V' + String(session.version).padStart(3,'0') : '—'}</td>
           <td><button class="session-name" title="${esc(session.ruta)}" onclick="event.stopPropagation();selectStageSession('${stage.clave}','${session.id}')">◈ ${esc(session.nombre)}
             <small>${/\.(cpr|rpp|ptx|als|song|flp|npr|wpr)$/i.test(session.ruta) ? esc(session.ruta.split(/[\\/]/).pop()) : ''}</small></button></td>
           <td>${esc(session.daw || '—')}</td><td>${session.vigente ? '<strong class="mint">Validada ✓</strong>' : ''}
               <small>${session.disponible ? 'Disponible' : 'Ruta no disponible'}</small></td>
           <td onclick="event.stopPropagation()"><div class="row session-actions">
             <button class="alt" ${session.abrible ? '' : 'disabled'} onclick="openDawSession('${session.id}')">Abrir en DAW</button>
-            <button class="alt" onclick="sessionDialog('${stage.clave}','${session.id}')">Nueva sesión basada en esta</button>
+            <button class="alt" onclick="duplicateSessionDialog('${session.id}')">Nueva versión basada en esta</button>
           </div></td>
-        </tr>`).join('') || '<tr><td colspan="5" class="muted">Todavía no hay sesiones en esta etapa.</td></tr>'}
+        </tr>`).join('') || '<tr><td colspan="6" class="muted">Todavía no hay sesiones en esta etapa.</td></tr>'}
       </tbody></table></div></section>
       <div id="sessionNotes-${stage.clave}"></div>
       ${audioFilesMarkup(files)}
