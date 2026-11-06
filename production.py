@@ -2,6 +2,8 @@
 import json
 import os
 import uuid
+import wave
+from audio_waveform import pcm_waveform
 from pathlib import Path
 from flask import jsonify, request, send_file
 from management import required_row
@@ -94,7 +96,7 @@ def register_production(app, connect, safe_name):
             for file in files:
                 try:
                     stat = Path(file['ruta']).stat()
-                    file.update(disponible=True, tamano=stat.st_size)
+                    file.update(disponible=True, tamano=stat.st_size, modificado=stat.st_mtime_ns)
                 except OSError:
                     file.update(disponible=False, tamano=None)
             notes = {row['etapa']: row['texto'] for row in db.execute('SELECT * FROM notas_etapa WHERE cancion_id=?', (sid,))}
@@ -162,8 +164,17 @@ def register_production(app, connect, safe_name):
         with connect() as db:
             session = checked_session(db, sid, identity)
             stage = stage_row(db, session['etapa'])['clave']
-            db.execute('INSERT OR REPLACE INTO sesion_vigente VALUES(?,?,?)', (sid, stage, identity))
-            log(db, sid, stage, 'Sesión válida seleccionada', identity)
+            active = (request.get_json() or {}).get('activa', True)
+            if not isinstance(active, bool):
+                raise ValueError('La marca de sesión válida debe ser verdadera o falsa.')
+            if active:
+                db.execute('INSERT OR REPLACE INTO sesion_vigente VALUES(?,?,?)', (sid, stage, identity))
+                log(db, sid, stage, 'Sesión válida seleccionada', identity)
+            else:
+                deleted = db.execute('DELETE FROM sesion_vigente WHERE cancion_id=? AND etapa=? AND sesion_id=?',
+                                     (sid, stage, identity))
+                if deleted.rowcount:
+                    log(db, sid, stage, 'Marca de sesión válida retirada', identity)
         return jsonify(ok=True)
 
     @app.post('/api/produccion/<sid>/sesiones/<identity>/notas')
@@ -341,8 +352,22 @@ def register_production(app, connect, safe_name):
         if not path.is_file():
             return jsonify(error='Archivo no disponible. Revisá la unidad o ruta vinculada.'), 404
         # El usuario decide abrir o descargar. Los documentos arbitrarios no ejecutan HTML en la aplicación.
-        audio = path.suffix.lower() in ('.wav', '.mp3', '.flac', '.ogg', '.m4a')
+        audio = path.suffix.lower() in ('.wav', '.mp3', '.flac', '.ogg', '.m4a', '.aac', '.opus', '.aif', '.aiff')
         return send_file(path, as_attachment=not audio, download_name=file['nombre'], conditional=True)
+
+    @app.get('/api/produccion/archivo/<identity>/onda')
+    def waveform(identity):
+        with connect() as db:
+            file = required_row(db, 'archivos', identity)
+        path = Path(file['ruta'])
+        if not path.is_file():
+            return jsonify(error='El audio no está disponible.'), 404
+        if path.suffix.lower() != '.wav':
+            return jsonify(error='Usar el decodificador del reproductor.'), 415
+        try:
+            return jsonify(pcm_waveform(path))
+        except (wave.Error, EOFError, ValueError):
+            return jsonify(error='Usar el decodificador del reproductor.'), 415
 
     @app.post('/api/produccion/<sid>/notas/<stage_key>')
     def note(sid, stage_key):

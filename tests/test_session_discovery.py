@@ -56,6 +56,9 @@ class SessionDiscoveryTest(unittest.TestCase):
         state = self.client.get(self.url).json
         self.assertEqual([row['id'] for row in state['sesiones'] if row['vigente']], [ids[1]])
         self.assertEqual(next(row for row in state['sesiones'] if row['id']==ids[1])['comentario'], 'Esta es la aprobada')
+        self.assertEqual(self.client.post(self.url+'/vigente/'+ids[1], json={'activa':False}).status_code, 200)
+        self.assertFalse(any(row['vigente'] for row in self.client.get(self.url).json['sesiones']))
+        self.client.post(self.url+'/vigente/'+ids[1], json={'activa':True})
         with patch('production.os.startfile') as launch:
             response = self.client.post(self.url+'/sesiones/'+ids[1]+'/abrir', json={})
             self.assertEqual(response.status_code, 200)

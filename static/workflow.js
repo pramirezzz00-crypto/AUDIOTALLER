@@ -1,6 +1,7 @@
 // Vista de canción. Cada macroproceso conserva sus controles al alternar etapas.
 let workflow;
 let songLoad = 0;
+let activeMacro = 'pre';
 const selectedStageSessions = new Map();
 const sessionDrafts = new Map();
 const activeStages = {pre:'demo', prod:'grabacion'};
@@ -37,6 +38,7 @@ const macroCount = macro => workflow.archivos.filter(file => workflow.etapas.fin
 const draftKey = stage => currentSong.id + ':' + stage;
 
 function renderWorkflow() {
+    disposeWavePlayers();
     const song = currentSong;
     $('songHeading').textContent = song.titulo;
     songBreadcrumbs();
@@ -47,26 +49,32 @@ function renderWorkflow() {
       <span><small>Última edición registrada</small><b>${esc(song.actualizado || 'Sin registro')}</b></span>
       <span><small>DAW asociado</small><b>${esc(main?.daw || 'Sin asociar')}</b></span>`;
     $('songOverview').innerHTML = `<div class="project-art">${projectImage(song.portada,'♫')}</div>
-        <h3>Resumen</h3><p>Preproducción · ${macroCount('pre')} archivos</p><p>Producción · ${macroCount('prod')} archivos</p>
+        <h3>Resumen</h3><p>Preproducción · ${countLabel(macroCount('pre'),'archivo','archivos')}</p><p>Producción · ${countLabel(macroCount('prod'),'archivo','archivos')}</p>
         <h4>Última sesión</h4><p>${esc(workflow.sesiones[0]?.nombre || 'Sin sesiones')}</p>
         <h4>DAW principal</h4><p>${esc(main?.daw || 'Sin asociar')}</p>`;
     $('workflowPanels').innerHTML = ['pre','prod'].map(macro => {
         const stages = workflow.etapas.filter(stage => stage.macro === macro);
         if (!stages.some(stage => stage.clave === activeStages[macro])) activeStages[macro] = stages[0].clave;
-        return `<article class="card macro-panel"><div class="heading"><h2>${macro === 'pre' ? 'PREPRODUCCIÓN' : 'PRODUCCIÓN'}</h2><span>${macroCount(macro)} archivos</span></div>
+        return `<article class="card macro-panel" data-macro-panel="${macro}"><div class="heading"><h2>${macro === 'pre' ? 'PREPRODUCCIÓN' : 'PRODUCCIÓN'}</h2><span>${countLabel(macroCount(macro),'archivo','archivos')}</span></div>
           <p class="muted">${macro === 'pre' ? 'Definición de la canción, ideas, arreglos y estructura.' : 'Grabación, edición, mezcla y mastering del material final.'}</p>
           <div class="stage-tabs">${stages.map(stage => `<button class="alt" data-macro="${macro}" data-stage="${stage.clave}" onclick="switchStage('${macro}','${stage.clave}')">${esc(stage.nombre)} (${stageFiles(stage.clave).length})</button>`).join('')}</div>
           ${stages.map(stage => stageMarkup(stage)).join('')}</article>`;
     }).join('');
+    $('workflowMacroTabs').innerHTML = ['pre','prod'].map(macro =>
+        `<button class="alt" role="tab" aria-selected="${macro === activeMacro}" data-macro-tab="${macro}"
+            onclick="switchMacro('${macro}')">${macro === 'pre' ? 'Preproducción' : 'Producción'} · ${countLabel(macroCount(macro),'archivo','archivos')}</button>`).join('');
     for (const stage of workflow.etapas) bindStage(stage);
     switchStage('pre',activeStages.pre);
     switchStage('prod',activeStages.prod);
+    switchMacro(activeMacro);
+    setupWavePlayers($('workflowPanels'));
     $('songHistory').innerHTML = workflow.eventos.map(event => `<div class="item"><time>${esc(event.creado)}</time><span>${esc(event.tipo)} · ${esc(event.detalle)}</span></div>`).join('') ||
         '<p class="muted">Sin eventos nuevos registrados.</p>';
 }
 function switchStage(macro, key) {
     activeStages[macro] = key;
-    document.querySelectorAll(`[data-stage-body][data-macro="${macro}"]`).forEach(panel => { panel.hidden = panel.dataset.stageBody !== key; });
+    document.querySelectorAll(`[data-stage-body][data-macro="${macro}"]`).forEach(panel => { panel.hidden = panel.dataset.stageBody !== key;
+        if (panel.hidden) panel.querySelectorAll('audio').forEach(audio => audio.pause()); });
     document.querySelectorAll(`button[data-macro="${macro}"]`).forEach(button => button.setAttribute('aria-pressed', button.dataset.stage === key));
 }
 function fileType(name) {
@@ -82,29 +90,39 @@ function stageMarkup(stage) {
     const sessionName = id => workflow.sesiones.find(session => session.id === id)?.nombre || 'Sin sesión';
     return `<section data-stage-body="${stage.clave}" data-macro="${stage.macro}">
       <h3>${esc(stage.nombre)}</h3><p class="muted">${esc(stageDescriptions[stage.clave] || '')}</p>
-      <div class="row"><button class="alt" onclick="discoverSessionDialog('${stage.clave}')">Buscar sesiones en carpeta</button><button onclick="sessionDialog('${stage.clave}')">＋ Nueva sesión</button>
-        <button class="alt" onclick="linkFileDialog('${stage.clave}')">Vincular archivo externo</button></div>
+      <div class="row"><button class="alt" onclick="linkFileDialog('${stage.clave}')">Vincular archivo externo</button></div>
       <label>Sesión para los archivos nuevos<select id="targetSession-${stage.clave}"><option value="">Sin sesión específica</option>
         ${sessions.map(session => `<option value="${session.id}">${esc(session.nombre)}</option>`).join('')}</select></label>
       <label id="upload-${stage.clave}" class="drop-zone">Importar · Arrastrá archivos acá o elegilos
         <input type="file" multiple><span class="file-status" role="status">Se copiarán a AudioTaller conservando los originales.</span></label>
-      <details ${sessions.length ? 'open' : ''}><summary>Sesiones (${sessions.length})</summary><div class="list">
-        ${sessions.map(session => `<div class="session-row ${session.vigente ? 'valid-session' : ''}">
-        <div class="row"><input type="radio" name="valid-${stage.clave}" aria-label="Marcar ${esc(session.nombre)} como sesión válida" ${session.vigente ? 'checked' : ''}
-          onchange="setValidSession('${session.id}','${stage.clave}')">
-        <button class="alt" onclick="selectStageSession('${stage.clave}','${session.id}')">${esc(session.nombre)}</button>
-        ${session.vigente ? '<strong class="mint">Válida ✓</strong>' : ''}</div>
-        <small>${esc(session.ruta)} · ${session.disponible ? 'Disponible' : 'No disponible'}</small>
-        <div class="row"><button class="alt" ${session.abrible ? '' : 'disabled'} onclick="openDawSession('${session.id}')">Abrir en el DAW</button>
-        <button class="alt" onclick="discoverSessionDialog('${stage.clave}','${session.id}')">Buscar sesiones junto a esta</button>
-        <button class="alt" onclick="sessionDialog('${stage.clave}','${session.id}')">Nueva sesión basada en esta</button>
-        ${session.daw ? `<button class="alt" onclick="setMainSession('${session.id}')">${session.principal ? 'DAW principal ✓' : 'DAW principal'}</button>` : ''}</div></div>`).join('') || '<p class="muted">Sin sesiones.</p>'}
-      </div></details><div id="sessionNotes-${stage.clave}"></div>
+      <section class="sessions-explorer" aria-label="Sesiones de la etapa">
+      <div class="heading"><h3>Sesiones (${sessions.length})</h3><div class="row">
+        <button class="alt" onclick="discoverSessionDialog('${stage.clave}')">Buscar sesiones en carpeta</button>
+        <button onclick="sessionDialog('${stage.clave}')">＋ Nueva sesión</button></div></div>
+      <div class="session-scroll"><table class="session-table"><thead><tr>
+        <th>Válida</th><th>Sesión</th><th>DAW</th><th>Estado</th><th>Acciones</th>
+      </tr></thead><tbody>
+        ${sessions.map(session => `<tr class="session-entry ${session.vigente ? 'valid-session' : ''}" data-session-row="${session.id}"
+            onclick="selectStageSession('${stage.clave}','${session.id}')">
+          <td onclick="event.stopPropagation()"><input type="checkbox" aria-label="Marcar ${esc(session.nombre)} como sesión válida"
+              ${session.vigente ? 'checked' : ''} onchange="setValidSession('${session.id}','${stage.clave}',this.checked)"></td>
+          <td><button class="session-name" title="${esc(session.ruta)}" onclick="event.stopPropagation();selectStageSession('${stage.clave}','${session.id}')">◈ ${esc(session.nombre)}
+            <small>${/\.(cpr|rpp|ptx|als|song|flp|npr|wpr)$/i.test(session.ruta) ? esc(session.ruta.split(/[\\/]/).pop()) : ''}</small></button></td>
+          <td>${esc(session.daw || '—')}</td><td>${session.vigente ? '<strong class="mint">Validada ✓</strong>' : ''}
+              <small>${session.disponible ? 'Disponible' : 'Ruta no disponible'}</small></td>
+          <td onclick="event.stopPropagation()"><div class="row session-actions">
+            <button class="alt" ${session.abrible ? '' : 'disabled'} onclick="openDawSession('${session.id}')">Abrir en DAW</button>
+            <button class="alt" onclick="sessionDialog('${stage.clave}','${session.id}')">Nueva sesión basada en esta</button>
+          </div></td>
+        </tr>`).join('') || '<tr><td colspan="5" class="muted">Todavía no hay sesiones en esta etapa.</td></tr>'}
+      </tbody></table></div></section>
+      <div id="sessionNotes-${stage.clave}"></div>
+      ${audioFilesMarkup(files)}
       <h3>Archivos de la etapa (${files.length})</h3><div class="file-table"><table><thead><tr><th>Nombre</th><th>Tipo</th><th>Fecha</th><th>Tamaño</th><th>Sesión</th><th>Acciones</th></tr></thead><tbody>
       ${files.map(file => `<tr><td title="${esc(file.ruta)}">${esc(file.nombre)}<small>${esc(file.modo)} · ${file.disponible ? 'Disponible' : 'No disponible'}</small></td><td>${esc(fileType(file.nombre))}</td>
       <td>${esc(file.creado)}</td><td>${file.tamano === null ? '—' : (file.tamano / 1024).toFixed(1) + ' KB'}</td><td>${esc(sessionName(file.sesion_id))}</td>
       <td>${file.disponible ? `<details><summary>⋯</summary><a href="/api/produccion/archivo/${file.id}" target="_blank" rel="noopener">Abrir / descargar</a><button class="alt" onclick="fileVersionDialog('${file.id}','${stage.clave}')">Registrar versión</button>
-      ${/\.(wav|mp3|flac|ogg|m4a)$/i.test(file.nombre) ? `<audio controls preload="none" src="/api/produccion/archivo/${file.id}"></audio>` : ''}</details>` : 'Ruta inaccesible'}</td></tr>`).join('')}
+</details>` : 'Ruta inaccesible'}</td></tr>`).join('')}
       </tbody></table></div>
       <label>Documentación y notas<textarea id="note-${stage.clave}">${esc(noteDrafts.get(draftKey(stage.clave)) ?? workflow.notas[stage.clave] ?? '')}</textarea></label>
       <button class="alt" onclick="saveStageNote('${stage.clave}')">Guardar nota</button><span id="noteStatus-${stage.clave}" role="status"></span>
@@ -274,6 +292,11 @@ window.addEventListener('beforeunload', event => {
 function selectStageSession(stage, identity) {
     selectedStageSessions.set(draftKey(stage), identity);
     $('targetSession-' + stage).value = identity;
+    document.querySelectorAll(`[data-stage-body="${stage}"] [data-session-row]`).forEach(row => {
+        row.classList.toggle('selected-session', row.dataset.sessionRow === identity);
+        const button = row.querySelector('.session-name');
+        if (button) button.setAttribute('aria-pressed', row.dataset.sessionRow === identity);
+    });
     const target = $('sessionNotes-' + stage);
     const session = workflow.sesiones.find(item => item.id === identity);
     if (!session) { target.replaceChildren(); return; }
@@ -293,9 +316,9 @@ function selectStageSession(stage, identity) {
         } catch (error) { report(error); }
     };
 }
-async function setValidSession(identity, stage) {
+async function setValidSession(identity, stage, active = true) {
     try {
-        await api('/api/produccion/' + currentSong.id + '/vigente/' + identity, body({}));
+        await api('/api/produccion/' + currentSong.id + '/vigente/' + identity, body({activa:active}));
         selectedStageSessions.set(draftKey(stage), identity);
         await openSong(currentSong.id);
     } catch (error) {
@@ -370,4 +393,18 @@ async function discoverSessionDialog(stage, baseId, folder = '') {
             if (initial) scan();
         });
     $('iterationSubmit').textContent = 'Vincular seleccionadas';
+}
+
+// Se muestran los dos macroprocesos como solapas. Sus etapas y borradores permanecen montados.
+function switchMacro(macro) {
+    activeMacro = macro;
+    document.querySelectorAll('[data-macro-panel]').forEach(panel => {
+        panel.hidden = panel.dataset.macroPanel !== macro;
+        if (panel.hidden) panel.querySelectorAll('audio').forEach(audio => audio.pause());
+    });
+    document.querySelectorAll('[data-macro-tab]').forEach(button => {
+        const selected = button.dataset.macroTab === macro;
+        button.setAttribute('aria-selected', selected);
+        button.setAttribute('aria-pressed', selected);
+    });
 }

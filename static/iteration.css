@@ -32,3 +32,26 @@
 .session-row input[type=radio],#discoveredSessions input[type=checkbox]{width:auto;margin:0 5px 0 0;accent-color:var(--mint)}
 .valid-session{border-color:var(--mint);background:#12434b}
 #discoveredSessions{max-height:36vh;overflow:auto}.session-row button:disabled{opacity:.45;cursor:default}
+
+/* Canción a ancho completo: un macroproceso visible a la vez. */
+#workflowPanels{display:block}
+.session-scroll{overflow-x:auto;max-height:360px;overflow-y:auto;border:1px solid var(--line);border-radius:10px}
+.session-table{border-collapse:collapse;width:100%;font-size:13px}
+.session-table th{position:sticky;top:0;background:#112b39;z-index:1}
+.session-table td,.session-table th{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left}
+.session-table td:first-child{width:45px;text-align:center}
+.session-table small{display:block;color:var(--muted)}
+.session-entry{cursor:pointer;background:#0c2431}.session-entry:hover{background:#173e4c}
+.session-entry.valid-session{background:#12434b}
+.session-entry.selected-session{box-shadow:inset 3px 0 0 var(--mint);outline:1px solid #4ed8c155;outline-offset:-1px}
+.session-table input[type=checkbox]{width:17px;height:17px;margin:0;accent-color:var(--mint)}
+.session-name{background:none;color:inherit;text-align:left;padding:0!important;margin:0;overflow-wrap:anywhere}
+.session-actions{flex-wrap:nowrap}.session-actions button{white-space:nowrap}
+#sessionNotes-demo,#sessionNotes-maqueta,#sessionNotes-grabacion,#sessionNotes-mezcla,#sessionNotes-mastering{margin-top:12px}
+.wave-track{border:1px solid var(--line);border-radius:10px;padding:12px;background:#0b2331;margin-bottom:10px}
+.wave-track-head{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:8px}
+.wave-track-head strong{overflow-wrap:anywhere}.wave-track small{color:var(--muted)}
+.wave-track audio{width:100%;max-width:390px;height:34px}
+.wave-seek{display:block;width:100%;height:90px;cursor:crosshair;background:#081c27;border-radius:7px;touch-action:pan-y}
+.wave-status{font-size:12px;display:block;margin-top:5px;color:var(--muted)}
+@media(max-width:700px){.session-actions{flex-wrap:wrap}.wave-track audio{max-width:none}.macro-panel{padding:12px}}
