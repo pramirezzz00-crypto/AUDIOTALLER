@@ -1,5 +1,8 @@
 import json
 from contextlib import contextmanager
+from migrations import migrate
+from management import register_management, save_roles
+from production import register_production
 from flask import Flask, jsonify, request, send_file
 from itsdangerous import BadSignature, URLSafeSerializer
 from pathlib import Path
@@ -10,20 +13,12 @@ ROOT = Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'AudioTaller'
 LIBRARY = ROOT / 'Artistas'
 DB = ROOT / 'audiotaller.sqlite3'
 STAGES = ('01. DEMO', '02. MAQUETADO', '03. GRABACIÓN', '04. PRODUCCIÓN')
-ATTACHMENT_FOLDERS = {
-    'demo': Path(STAGES[0]),
-    'maqueta': Path(STAGES[1]),
-    'grabacion': Path(STAGES[2]),
-    'mezcla': Path(STAGES[3]) / 'Mezcla',
-    'mastering': Path(STAGES[3]) / 'Mastering',
-    'produccion': Path(STAGES[3]),
-}
-
 @contextmanager
 def db_open():
     DB.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(DB)
     db.row_factory = sqlite3.Row
+    db.execute("PRAGMA foreign_keys=ON")
     db.executescript('''
     CREATE TABLE IF NOT EXISTS artistas(id TEXT PRIMARY KEY,nombre TEXT NOT NULL,tipo TEXT NOT NULL,carpeta TEXT NOT NULL,imagen TEXT DEFAULT '',creado TEXT DEFAULT CURRENT_TIMESTAMP);
     CREATE TABLE IF NOT EXISTS perfiles_artista(id TEXT PRIMARY KEY, datos TEXT NOT NULL);
@@ -35,6 +30,7 @@ def db_open():
     CREATE TABLE IF NOT EXISTS versiones(id TEXT PRIMARY KEY,sesion_id TEXT NOT NULL,ruta TEXT NOT NULL,comentario TEXT DEFAULT '',creado TEXT DEFAULT CURRENT_TIMESTAMP);
     ''')
     try:
+        migrate(db, DB)
         with db:
             yield db
     finally:
@@ -61,7 +57,7 @@ def guardar_artista(aid=None):
     name = data.get('nombre', '').strip()
     tipo = data.get('tipo', 'Artista')
     imagen = data.get('imagen', '')
-    if not name or len(name) > 150 or tipo not in ('Artista', 'Grupo', 'Banda'):
+    if not name or len(name) > 150 or not isinstance(tipo, str) or not tipo.strip() or len(tipo) > 80:
         return jsonify(error='Ingresá un nombre válido y elegí el tipo de artista.'), 400
     if imagen and (len(imagen) > 2_800_000 or not re.fullmatch(r'data:image/(png|jpeg);base64,[A-Za-z0-9+/=]+', imagen)):
         return jsonify(error='La imagen debe ser JPG o PNG de hasta 2 MB.'), 400
@@ -79,6 +75,7 @@ def guardar_artista(aid=None):
             folder.mkdir(parents=True, exist_ok=False)
             db.execute('INSERT INTO artistas(id,nombre,tipo,carpeta,imagen) VALUES(?,?,?,?,?)',
                        (aid, name, tipo, str(folder), imagen))
+        save_roles(db, aid, data.get('perfil', {}), tipo)
         db.execute('INSERT OR REPLACE INTO perfiles_artista VALUES(?,?)', (aid, json.dumps(data.get('perfil', {}))))
     return jsonify(id=aid), 200 if editing else 201
 
@@ -104,7 +101,8 @@ def artist_content(aid):
             """SELECT d.*, x.datos, x.creado, x.actualizado FROM discos d
                LEFT JOIN detalle_disco x ON x.id=d.id WHERE d.artista_id=?""", (aid,))]
         songs = [dict(row) for row in db.execute(
-            """SELECT c.*, x.datos FROM canciones c LEFT JOIN detalle_cancion x ON x.id=c.id
+            """SELECT c.*, x.datos, e.estado, e.actualizado FROM canciones c LEFT JOIN detalle_cancion x ON x.id=c.id
+               LEFT JOIN estado_cancion e ON e.id=c.id
                WHERE c.artista_id=? ORDER BY c.creado, c.id""", (aid,))]
     for row in albums + songs:
         row.update(json.loads(row.pop('datos') or '{}'))
@@ -197,46 +195,6 @@ def song_stages(sid):
         result.extend({'etapa':label,'key':key,'adjuntos':label.lower() if key=='produccion' else key,'sesiones':[dict(x) for x in sessions if x['etapa']==label]} for label in labelstage)
     return jsonify(result)
 
-@app.post('/api/canciones/<sid>/sesiones')
-def session_new(sid):
-    data=request.get_json() or {};stage=data.get('etapa','')
-    if stage not in ('01. DEMO','02. MAQUETADO','03. GRABACIÓN','Mezcla','Mastering'):return jsonify(error='Etapa inválida.'),400
-    with db_open() as db:
-        song=db.execute('SELECT * FROM canciones WHERE id=?',(sid,)).fetchone()
-        if not song:return jsonify(error='Canción no encontrada.'),404
-        if data.get('ruta','').strip():folder=Path(data['ruta'].strip()).expanduser()
-        else:
-            sub='04. PRODUCCIÓN/'+stage if stage in ('Mezcla','Mastering') else stage
-            folder=Path(song['carpeta'])/sub/f'Sesión {uuid.uuid4().hex[:6]}'
-        folder.mkdir(parents=True,exist_ok=True);session_id=uuid.uuid4().hex
-        db.execute('INSERT INTO sesiones(id,cancion_id,etapa,daw,ruta,comentario) VALUES(?,?,?,?,?,?)',(session_id,sid,stage,data.get('daw',''),str(folder),data.get('comentario','')))
-    return jsonify(id=session_id),201
-
-@app.post('/api/canciones/<sid>/adjuntos/<path:stage>')
-def attachment(sid,stage):
-    stage_folder = ATTACHMENT_FOLDERS.get(stage)
-    if stage_folder is None:
-        return jsonify(error='Etapa inválida.'), 400
-    file=request.files.get('file')
-    if not file:return jsonify(error='No se recibió el archivo.'),400
-    with db_open() as db:song=db.execute('SELECT * FROM canciones WHERE id=?',(sid,)).fetchone()
-    if not song:return jsonify(error='Canción no encontrada.'),404
-    folder=Path(song['carpeta'])/stage_folder/'Adjuntos';folder.mkdir(parents=True,exist_ok=True)
-    target=folder/f'{uuid.uuid4().hex[:6]}-{safe_name(file.filename)}';file.save(target)
-    return jsonify(ruta=str(target)),201
-
-@app.post('/api/sesiones/<session_id>/versiones')
-def version_new(session_id):
-    data=request.get_json() or {}
-    with db_open() as db:
-        original=db.execute('SELECT * FROM sesiones WHERE id=?',(session_id,)).fetchone()
-        if not original:return jsonify(error='Sesión no encontrada.'),404
-        vid=uuid.uuid4().hex;folder=Path(original['ruta']).parent/f'{Path(original["ruta"]).name}_v{vid[:5]}';folder.mkdir(parents=True,exist_ok=False)
-        db.execute('INSERT INTO versiones(id,sesion_id,ruta,comentario) VALUES(?,?,?,?)',(vid,session_id,str(folder),data.get('comentario','')))
-        # Cada versión queda registrada como sesión independiente para tener su nota visible.
-        db.execute('INSERT INTO sesiones(id,cancion_id,etapa,daw,ruta,comentario) VALUES(?,?,?,?,?,?)',(vid,original['cancion_id'],original['etapa'],original['daw'],str(folder),data.get('comentario','')))
-    return jsonify(id=vid),201
-
 # Arreglos reproduce los archivos de audio existentes, sin interpretar sesiones del DAW.
 AUDIO_TYPES = {
     '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.flac': 'audio/flac',
@@ -262,10 +220,13 @@ def arrangement_folders(sid):
         if not song:
             return None
         sessions = db.execute('SELECT ruta, etapa, daw FROM sesiones WHERE cancion_id=?', (sid,)).fetchall()
+        linked_files = db.execute("SELECT ruta, etapa FROM archivos WHERE cancion_id=? AND modo='vinculado'", (sid,)).fetchall()
         versions = db.execute("""SELECT v.ruta, s.etapa, s.daw FROM versiones v
             JOIN sesiones s ON s.id=v.sesion_id WHERE s.cancion_id=?""", (sid,)).fetchall()
     folders = [(row['ruta'], ' · '.join(filter(None, (row['etapa'], row['daw']))))
                for row in [*sessions, *versions] if row['ruta']]
+    folders.extend((row['ruta'], 'Archivo vinculado · ' + row['etapa'])
+                   for row in linked_files if Path(row['ruta']).suffix.lower() in AUDIO_TYPES)
     if song['carpeta']:
         folders.append((song['carpeta'], 'Carpeta de la canción'))
     return folders
@@ -286,6 +247,12 @@ def arrangements_takes(sid):
             root = Path(stored).resolve(strict=True)
             # Algunas sesiones vinculadas guardan el archivo del DAW, no su carpeta.
             if root.is_file():
+                if root.suffix.lower() in AUDIO_TYPES:
+                    if root not in seen_files:
+                        seen_files.add(root)
+                        takes.append(dict(nombre=root.name, origen=label, carpeta='.',
+                                          token=take_tokens.dumps(str(root))))
+                    continue
                 root = root.parent
             if not root.is_dir():
                 missing.add(stored)
@@ -332,6 +299,9 @@ def arrangements_audio(token):
         pass
     return jsonify(error='El archivo ya no está disponible.'), 404
 
+
+register_management(app, db_open)
+register_production(app, db_open, safe_name)
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1',port=5000,debug=False)

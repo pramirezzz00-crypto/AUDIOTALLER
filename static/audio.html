@@ -10,7 +10,7 @@
 .social-links a,.social-preview{color:var(--mint);overflow-wrap:anywhere}.social-links:not(:empty){margin-bottom:16px}.social-links a{padding:5px 8px;border:1px solid var(--line);border-radius:8px}
 .social-badge{display:inline-flex;align-items:center;gap:2px}.social-badge button{margin:0;padding:5px}.social-links .social-icon{display:inline-flex;padding:7px;color:#fff;background:var(--brand,#214557)}.social-icon svg{width:22px;height:22px;display:block}
 .profile-image{width:100%;max-height:220px;object-fit:cover;border-radius:10px}dt{color:var(--muted);margin-top:10px}dd{margin:3px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}#profileMembers fieldset{margin-bottom:14px}
-</style><link rel="stylesheet" href="/static/projects.css"><link rel="stylesheet" href="/static/artists.css">
+</style><link rel="stylesheet" href="/static/projects.css"><link rel="stylesheet" href="/static/artists.css"><link rel="stylesheet" href="/static/iteration.css">
 <header class="app-brand"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M2 16h4l3-8 4 16 4-21 4 26 4-15 2 2h3"/></svg> AudioTaller</header>
 <aside class="sidebar" aria-label="Navegación">
   <button aria-label="Inicio" id="sideHome" onclick="go('home')">⌂ <span>Inicio</span></button>
@@ -32,12 +32,18 @@
     <article class="card action"><div class="symbol"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M11 23V8l16-4v15M11 12l16-4"/><ellipse cx="7" cy="24" rx="4" ry="3"/><ellipse cx="23" cy="20" rx="4" ry="3"/></svg></div><h2>Gestión de proyectos por artistas</h2><p class="muted">Administrá discos, EP, singles y canciones.</p><button onclick="go('projectManager')">Gestionar proyectos</button></article>
   </div>
 </section>
+<div id="moduleTabs" class="module-tabs" hidden>
+  <button class="alt" id="peopleTab" onclick="go('manager')">♧ Artistas</button>
+  <button class="alt" id="productionsTab" onclick="go('projectManager')">◉ Proyectos</button>
+</div>
 <section id="manager" hidden>
   <div class="heading"><div><h1 id="managerTitle">Gestión de artistas</h1><p id="managerDescription" class="muted"></p></div><button onclick="editArtist()">＋ Nuevo artista</button></div>
   <div class="filters"><input id="query" aria-label="Buscar" placeholder="Buscar artista, disco o canción…" oninput="loadLibrary()">
   <select id="typeFilter" aria-label="Tipo" onchange="loadLibrary()"><option value="">Todos los tipos</option><option>Artista</option><option>Grupo</option><option>Banda</option></select>
   <select id="sort" aria-label="Orden" onchange="loadLibrary()"><option value="asc">A–Z</option><option value="desc">Z–A</option><option value="new">Más recientes</option><option value="old">Más antiguos</option></select><button class="alt" id="artistGrid" onclick="setArtistView(false)" aria-label="Cuadrícula">▦</button><button class="alt" id="artistList" onclick="setArtistView(true)" aria-label="Lista">☰</button></div>
-  <div id="library" class="tiles"></div><p id="count" class="muted"></p>
+  <div id="categoryChips" class="row chips"></div>
+  <div class="people-layout"><div><div id="library" class="tiles"></div><p id="count" class="muted"></p></div>
+  <aside id="personPreview" class="card" hidden></aside></div>
 </section>
 <section id="profile" hidden>
   <div class="project-head">
@@ -64,7 +70,12 @@
       <h2>Información principal</h2>
       <label id="photoZone" class="drop-zone">Arrastrá una imagen acá o elegí un archivo (JPG o PNG, hasta 2 MB)<input id="photo" type="file" accept="image/jpeg,image/png"><span id="photoStatus" class="file-status" role="status"></span></label><img id="preview" hidden alt="Imagen del artista">
       <label>Nombre *<input name="nombre" required maxlength="150"></label>
-      <label>Tipo *<select name="tipo"><option>Artista</option><option>Grupo</option><option>Banda</option></select></label>
+      <label>Clasificación principal *<select name="tipo" id="primaryRole"></select></label>
+      <label>Roles adicionales (selección múltiple)<select id="extraRoles" multiple size="5"></select></label>
+      <label>Instrumentos (separados por comas)<input name="instrumentos" list="instrumentSuggestions"></label>
+      <datalist id="instrumentSuggestions"><option>Voz</option><option>Guitarra acústica</option><option>Guitarra eléctrica</option><option>Bajo eléctrico</option><option>Batería</option><option>Piano</option><option>Violín</option></datalist>
+      <label>Especialidades (separadas por comas)<input name="especialidades" list="specialtySuggestions"></label>
+      <datalist id="specialtySuggestions"><option>Grabación</option><option>Edición</option><option>Mezcla</option><option>Mastering</option><option>Producción artística</option></datalist>
       <label>Formación<input name="formacion"></label>
       <label>Año de inicio<input name="anio" type="number" min="1" max="9999"></label>
       <label>Estado<select name="estado"><option>Activo</option><option>En pausa</option><option>Inactivo</option></select></label>
@@ -108,7 +119,28 @@
   <p id="projectFormError" role="alert"></p>
   <div class="form-actions"><button type="button" class="alt" onclick="document.getElementById('projectDialog').close()">Cancelar</button><button>Guardar</button></div>
 </form></dialog>
-<div id="albumPane" class="card wide" hidden><div class="back" onclick="back()">← Artista</div><h2 id="albumTitle"></h2><div class="row"><input id="songTitle" placeholder="Título de canción"><button onclick="newSong(currentAlbum.id)">＋ Canción</button></div><div id="albumSongs" class="list"></div></div><div id="songPane" class="card wide" hidden><div class="back" onclick="back()">← Canciones</div><h2 id="songHeading"></h2><p class="muted">Flujo de producción</p><div id="stages" class="grid"></div></div>
+<div id="albumPane" class="card wide" hidden><div class="back" onclick="back()">← Artista</div><h2 id="albumTitle"></h2><div class="row"><input id="songTitle" placeholder="Título de canción"><button onclick="newSong(currentAlbum.id)">＋ Canción</button></div><div id="albumSongs" class="list"></div></div><section id="songPane" hidden>
+  <div class="heading"><h1 id="songHeading"></h1><div>
+    <button class="alt" onclick="editProductionSong()">Editar canción</button>
+    <button onclick="sessionDialog()">Vincular sesión DAW</button>
+  </div></div>
+  <div id="songSummary" class="card song-summary"></div>
+  <div class="workflow-layout">
+    <aside id="songOverview" class="card"></aside>
+    <div id="workflowPanels" class="macro-layout"></div>
+  </div>
+  <details class="card"><summary>Historial de producción</summary><div id="songHistory"></div></details>
+</section>
+<section id="globalProjects" hidden>
+  <div class="heading"><div><h1>Proyectos</h1><p class="muted">Todos los discos y canciones de tu biblioteca.</p></div></div>
+  <div class="filters"><input id="globalSearch" type="search" placeholder="Buscar disco, canción, artista o tipo…" oninput="renderGlobalProjects()">
+    <select id="globalKind" onchange="renderGlobalProjects()"><option value="">Todos</option><option value="discos">Discos</option><option value="sueltas">Canciones sueltas</option></select>
+  </div>
+  <div id="globalCards" class="tiles"></div>
+</section>
+<dialog id="iterationDialog" class="card"><form id="iterationForm"><h2 id="iterationTitle"></h2><div id="iterationFields"></div>
+  <p id="iterationError" role="alert"></p><div class="form-actions"><button type="button" class="alt" onclick="closeIterationDialog()">Cancelar</button><button id="iterationSubmit">Guardar</button></div>
+</form></dialog>
 <section id="arrangements" hidden>
   <h1>Arreglos</h1><p class="muted">Escuchá las tomas de una canción sin abrir el DAW.</p>
   <div class="grid">
@@ -123,4 +155,4 @@
     </article>
   </div>
 </section>
-</main><script src="/static/navigation.js"></script><script src="/static/projects.js"></script><script src="/static/arrangements.js"></script></html>
+</main><script src="/static/navigation.js"></script><script src="/static/projects.js"></script><script src="/static/arrangements.js"></script><script src="/static/management-ui.js"></script><script src="/static/workflow.js"></script></html>

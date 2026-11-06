@@ -1,13 +1,18 @@
-async function openAlbum(id){currentAlbum=await api('/api/discos/'+id);$('albumTitle').textContent='💿 '+currentAlbum.nombre;go('albumPane');let ss=await api('/api/discos/'+id+'/canciones');$('albumSongs').innerHTML=ss.map(songRow).join('')||'<p class="muted">Disco vacío.</p>'}function songRow(s){return `<div class="item"><b>♫ ${esc(s.titulo)}</b><button onclick="openSong('${s.id}')">Producción</button></div>`}async function openSong(id){currentSong=await api('/api/canciones/'+id);$('songHeading').textContent=currentSong.titulo;go('songPane');let stages=await api('/api/canciones/'+id+'/etapas');$('stages').innerHTML=stages.map(s=>`<div class="card"><h3>${esc(s.etapa)}</h3><div class="row"><button onclick="newSession('${s.etapa}')">Nueva sesión</button></div><label class="drop-zone" data-attachment="${s.adjuntos}">Arrastrá archivos acá o elegilos<input type="file" multiple><span class="file-status" role="status"></span></label><div class="list">${s.sesiones.map(x=>`<div class="item"><div><b>${esc(x.daw||'Archivo')}</b><div class="muted">${esc(x.ruta)} ${esc(x.comentario)}</div></div><button class="alt" onclick="version('${x.id}')">Nueva versión</button></div>`).join('')}</div></div>`).join(''); bindAttachments(id)}async function newSession(stage){let daw=prompt('DAW (Cubase, REAPER, WaveLab u otro)');if(!daw)return;let path=prompt('Ubicación de carpeta de sesión. Dejá vacío para crearla dentro del artista.','');let comment=prompt('Notas o cambios iniciales:')||'';try{await api('/api/canciones/'+currentSong.id+'/sesiones',body({etapa:stage,daw,ruta:path,comentario:comment}));openSong(currentSong.id)}catch(e){alert(e.message)}}async function version(id){let comentario=prompt('Describe los cambios de esta versión:')||'';try{await api('/api/sesiones/'+id+'/versiones',body({comentario}));openSong(currentSong.id)}catch(e){alert(e.message)}}
+async function openAlbum(id){currentAlbum=await api('/api/discos/'+id);$('albumTitle').textContent='💿 '+currentAlbum.nombre;go('albumPane');let ss=await api('/api/discos/'+id+'/canciones');$('albumSongs').innerHTML=ss.map(songRow).join('')||'<p class="muted">Disco vacío.</p>'}function songRow(s){return `<div class="item"><b>♫ ${esc(s.titulo)}</b><button onclick="openSong('${s.id}')">Producción</button></div>`}async function version(id){let comentario=prompt('Describe los cambios de esta versión:')||'';try{await api('/api/sesiones/'+id+'/versiones',body({comentario}));openSong(currentSong.id)}catch(e){alert(e.message)}}
 const $ = id => document.getElementById(id);
 let artist, currentAlbum, currentSong, editing, photo, selectedPhoto;
 let previewUrl;
-const pages = ['home', 'manager', 'profile', 'editor', 'artistPane', 'albumPane', 'songPane', 'arrangements'];
+const pages = ['home', 'manager', 'profile', 'editor', 'artistPane', 'albumPane', 'songPane', 'arrangements', 'globalProjects'];
 const trail = ['home'];
 function display() {
     const page = trail.at(-1);
-    const visible = page === 'projectManager' ? 'manager' : page;
+    const visible = page === 'projectManager' ? 'globalProjects' : page;
     pages.forEach(id => { $(id).hidden = id !== visible; });
+    $('moduleTabs').hidden = !['manager', 'projectManager'].includes(page);
+    $('peopleTab').setAttribute('aria-pressed', page === 'manager');
+    $('productionsTab').setAttribute('aria-pressed', page === 'projectManager');
+    if (page === 'projectManager') loadGlobalProjects();
+    if (page !== 'songPane') document.querySelectorAll('#songPane audio').forEach(audio => audio.pause());
     $('nav').hidden = page === 'home';
     $('sideHome').setAttribute('aria-current', page === 'home' ? 'page' : 'false');
     $('sideArtists').setAttribute('aria-current', ['home', 'arrangements'].includes(page) ? 'false' : 'page');
@@ -18,6 +23,7 @@ function display() {
     const artistLabel = ['profile', 'artistPane', 'editor', 'songPane'].includes(page) && artist ? ' › ' + esc(artist.nombre) : '';
     $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="openArtistManager(${projectPath})">${manager}</button>${artistLabel}`;
     if (page === 'arrangements') $('crumbPath').innerHTML = '<button onclick="go(\'home\')">Inicio</button> › Arreglos';
+    if (page === 'songPane' && currentSong) songBreadcrumbs();
     $('error').textContent = '';
     window.scrollTo(0, 0);
     if (page === 'profile' && artist) renderProfile();
@@ -29,11 +35,15 @@ function display() {
     }
 }
 function go(page) {
+    if (trail.at(-1) === 'songPane' && page !== 'songPane' && hasUnsavedSongNotes() &&
+        !confirm('Hay notas sin guardar. Se conservarán como borrador mientras esta ventana siga abierta. ¿Querés continuar?')) return;
     if (page === 'home') trail.splice(1);
     else if (trail.at(-1) !== page) trail.push(page);
     display();
 }
 function back() {
+    if (trail.at(-1) === 'songPane' && hasUnsavedSongNotes() &&
+        !confirm('Hay notas sin guardar. Se conservarán como borrador mientras esta ventana siga abierta. ¿Querés volver?')) return;
     if (trail.length > 1) trail.pop();
     display();
 }
@@ -75,13 +85,21 @@ async function loadLibrary() {
     const page = trail.at(-1);
     const projects = page === 'projectManager';
     const query = $('query').value.trim();
-    $('query').placeholder = projects ? 'Buscar artista, disco o canción…' : 'Buscar artista, grupo o banda…';
+    $('query').placeholder = projects ? 'Buscar artista, disco o canción…' : 'Buscar nombre, grupo, instrumento o especialidad…';
     try {
-        let rows = await api('/api/biblioteca?q=' + encodeURIComponent(projects ? query : ''));
+        let rows = await api('/api/personas');
+        peopleCache = rows;
+        await renderCategoryChips();
+        const typeFilter = $('typeFilter');
+        const oldFilter = typeFilter.value;
+        typeFilter.innerHTML = '<option value="">Todas las clasificaciones</option>' + categoryNames.map(name => '<option>' + esc(name) + '</option>').join('');
+        typeFilter.value = oldFilter;
         if (sequence !== searchSequence || page !== trail.at(-1)) return;
         const hasArtists = rows.length > 0;
-        if (!projects) rows = rows.filter(row => projectText(row.nombre).includes(projectText(query)));
-        rows = rows.filter(row => !$('typeFilter').value || row.tipo === $('typeFilter').value);
+        rows = rows.filter(row => projectText([row.nombre, ...row.roles, ...row.instrumentos,
+            ...row.especialidades, ...row.participaciones.map(p => p.grupo)].join(' ')).includes(projectText(query)));
+        if (activeCategory) rows = rows.filter(row => row.roles.includes(activeCategory));
+        rows = rows.filter(row => !$('typeFilter').value || row.roles.includes($('typeFilter').value));
         const order = $('sort').value;
         rows.sort((a, b) => {
             const name = a.nombre.localeCompare(b.nombre, 'es');
@@ -91,9 +109,9 @@ async function loadLibrary() {
         setArtistView(compactArtists);
         $('library').innerHTML = rows.map(row => `
             <article class="card tile artist-tile">
-              <button class="artist-open" onclick="openArtist('${row.id}', ${projects})">
+              <button class="artist-open" onclick="selectPerson('${row.id}')">
                 <span class="cover">${projectImage(row.imagen, artistInitials(row.nombre))}</span>
-                <span class="tile-body"><strong>${esc(row.nombre)}</strong><span class="muted">${esc(row.tipo)}</span><small>${artistTotals(row)}</small></span>
+                <span class="tile-body"><strong>${esc(row.nombre)}</strong><span class="muted">${esc(row.roles.join(' · '))}</span><small>${esc([...row.instrumentos,...row.especialidades].join(' · '))}</small><small>${artistTotals(row)}</small></span>
               </button>
               <details><summary aria-label="Opciones de ${esc(row.nombre)}">•••</summary>
                 <button class="alt" onclick="editArtist('${row.id}')">Editar artista</button>
@@ -127,6 +145,7 @@ function addMember(member = {}) {
 }
 async function editArtist(id, addContact = false) {
     const data = id ? await api('/api/artistas/' + id) : {};
+    const professional = id ? await api('/api/personas/' + id) : null;
     editing = id;
     photo = data.imagen || '';
     selectedPhoto = null;
@@ -134,11 +153,12 @@ async function editArtist(id, addContact = false) {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = null;
     $('artistForm').reset();
+    await setupProfessionalForm(data, professional);
     $('members').replaceChildren();
     const {integrantes = [], redesSociales = [], ...profile} = data.perfil || {};
     for (const [key, value] of Object.entries({...profile, nombre: data.nombre || '', tipo: data.tipo || 'Artista'})) {
         const field = $('artistForm').elements.namedItem(key);
-        if (field) field.value = value;
+        if (field && !['instrumentos','especialidades','tipo'].includes(key)) field.value = value;
     }
     integrantes.forEach(addMember);
     $('legacySocial').hidden = !profile.redes;
@@ -161,6 +181,9 @@ async function saveArtist(event) {
     button.disabled = true;
     try {
         const {nombre, tipo, ...perfil} = Object.fromEntries(new FormData(event.target));
+        perfil.roles = [...new Set([tipo, ...Array.from($('extraRoles').selectedOptions, option => option.value)])];
+        perfil.instrumentos = splitTags(perfil.instrumentos);
+        perfil.especialidades = splitTags(perfil.especialidades);
         perfil.integrantes = [...$('members').children].map(block =>
             Object.fromEntries([...block.querySelectorAll('input')].map(input => [input.dataset.key,input.value.trim()]))
         ).filter(member => Object.values(member).some(Boolean));
@@ -178,6 +201,8 @@ async function saveArtist(event) {
                 reader.readAsDataURL(file);
             });
         }
+        const previousProfile = editing ? (await api('/api/artistas/' + editing)).perfil : {};
+        Object.assign(perfil, {...previousProfile, ...perfil});
         await api('/api/artistas' + (editing ? '/' + editing : ''), body({nombre,tipo,perfil,imagen:photo}));
         if (editing) {
             if (artist?.id === editing) {

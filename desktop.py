@@ -25,7 +25,14 @@ def main():
 
     # pywebview sirve Flask en una dirección local y muestra la misma página
     # de bienvenida dentro de la ventana. Al cerrarla termina el proceso.
-    webview.create_window("AudioTaller", app, width=1000, height=700)
+    class Dialogs:
+        # Se devuelve la ubicación elegida, sin copiar ni mover el archivo.
+        def choose_path(self, folder=False):
+            kind = webview.FileDialog.FOLDER if folder else webview.FileDialog.OPEN
+            result = webview.windows[0].create_file_dialog(kind, allow_multiple=False)
+            return result[0] if result else ''
+
+    webview.create_window("AudioTaller", app, width=1280, height=800, js_api=Dialogs())
     webview.start(gui="edgechromium", debug=False)
 
 

@@ -31,7 +31,7 @@ const projectImage = (url, fallback) => /^data:image\/(png|jpeg);base64,/.test(u
 const projectType = album => album.tipo || 'Álbum';
 const projectText = value => String(value || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 const albumTracks = id => projects.canciones.filter(song => song.disco_id === id);
-const trackCount = songs => countLabel(songs.length, 'canción', 'canciones');
+const trackCount = songs => countLabel(Array.isArray(songs) ? songs.length : songs, 'canción', 'canciones');
 
 function selectProject(id) {
     selectedProject = id;
@@ -90,6 +90,7 @@ function renderProjectDetail(album, songs, total) {
     <div class="heading"><h3>♫ Canciones (${songs.length})</h3><button class="alt" onclick="projectForm('song', '${album?.id || ''}')">＋ Agregar canción</button></div>
     <div class="list">${songs.map(song => `<button class="alt project-track" onclick="openSong('${song.id}')">
       <span>${song.pista ? String(song.pista).padStart(2, '0') : '—'}</span><span>${esc(song.titulo)}</span>
+      <span class="muted">${esc(song.estado || 'En producción')}<small>${esc(song.actualizado || '')}</small></span>
       ${song.duracion ? `<span>${esc(song.duracion)}</span>` : ''}<span title="Abrir producción">›</span></button>`).join('') ||
       '<p class="muted">Todavía no hay canciones.</p>'}</div>`;
 }
