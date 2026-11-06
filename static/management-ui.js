@@ -159,6 +159,7 @@ let dialogDirty = false;
 function formDialog(title, fields, save, prepare) {
     const dialog = $('iterationDialog');
     $('iterationTitle').textContent = title;
+    $('iterationSubmit').textContent = 'Guardar';
     $('iterationFields').innerHTML = fields;
     $('iterationError').textContent = '';
     dialogDirty = false;

@@ -27,3 +27,8 @@
 #iterationDialog input[type=checkbox]{width:auto}#iterationError{color:#ffada9}
 @media(max-width:1250px){.workflow-layout{grid-template-columns:1fr}#songOverview{display:none}.macro-panel h2{font-size:19px}}
 @media(max-width:980px){.people-layout,.macro-layout{grid-template-columns:1fr}#personPreview{position:static;max-height:none}}
+
+/* La marca válida es exclusiva por etapa, independiente del DAW principal. */
+.session-row input[type=radio],#discoveredSessions input[type=checkbox]{width:auto;margin:0 5px 0 0;accent-color:var(--mint)}
+.valid-session{border-color:var(--mint);background:#12434b}
+#discoveredSessions{max-height:36vh;overflow:auto}.session-row button:disabled{opacity:.45;cursor:default}

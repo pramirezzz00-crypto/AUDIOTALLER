@@ -8,6 +8,11 @@ from management import required_row
 from migrations import LEGACY_STAGE
 
 
+# Extensiones de proyecto. El lanzador solo abre archivos de estos tipos mediante Windows.
+DAW_PROJECTS = {'.cpr':'Cubase', '.rpp':'Reaper', '.ptx':'Pro Tools', '.als':'Ableton Live',
+                '.song':'Studio One', '.flp':'FL Studio', '.npr':'Nuendo', '.wpr':'WaveLab'}
+
+
 def register_production(app, connect, safe_name):
     @app.before_request
     def validate_json_payload():
@@ -78,8 +83,12 @@ def register_production(app, connect, safe_name):
             sessions = [dict(row) for row in db.execute("""SELECT s.*, i.nombre,i.principal,i.modo
                 FROM sesiones s LEFT JOIN sesion_info i ON i.id=s.id
                 WHERE s.cancion_id=? ORDER BY s.creado DESC,s.rowid DESC""", (sid,))]
+            valid = {row['etapa']:row['sesion_id'] for row in db.execute(
+                'SELECT etapa,sesion_id FROM sesion_vigente WHERE cancion_id=?', (sid,))}
             for session in sessions:
                 session['etapa'] = stage_row(db, session['etapa'])['clave']
+                session['vigente'] = valid.get(session['etapa']) == session['id']
+                session['abrible'] = Path(session['ruta']).suffix.lower() in DAW_PROJECTS and Path(session['ruta']).is_file()
                 session['disponible'] = Path(session['ruta']).exists() if session['ruta'] else False
             files = [dict(row) for row in db.execute('SELECT * FROM archivos WHERE cancion_id=? ORDER BY creado DESC', (sid,))]
             for file in files:
@@ -141,6 +150,132 @@ def register_production(app, connect, safe_name):
             db.execute('UPDATE sesion_info SET principal=1 WHERE id=?', (identity,))
             log(db, sid, stage_row(db, session['etapa'])['clave'], 'DAW principal seleccionado', identity)
         return jsonify(ok=True)
+
+    def checked_session(db, sid, identity):
+        row = required_row(db, 'sesiones', identity)
+        if row['cancion_id'] != sid:
+            raise ValueError('La sesión no pertenece a esta canción.')
+        return row
+
+    @app.post('/api/produccion/<sid>/vigente/<identity>')
+    def valid_session(sid, identity):
+        with connect() as db:
+            session = checked_session(db, sid, identity)
+            stage = stage_row(db, session['etapa'])['clave']
+            db.execute('INSERT OR REPLACE INTO sesion_vigente VALUES(?,?,?)', (sid, stage, identity))
+            log(db, sid, stage, 'Sesión válida seleccionada', identity)
+        return jsonify(ok=True)
+
+    @app.post('/api/produccion/<sid>/sesiones/<identity>/notas')
+    def session_notes(sid, identity):
+        text = (request.get_json() or {}).get('texto', '')
+        with connect() as db:
+            session = checked_session(db, sid, identity)
+            db.execute('UPDATE sesiones SET comentario=? WHERE id=?', (text, identity))
+            log(db, sid, stage_row(db, session['etapa'])['clave'], 'Nota de sesión guardada', identity, text)
+        return jsonify(ok=True)
+
+    @app.post('/api/produccion/<sid>/sesiones/<identity>/abrir')
+    def open_daw(sid, identity):
+        with connect() as db:
+            session = checked_session(db, sid, identity)
+        path = local_path(session['ruta'])
+        if path.suffix.lower() not in DAW_PROJECTS or not path.is_file():
+            raise ValueError('Seleccioná un archivo de sesión DAW disponible, por ejemplo un .cpr.')
+        # startfile usa la asociación de Windows y recibe una ruta, sin construir comandos.
+        try:
+            os.startfile(str(path.resolve()))
+        except OSError as error:
+            raise ValueError('No se pudo abrir la sesión. Revisá la asociación del archivo con su DAW en Windows.') from error
+        return jsonify(ok=True)
+
+    def scan_daw_folder(folder, recursive):
+        if not folder.is_dir():
+            raise ValueError('La carpeta no está disponible. Revisá su ubicación o la unidad externa.')
+        root = folder.resolve()
+        results = []
+        inaccessible = []
+
+        def unreadable(error):
+            inaccessible.append(str(error.filename or root))
+
+        for directory, subdirs, files in os.walk(root, onerror=unreadable):
+            current = Path(directory)
+            subdirs[:] = [name for name in subdirs if not (current/name).is_symlink()
+                          and not (current/name).is_junction()]
+            if not recursive:
+                subdirs.clear()
+            for name in files:
+                path = current/name
+                daw = DAW_PROJECTS.get(path.suffix.lower())
+                if not daw:
+                    continue
+                try:
+                    path = path.resolve(strict=True)
+                    if not path.is_relative_to(root) or not path.is_file():
+                        continue
+                    stat = path.stat()
+                except OSError:
+                    inaccessible.append(str(path))
+                    continue
+                results.append(dict(ruta=str(path), nombre=path.stem, daw=daw,
+                                    modificado=stat.st_mtime, tamano=stat.st_size))
+        results.sort(key=lambda item: (-item['modificado'], item['ruta'].casefold()))
+        return results, inaccessible
+
+    @app.post('/api/produccion/<sid>/buscar-sesiones')
+    def discover_sessions(sid):
+        data = request.get_json() or {}
+        folder = local_path(data.get('ruta', ''))
+        if not isinstance(data.get('recursivo', False), bool):
+            raise ValueError('La opción de subcarpetas debe ser verdadera o falsa.')
+        with connect() as db:
+            required_row(db, 'canciones', sid)
+            stage = stage_row(db, data.get('etapa'))['clave']
+            existing = {str(Path(row['ruta']).resolve()).casefold():row['id'] for row in
+                        db.execute('SELECT ruta,id,etapa FROM sesiones WHERE cancion_id=?', (sid,))
+                        if stage_row(db, row['etapa'])['clave'] == stage}
+        found, inaccessible = scan_daw_folder(folder, data.get('recursivo', False))
+        for item in found:
+            item['registrada'] = existing.get(item['ruta'].casefold())
+        return jsonify(sesiones=found, inaccesibles=len(inaccessible))
+
+    @app.post('/api/produccion/<sid>/vincular-sesiones')
+    def register_discovered(sid):
+        data = request.get_json() or {}
+        folder = local_path(data.get('ruta', '')).resolve()
+        paths = data.get('archivos')
+        if not isinstance(paths, list) or not paths or not all(isinstance(path, str) for path in paths):
+            raise ValueError('Seleccioná las sesiones que querés vincular.')
+        # Revalida los archivos antes de escribir. Si uno dejó de existir, no registra un lote parcial.
+        candidates = []
+        for value in dict.fromkeys(paths):
+            path = local_path(value).resolve()
+            if not path.is_relative_to(folder) or not path.is_file() or path.suffix.lower() not in DAW_PROJECTS:
+                raise ValueError('Una sesión ya no está disponible o no pertenece a la carpeta elegida. Volvé a buscar.')
+            candidates.append(path)
+        with connect() as db:
+            required_row(db, 'canciones', sid)
+            stage = stage_row(db, data.get('etapa'))['clave']
+            # Reserva la escritura para que dos confirmaciones simultáneas no dupliquen sesiones.
+            db.execute('BEGIN IMMEDIATE')
+            existing = {str(Path(row['ruta']).resolve()).casefold():row['id'] for row in
+                        db.execute('SELECT ruta,id,etapa FROM sesiones WHERE cancion_id=?', (sid,))
+                        if stage_row(db, row['etapa'])['clave'] == stage}
+            identities = []
+            for path in candidates:
+                key = str(path).casefold()
+                if key in existing:
+                    identities.append(existing[key])
+                    continue
+                identity = uuid.uuid4().hex
+                db.execute('INSERT INTO sesiones(id,cancion_id,etapa,daw,ruta) VALUES(?,?,?,?,?)',
+                           (identity, sid, stage, DAW_PROJECTS[path.suffix.lower()], str(path)))
+                db.execute('INSERT INTO sesion_info(id,nombre,modo) VALUES(?,?,?)', (identity,path.stem,'vinculada'))
+                log(db, sid, stage, 'Sesión DAW asociada', identity, str(path))
+                existing[key] = identity
+                identities.append(identity)
+        return jsonify(ids=identities), 201
 
     @app.post('/api/produccion/<sid>/archivos/<stage_key>')
     def upload(sid, stage_key):

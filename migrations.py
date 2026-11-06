@@ -25,6 +25,7 @@ def migrate(db, database):
     with LOCK:
         exists = db.execute("SELECT 1 FROM sqlite_master WHERE name='schema_audio'").fetchone()
         if exists and db.execute('SELECT version FROM schema_audio').fetchone()[0] >= 1:
+            migrate_session_selection(db, database)
             return
         db.execute('BEGIN IMMEDIATE')
         backup = database.with_name(database.stem + '.respaldo-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
@@ -93,9 +94,32 @@ def migrate(db, database):
                         if file.is_file() and not file.is_symlink():
                             db.execute('INSERT OR IGNORE INTO archivos(id,cancion_id,etapa,nombre,ruta,modo) VALUES(?,?,?,?,?,?)',
                                        (uuid.uuid4().hex, song['id'], 'historico', file.name, str(file.resolve()), 'importado'))
-            db.execute('INSERT INTO schema_audio VALUES(1)')
+            db.execute('''CREATE TABLE sesion_vigente(
+                cancion_id TEXT REFERENCES canciones(id), etapa TEXT REFERENCES etapas(clave),
+                sesion_id TEXT NOT NULL REFERENCES sesiones(id), PRIMARY KEY(cancion_id,etapa))''')
+            db.execute('INSERT INTO schema_audio VALUES(2)')
             db.commit()
         except Exception:
             db.rollback()
             raise
 
+
+
+def migrate_session_selection(db, database):
+    """Guarda una sesión vigente por canción/etapa, con respaldo previo al cambio."""
+    if db.execute('SELECT version FROM schema_audio').fetchone()[0] >= 2:
+        return
+    db.execute('BEGIN IMMEDIATE')
+    backup = database.with_name(database.stem + '.respaldo-sesiones-' +
+                                datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
+    try:
+        with closing(sqlite3.connect(database)) as source, closing(sqlite3.connect(backup)) as target:
+            source.backup(target)
+        db.execute("""CREATE TABLE sesion_vigente(
+            cancion_id TEXT REFERENCES canciones(id), etapa TEXT REFERENCES etapas(clave),
+            sesion_id TEXT NOT NULL REFERENCES sesiones(id), PRIMARY KEY(cancion_id,etapa))""")
+        db.execute('UPDATE schema_audio SET version=2')
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise

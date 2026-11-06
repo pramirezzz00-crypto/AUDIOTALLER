@@ -1,6 +1,8 @@
 // Vista de canción. Cada macroproceso conserva sus controles al alternar etapas.
 let workflow;
 let songLoad = 0;
+const selectedStageSessions = new Map();
+const sessionDrafts = new Map();
 const activeStages = {pre:'demo', prod:'grabacion'};
 const noteDrafts = new Map();
 const stageDescriptions = {
@@ -80,18 +82,24 @@ function stageMarkup(stage) {
     const sessionName = id => workflow.sesiones.find(session => session.id === id)?.nombre || 'Sin sesión';
     return `<section data-stage-body="${stage.clave}" data-macro="${stage.macro}">
       <h3>${esc(stage.nombre)}</h3><p class="muted">${esc(stageDescriptions[stage.clave] || '')}</p>
-      <div class="row"><button onclick="sessionDialog('${stage.clave}')">＋ Nueva sesión</button>
+      <div class="row"><button class="alt" onclick="discoverSessionDialog('${stage.clave}')">Buscar sesiones en carpeta</button><button onclick="sessionDialog('${stage.clave}')">＋ Nueva sesión</button>
         <button class="alt" onclick="linkFileDialog('${stage.clave}')">Vincular archivo externo</button></div>
       <label>Sesión para los archivos nuevos<select id="targetSession-${stage.clave}"><option value="">Sin sesión específica</option>
         ${sessions.map(session => `<option value="${session.id}">${esc(session.nombre)}</option>`).join('')}</select></label>
       <label id="upload-${stage.clave}" class="drop-zone">Importar · Arrastrá archivos acá o elegilos
         <input type="file" multiple><span class="file-status" role="status">Se copiarán a AudioTaller conservando los originales.</span></label>
       <details ${sessions.length ? 'open' : ''}><summary>Sesiones (${sessions.length})</summary><div class="list">
-        ${sessions.map(session => `<div class="session-row"><strong>${esc(session.nombre)}</strong><span>${esc(session.daw || 'Sin DAW')} · ${esc(session.creado)}</span>
-        <small>${esc(session.ruta)} · ${session.disponible ? 'Disponible' : 'No disponible'} · ${esc(session.modo || 'Anterior')}</small>
-        <p>${esc(session.comentario)}</p><div class="row"><button class="alt" onclick="sessionDialog('${stage.clave}','${session.id}')">Nueva sesión basada en esta</button>
-        ${session.daw ? `<button class="alt" onclick="setMainSession('${session.id}')">${session.principal ? 'DAW principal ✓' : 'Usar como principal'}</button>` : ''}</div></div>`).join('') || '<p class="muted">Sin sesiones.</p>'}
-      </div></details>
+        ${sessions.map(session => `<div class="session-row ${session.vigente ? 'valid-session' : ''}">
+        <div class="row"><input type="radio" name="valid-${stage.clave}" aria-label="Marcar ${esc(session.nombre)} como sesión válida" ${session.vigente ? 'checked' : ''}
+          onchange="setValidSession('${session.id}','${stage.clave}')">
+        <button class="alt" onclick="selectStageSession('${stage.clave}','${session.id}')">${esc(session.nombre)}</button>
+        ${session.vigente ? '<strong class="mint">Válida ✓</strong>' : ''}</div>
+        <small>${esc(session.ruta)} · ${session.disponible ? 'Disponible' : 'No disponible'}</small>
+        <div class="row"><button class="alt" ${session.abrible ? '' : 'disabled'} onclick="openDawSession('${session.id}')">Abrir en el DAW</button>
+        <button class="alt" onclick="discoverSessionDialog('${stage.clave}','${session.id}')">Buscar sesiones junto a esta</button>
+        <button class="alt" onclick="sessionDialog('${stage.clave}','${session.id}')">Nueva sesión basada en esta</button>
+        ${session.daw ? `<button class="alt" onclick="setMainSession('${session.id}')">${session.principal ? 'DAW principal ✓' : 'DAW principal'}</button>` : ''}</div></div>`).join('') || '<p class="muted">Sin sesiones.</p>'}
+      </div></details><div id="sessionNotes-${stage.clave}"></div>
       <h3>Archivos de la etapa (${files.length})</h3><div class="file-table"><table><thead><tr><th>Nombre</th><th>Tipo</th><th>Fecha</th><th>Tamaño</th><th>Sesión</th><th>Acciones</th></tr></thead><tbody>
       ${files.map(file => `<tr><td title="${esc(file.ruta)}">${esc(file.nombre)}<small>${esc(file.modo)} · ${file.disponible ? 'Disponible' : 'No disponible'}</small></td><td>${esc(fileType(file.nombre))}</td>
       <td>${esc(file.creado)}</td><td>${file.tamano === null ? '—' : (file.tamano / 1024).toFixed(1) + ' KB'}</td><td>${esc(sessionName(file.sesion_id))}</td>
@@ -108,6 +116,15 @@ function bindStage(stage) {
         noteDrafts.set(draftKey(key), event.target.value);
         $('noteStatus-' + key).textContent = 'Sin guardar';
     };
+    const target = $('targetSession-' + key);
+    const sessions = workflow.sesiones.filter(session => session.etapa === key);
+    const saved = selectedStageSessions.get(draftKey(key));
+    const selected = sessions.find(session => session.id === saved) || sessions.find(session => session.vigente) || sessions[0];
+    if (selected) {
+        target.value = selected.id;
+        selectStageSession(key, selected.id);
+    }
+    target.onchange = () => selectStageSession(key, target.value);
     const songId = currentSong.id;
     let queue = Promise.resolve();
     bindDropZone($('upload-' + key), files => {
@@ -173,7 +190,21 @@ function sessionDialog(stage = activeStages.prod, baseId) {
           await openSong(currentSong.id);
       }, form => {
           $('pickDawFile').onclick = () => pickLocalPath(form.elements.ruta);
-          $('pickDawFolder').onclick = () => pickLocalPath(form.elements.ruta, true);
+          const discoverFolder = () => {
+              const path = form.elements.ruta.value.trim();
+              if (!path || /\.(cpr|rpp|ptx|als|song|flp|npr|wpr)$/i.test(path)) return;
+              if ((form.elements.nombre.value.trim() || form.elements.notas.value.trim()) &&
+                  !confirm('Para buscar sesiones vamos a abrir el explorador de carpeta. El nombre y las notas de este formulario no se guardarán. ¿Continuar?')) return;
+              const selectedStage = form.elements.etapa.value;
+              dialogDirty = false;
+              $('iterationDialog').close();
+              discoverSessionDialog(selectedStage, null, path);
+          };
+          $('pickDawFolder').onclick = async () => {
+              await pickLocalPath(form.elements.ruta, true);
+              discoverFolder();
+          };
+          form.elements.ruta.onchange = discoverFolder;
       });
 }
 function linkFileDialog(stage) {
@@ -230,7 +261,7 @@ function fileVersionDialog(identity, stage) {
 }
 
 function hasUnsavedSongNotes() {
-    return currentSong && [...noteDrafts.keys()].some(key => key.startsWith(currentSong.id + ':'));
+    return currentSong && ([...noteDrafts.keys()].some(key => key.startsWith(currentSong.id + ':')) || workflow?.sesiones.some(session => sessionDrafts.has(session.id)));
 }
 window.addEventListener('beforeunload', event => {
     if (hasUnsavedSongNotes() || dialogDirty) {
@@ -238,3 +269,105 @@ window.addEventListener('beforeunload', event => {
         event.returnValue = '';
     }
 });
+
+// La selección para consultar notas es independiente de la sesión válida de la etapa.
+function selectStageSession(stage, identity) {
+    selectedStageSessions.set(draftKey(stage), identity);
+    $('targetSession-' + stage).value = identity;
+    const target = $('sessionNotes-' + stage);
+    const session = workflow.sesiones.find(item => item.id === identity);
+    if (!session) { target.replaceChildren(); return; }
+    target.innerHTML = `<div class="card"><h3>Notas de ${esc(session.nombre)}</h3>
+        <p class="muted">${esc(session.daw || 'Sin DAW')} · Registrada: ${esc(session.creado)}</p>
+        <textarea aria-label="Notas de la sesión seleccionada">${esc(sessionDrafts.get(identity) ?? session.comentario)}</textarea>
+        <button class="alt">Guardar notas de esta sesión</button><span role="status"></span></div>`;
+    const textarea = target.querySelector('textarea');
+    textarea.oninput = () => { sessionDrafts.set(identity, textarea.value); };
+    target.querySelector('button').onclick = async () => {
+        const text = textarea.value;
+        try {
+            await api('/api/produccion/' + currentSong.id + '/sesiones/' + identity + '/notas', body({texto:text}));
+            session.comentario = text;
+            if (sessionDrafts.get(identity) === text) sessionDrafts.delete(identity);
+            target.querySelector('[role=status]').textContent = 'Notas guardadas';
+        } catch (error) { report(error); }
+    };
+}
+async function setValidSession(identity, stage) {
+    try {
+        await api('/api/produccion/' + currentSong.id + '/vigente/' + identity, body({}));
+        selectedStageSessions.set(draftKey(stage), identity);
+        await openSong(currentSong.id);
+    } catch (error) {
+        renderWorkflow();
+        report(error);
+    }
+}
+async function openDawSession(identity) {
+    try {
+        await api('/api/produccion/' + currentSong.id + '/sesiones/' + identity + '/abrir', body({}));
+    } catch (error) { report(error); }
+}
+
+async function discoverSessionDialog(stage, baseId, folder = '') {
+    const songId = currentSong.id;
+    const base = workflow.sesiones.find(session => session.id === baseId);
+    // Para un archivo vinculado, la exploración comienza en su carpeta contenedora.
+    let initial = folder || base?.ruta || '';
+    if (initial && /\.(cpr|rpp|ptx|als|song|flp|npr|wpr)$/i.test(initial)) initial = initial.replace(/[\\/][^\\/]+$/, '');
+    let discovered = [];
+    let generation = 0;
+    let scanParameters;
+    formDialog('Buscar y vincular sesiones DAW',
+        `<label>Carpeta local<input name="ruta" required value="${esc(initial)}" placeholder="Pegá la ruta de la carpeta de sesiones"></label>
+        <button class="alt" type="button" id="chooseSessionFolder">Elegir carpeta</button>
+        <label><input type="checkbox" name="recursivo"> Incluir subcarpetas</label>
+        <button class="alt" type="button" id="scanSessionFolder">Buscar sesiones</button>
+        <p class="muted">Se registran vínculos a los archivos elegidos. Marcá luego cuál es la sesión válida de esta etapa.</p>
+        <div id="discoveryStatus" role="status"></div><div id="discoveredSessions" class="list"></div>`,
+        async () => {
+            if (!scanParameters) throw Error('Primero buscá las sesiones de la carpeta.');
+            const checked = Array.from($('discoveredSessions').querySelectorAll('input:checked'), input => discovered[Number(input.value)].ruta);
+            if (!checked.length) throw Error('Marcá al menos una sesión nueva para vincular.');
+            const result = await api('/api/produccion/' + songId + '/vincular-sesiones', body({...scanParameters,archivos:checked}));
+            if (result.ids.length) selectedStageSessions.set(draftKey(stage), result.ids[0]);
+            await openSong(songId);
+        }, form => {
+            const resetResults = () => {
+                generation++;
+                scanParameters = null;
+                discovered = [];
+                $('discoveredSessions').replaceChildren();
+            };
+            const scan = async () => {
+                resetResults();
+                const request = generation;
+                const parameters = {ruta:form.elements.ruta.value, etapa:stage, recursivo:form.elements.recursivo.checked};
+                $('discoveryStatus').textContent = 'Buscando sesiones…';
+                try {
+                    const result = await api('/api/produccion/' + songId + '/buscar-sesiones', body(parameters));
+                    if (request !== generation || !$('iterationDialog').open) return;
+                    discovered = result.sesiones;
+                    scanParameters = parameters;
+                    $('discoveryStatus').textContent = discovered.length + ' sesiones encontradas' +
+                        (result.inaccesibles ? ' · Algunas ubicaciones no se pudieron leer.' : '');
+                    $('discoveredSessions').innerHTML = discovered.map((session,index) =>
+                        `<label class="session-row"><span><input type="checkbox" value="${index}" ${session.registrada ? 'disabled' : 'checked'}>
+                          ${esc(session.nombre)} ${session.registrada ? '· Ya vinculada' : ''}</span>
+                          <small>${esc(session.daw)} · Archivo modificado: ${new Date(session.modificado * 1000).toLocaleString()}<br>${esc(session.ruta)}</small></label>`).join('');
+                } catch (error) {
+                    if (request === generation) $('discoveryStatus').textContent = error.message;
+                }
+            };
+            $('chooseSessionFolder').onclick = async () => {
+                await pickLocalPath(form.elements.ruta, true);
+                if (form.elements.ruta.value.trim()) scan();
+            };
+            form.elements.ruta.oninput = resetResults;
+            form.elements.ruta.onchange = () => { if (form.elements.ruta.value.trim()) scan(); };
+            form.elements.recursivo.onchange = () => { if (form.elements.ruta.value.trim()) scan(); };
+            $('scanSessionFolder').onclick = scan;
+            if (initial) scan();
+        });
+    $('iterationSubmit').textContent = 'Vincular seleccionadas';
+}
