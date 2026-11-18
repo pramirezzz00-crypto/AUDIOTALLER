@@ -2,7 +2,7 @@ function songRow(s){return `<div class="item"><b>♫ ${esc(s.titulo)}</b><button
 const $ = id => document.getElementById(id);
 let artist, currentAlbum, currentSong, editing, photo, selectedPhoto;
 let previewUrl;
-const pages = ['home', 'manager', 'profile', 'editor', 'artistPane', 'albumPane', 'songPane', 'arrangements', 'globalProjects', 'catalogPane', 'playlistsPane'];
+const pages = ['home', 'manager', 'profile', 'editor', 'artistPane', 'albumPane', 'songPane', 'arrangements', 'globalProjects', 'catalogPane', 'playlistsPane', 'composition', 'beats', 'scores', 'lyrics', 'entidades'];
 const trail = ['home'];
 function display() {
     const page = trail.at(-1);
@@ -16,14 +16,24 @@ function display() {
     document.querySelectorAll('main audio').forEach(audio => audio.pause());
     $('nav').hidden = page === 'home';
     $('sideHome').setAttribute('aria-current', page === 'home' ? 'page' : 'false');
-    $('sideArtists').setAttribute('aria-current', ['home', 'arrangements', 'catalogPane', 'playlistsPane'].includes(page) ? 'false' : 'page');
+    $('sideArtists').setAttribute('aria-current', ['home', 'arrangements', 'catalogPane', 'playlistsPane', 'composition', 'beats', 'scores', 'lyrics', 'entidades'].includes(page) ? 'false' : 'page');
     $('sideArrangements').setAttribute('aria-current', page === 'arrangements' ? 'page' : 'false');
+    const compositionLabels = {composition:'Composición',beats:'Beats',scores:'Partituras',lyrics:'Letras'};
+    $('sideComposition').setAttribute('aria-current', compositionLabels[page] ? 'page' : 'false');
+    $('sideEntities').setAttribute('aria-current', page === 'entidades' ? 'page' : 'false');
     if (page !== 'arrangements') $('takePlayer').pause();
     const projectPath = trail.includes('projectManager');
     const manager = projectPath ? 'Gestión de producciones' : 'Gestión de artistas';
     const artistLabel = ['profile', 'artistPane', 'editor', 'songPane'].includes(page) && artist ? ' › ' + esc(artist.nombre) : '';
     $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="openArtistManager(${projectPath})">${manager}</button>${artistLabel}`;
     if (page === 'arrangements') $('crumbPath').innerHTML = '<button onclick="go(\'home\')">Inicio</button> › Arreglos';
+    if (compositionLabels[page]) {
+        $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="go('composition')">Composición</button>${page==='composition'?'':' › '+compositionLabels[page]}`;
+        if(page==='beats') loadBeats();
+        if(page==='scores') loadScores();
+        if(page==='lyrics') loadLyrics();
+    }
+    if(page==='entidades') $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › Entidades`;
     if (page === 'songPane' && currentSong && workflow) renderWorkflow();
     if (page === 'albumPane' && currentAlbum) renderAlbumPage();
     if (page === 'catalogPane') { $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › Catálogo`; loadCatalog(); }

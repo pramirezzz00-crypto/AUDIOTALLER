@@ -16,6 +16,8 @@
   <button aria-label="Inicio" id="sideHome" onclick="go('home')">⌂ <span>Inicio</span></button>
   <button aria-label="Artistas y producciones" id="sideArtists" onclick="openArtistManager()">♧ <span>Artistas y producciones</span></button>
   <button id="sideArrangements" aria-label="Arreglos" onclick="openArrangements()">♫ <span>Arreglos</span></button>
+  <button id="sideComposition" aria-label="Composición" onclick="go('composition')">✎ <span>Composición</span></button>
+  <button id="sideEntities" aria-label="Entidades" onclick="go('entidades')">▤ <span>Entidades</span></button>
   <button id="sidePlaylists" onclick="openPlaylists()">☷ <span>Playlist</span></button>
   <button id="sideCatalog" onclick="openCatalog()">◫ <span>Catálogo</span></button>
   <button aria-label="Recientes" disabled title="Pendiente">◷ <span>Recientes</span></button>
@@ -193,4 +195,79 @@
   <div id="songDataTabs" class="module-tabs" role="tablist"></div><div id="songDataFields"></div><p id="songDataError" role="alert"></p>
   <div class="form-actions"><a id="songDataExport" class="mint" target="_blank" rel="noopener">Exportar ficha guardada</a><button type="button" class="alt" onclick="closeSongData()">Cancelar</button><button id="saveSongData">Guardar todos los cambios</button></div></form></dialog>
 <dialog id="portalPreview" class="card portal-preview"><div class="heading"><h2>Vista previa de entrega</h2><button class="alt" onclick="closePortalPreview()">Cerrar</button></div><p class="muted">Vista local: requiere AudioTaller abierto. No es todavía un enlace público de Internet.</p><iframe id="portalFrame" title="Portal del artista" sandbox="allow-scripts allow-same-origin allow-forms allow-downloads"></iframe></dialog>
-</main><script src="/static/navigation.js"></script><script src="/static/projects.js"></script><script src="/static/arrangements.js"></script><script src="/static/management-ui.js"></script><script src="/static/waveforms.js"></script><script src="/static/workflow.js"></script><script src="/static/session-operations.js"></script><script src="/static/publication.js"></script><script src="/static/album.js"></script><link rel="stylesheet" href="/static/catalog.css"><script src="/static/song-data.js"></script><script src="/static/catalog-ui.js"></script><script src="/static/cloud-ui.js"></script></html>
+<section id="entidades" hidden>
+  <div class="heading"><div><h1>Entidades y sociedades de gestión</h1><p class="muted">Accesos para gestionar tus obras, interpretaciones, fonogramas y distribución.</p></div></div>
+  <div class="entities-grid">
+    <a class="card entity-card" href="https://www.sadaic.org.ar/" target="_blank" rel="noopener noreferrer" aria-label="Abrir sitio de SADAIC"><span class="entity-logo"><img src="/static/entities/sadaic.png" alt="SADAIC"></span><strong>SADAIC</strong><span class="muted">Autores y compositores</span><span class="mint">Abrir sitio ↗</span></a>
+    <a class="card entity-card" href="https://aadim.org.ar/" target="_blank" rel="noopener noreferrer" aria-label="Abrir sitio de AADI"><span class="entity-logo"><img src="/static/entities/aadi.png" alt="AADI"></span><strong>AADI</strong><span class="muted">Intérpretes y ejecutantes</span><span class="mint">Abrir sitio ↗</span></a>
+    <a class="card entity-card" href="https://www.capifsgc.org.ar/" target="_blank" rel="noopener noreferrer" aria-label="Abrir sitio de CAPIF SGC"><span class="entity-logo"><img src="/static/entities/capif.png" alt="CAPIF SGC"></span><strong>CAPIF SGC</strong><span class="muted">Productores fonográficos</span><span class="mint">Abrir sitio ↗</span></a>
+    <a class="card entity-card" href="https://inamu.musica.ar/" target="_blank" rel="noopener noreferrer" aria-label="Abrir sitio de INAMU"><span class="entity-logo"><img src="/static/entities/inamu.png" alt="INAMU"></span><strong>INAMU</strong><span class="muted">Registro de músicos y fomento</span><span class="mint">Abrir sitio ↗</span></a>
+    <a class="card entity-card" href="https://ama.musica.ar/" target="_blank" rel="noopener noreferrer" aria-label="Abrir sitio de AMA"><span class="entity-logo"><img src="/static/entities/ama.png" alt="AMA"></span><strong>AMA</strong><span class="muted">Distribución musical</span><span class="mint">Abrir sitio ↗</span></a>
+  </div>
+  <p class="muted">Los sitios se abren en tu navegador. Podés preparar los códigos, créditos y datos de publicación desde «Datos de la canción».</p>
+</section>
+<section id="composition" hidden>
+  <h1>Composición</h1>
+  <p class="muted">Herramientas para crear, organizar y desarrollar tus ideas musicales.</p>
+  <div class="grid composition-grid">
+    <article class="card action composition-card">
+      <div class="symbol"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 17h4l3-9 5 18 5-22 4 17 3-6h2"/></svg></div>
+      <h2>Beats</h2><p class="muted">Gestioná y organizá tus bases instrumentales.</p>
+      <button onclick="go('beats')">Abrir Beats</button>
+    </article>
+    <article class="card action composition-card">
+      <div class="symbol"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 4v22M5 4h21v22M5 10h21M12 4v22M19 4v22"/><path d="M9 15h3m-3 5h3m9-5h3m-3 5h3"/></svg></div>
+      <h2>Partituras</h2><p class="muted">Guardá y consultá tus partituras musicales.</p>
+      <button onclick="go('scores')">Abrir Partituras</button>
+    </article>
+    <article class="card action composition-card">
+      <div class="symbol"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 4h12l5 5v19H8zM20 4v6h5M12 15h9M12 20h9M12 25h6"/></svg></div>
+      <h2>Letras</h2><p class="muted">Creá y organizá las letras de tus canciones.</p>
+      <button onclick="go('lyrics')">Abrir Letras</button>
+    </article>
+  </div>
+</section>
+<section id="beats" class="composition-detail" hidden>
+  <div class="heading"><div><h1>Beats</h1><p class="muted">Organizá tus bases instrumentales en listas independientes. Los archivos permanecen en sus carpetas originales.</p></div><button id="addBeats">＋ Agregar audios</button></div>
+  <p id="beatsStatus" class="muted" role="status">Cargando tus listas…</p>
+  <div class="grid beats-layout">
+    <article class="card"><div class="heading"><div><h2>Mis listas</h2><div class="beat-playlist-tools"><select id="beatsPlaylistSelect" aria-label="Seleccionar lista de Beats"></select><button id="newBeatPlaylist" class="alt">＋ Nueva lista</button><button id="renameBeatPlaylist" class="alt">Renombrar</button><button id="deleteBeatPlaylist" class="alt" disabled>Eliminar lista</button></div></div><span id="beatsCount" class="muted">0 audios</span></div><h3 id="beatsListTitle">Mi lista de audios</h3><small class="muted">Arrastrá los audios para cambiar el orden.</small><div id="beatsList" class="list"></div></article>
+    <article class="card"><h2>Reproductor</h2><p id="beatNow" class="muted">Seleccioná un audio de la lista para escucharlo.</p><audio id="beatPlayer" controls preload="metadata" style="width:100%"></audio><div class="row" style="margin-top:12px"><button id="openBeatFolder" class="alt" disabled>📁 Abrir ubicación</button></div><p class="muted">La lista se guarda automáticamente en este equipo. Quitar un audio solo lo elimina de la lista, no de tu PC.</p></article>
+  </div>
+</section>
+<section id="scores" class="composition-detail" hidden>
+  <div class="heading"><div><h1>Partituras</h1><p class="muted">Organizá tus partituras por colecciones y consultalas sin mover los archivos originales.</p></div><button id="addScores">＋ Agregar partituras</button></div>
+  <p id="scoresStatus" class="muted" role="status">Cargando tus colecciones…</p>
+  <div class="grid scores-layout">
+    <article class="card"><div class="heading"><h2>Mis colecciones</h2><span id="scoresCount" class="muted">0 partituras</span></div>
+      <div class="score-collection-tools"><select id="scoresCollectionSelect" aria-label="Seleccionar colección"></select><div class="row"><button id="newScoreCollection" class="alt">＋ Nueva</button><button id="renameScoreCollection" class="alt">Renombrar</button><button id="deleteScoreCollection" class="alt" disabled>Eliminar</button></div></div>
+      <h3 id="scoresListTitle">Mis partituras</h3><small class="muted">Arrastrá las partituras para cambiar el orden.</small><div id="scoresList" class="list"></div>
+    </article>
+    <article class="card score-viewer-card"><div class="heading"><h2>Visor de partituras</h2><button id="openScoreFolder" class="alt" disabled>📁 Abrir ubicación</button></div>
+      <p id="scoreNow" class="muted">Seleccioná una partitura de la colección para verla.</p>
+      <div id="scoreViewer" class="score-viewer"><div class="score-viewer-empty">♫<br>La vista previa aparecerá acá.</div></div>
+      <p class="muted">Se admiten archivos PDF, PNG y JPG. Quitar una partitura solo la elimina de la colección, no de tu PC.</p>
+    </article>
+  </div>
+</section>
+<section id="lyrics" class="composition-detail" hidden>
+  <div class="heading"><div><h1>Letras</h1><p class="muted">Organizá tus letras por colecciones y consultalas sin mover los archivos originales.</p></div><button id="addLyrics">＋ Agregar letras</button></div>
+  <p id="lyricsStatus" class="muted" role="status">Cargando tus colecciones…</p>
+  <div class="grid lyrics-layout">
+    <article class="card"><div class="heading"><h2>Mis colecciones</h2><span id="lyricsCount" class="muted">0 letras</span></div>
+      <div class="score-collection-tools"><select id="lyricsCollectionSelect" aria-label="Seleccionar colección de letras"></select><div class="row"><button id="newLyricCollection" class="alt">＋ Nueva</button><button id="renameLyricCollection" class="alt">Renombrar</button><button id="deleteLyricCollection" class="alt" disabled>Eliminar</button></div></div>
+      <h3 id="lyricsListTitle">Mis letras</h3><small class="muted">Arrastrá las letras para cambiar el orden.</small><div id="lyricsList" class="list"></div>
+    </article>
+    <article class="card"><div class="heading"><h2>Visor de letras</h2><button id="openLyricFolder" class="alt" disabled>📁 Abrir ubicación</button></div>
+      <p id="lyricNow" class="muted">Seleccioná una letra de la colección para verla.</p>
+      <pre id="lyricViewer" class="lyric-viewer">♫
+El contenido de la letra aparecerá acá.</pre>
+      <p class="muted">Se admiten archivos TXT y DOCX. Quitar una letra solo la elimina de la colección, no de tu PC.</p>
+    </article>
+  </div>
+</section>
+<dialog id="beatPlaylistDialog"><form id="beatPlaylistForm"><h2 id="beatPlaylistDialogTitle">Nueva lista</h2><label for="beatPlaylistName">Nombre de la lista</label><input id="beatPlaylistName" maxlength="80" required placeholder="Ej.: Ideas para canciones"><div class="row" style="justify-content:flex-end"><button type="button" id="cancelBeatPlaylist" class="alt">Cancelar</button><button type="submit">Guardar</button></div></form></dialog>
+<dialog id="scoreCollectionDialog"><form id="scoreCollectionForm"><h2 id="scoreCollectionDialogTitle">Nueva colección</h2><label for="scoreCollectionName">Nombre de la colección</label><input id="scoreCollectionName" maxlength="80" required placeholder="Ej.: Piano / Ideas originales"><div class="row" style="justify-content:flex-end"><button type="button" id="cancelScoreCollection" class="alt">Cancelar</button><button type="submit">Guardar</button></div></form></dialog>
+<dialog id="lyricCollectionDialog"><form id="lyricCollectionForm"><h2 id="lyricCollectionDialogTitle">Nueva colección</h2><label for="lyricCollectionName">Nombre de la colección</label><input id="lyricCollectionName" maxlength="80" required placeholder="Ej.: Canciones propias"><div class="row" style="justify-content:flex-end"><button type="button" id="cancelLyricCollection" class="alt">Cancelar</button><button type="submit">Guardar</button></div></form></dialog>
+
+</main><script src="/static/navigation.js"></script><script src="/static/projects.js"></script><script src="/static/arrangements.js"></script><script src="/static/management-ui.js"></script><script src="/static/waveforms.js"></script><script src="/static/workflow.js"></script><script src="/static/session-operations.js"></script><script src="/static/publication.js"></script><script src="/static/album.js"></script><link rel="stylesheet" href="/static/catalog.css"><script src="/static/song-data.js"></script><script src="/static/catalog-ui.js"></script><script src="/static/cloud-ui.js"></script><link rel="stylesheet" href="/static/composition.css"><script src="/static/composition.js"></script></html>

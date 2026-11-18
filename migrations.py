@@ -31,6 +31,7 @@ def migrate(db, database):
             migrate_catalog(db, database)
             migrate_cloud_portal(db, database)
             migrate_portal_feedback(db, database)
+            migrate_composition(db, database)
             return
         db.execute('BEGIN IMMEDIATE')
         backup = database.with_name(database.stem + '.respaldo-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
@@ -109,6 +110,7 @@ def migrate(db, database):
             migrate_catalog(db, database)
             migrate_cloud_portal(db, database)
             migrate_portal_feedback(db, database)
+            migrate_composition(db, database)
         except Exception:
             db.rollback()
             raise
@@ -268,6 +270,24 @@ def migrate_portal_feedback(db, database):
             estado TEXT NOT NULL DEFAULT 'Pendiente',nota_interna TEXT NOT NULL DEFAULT '')''')
         db.execute('CREATE INDEX devoluciones_cancion ON portal_devoluciones(cancion_id,creado)')
         db.execute('UPDATE schema_audio SET version=7')
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
+def migrate_composition(db, database):
+    """Amplía la base conservando playlists, credenciales y referencias previas."""
+    if db.execute('SELECT version FROM schema_audio').fetchone()[0] >= 8:
+        return
+    db.execute('BEGIN IMMEDIATE')
+    backup=database.with_name(database.stem+'.respaldo-composicion-'+datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.sqlite3')
+    try:
+        with closing(sqlite3.connect(database)) as source, closing(sqlite3.connect(backup)) as target:
+            source.backup(target)
+        from composition import create_composition_schema
+        create_composition_schema(db)
+        db.execute('UPDATE schema_audio SET version=8')
         db.commit()
     except Exception:
         db.rollback()

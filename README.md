@@ -32,4 +32,10 @@ Para colaborar, creá una rama por cambio y abrí un pull request.
 
 ## Comprobaciones de desarrollo
 
-Con el entorno activado, ejecutá `python -m unittest discover -s tests -q`. Las 34 pruebas actuales cubren migraciones, producción, catálogo, publicación y devoluciones; las conexiones externas se simulan para no publicar material durante los tests.
+Con el entorno activado, ejecutá `python -m unittest discover -s tests -q`. Las 40 pruebas actuales cubren migraciones, producción, catálogo, publicación y devoluciones; las conexiones externas se simulan para no publicar material durante los tests.
+
+## Composición y entidades
+
+La beta de desarrollo integra el aporte de Zharelly: Beats con listas independientes, Partituras PDF/PNG/JPG y Letras TXT/DOCX organizadas en colecciones. Las colecciones guardan referencias y no eliminan los archivos originales.
+
+La sección Entidades incorpora los logos aportados por Silvio y accesos a SADAIC, AADI, CAPIF SGC, INAMU y AMA. Los detalles de procedencia, adaptación y respaldo están en [Integración de aportes](docs/INTEGRACION_COMPOSICION_Y_ENTIDADES.md).

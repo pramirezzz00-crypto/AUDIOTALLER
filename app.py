@@ -8,6 +8,7 @@ from folder_migration import register_folder_migration
 from publication import register_publication, validate_collaborators, add_collaborators, validate_loose_songs, attach_songs
 from song_hub import register_song_hub
 from catalog import register_catalog
+from composition import register_composition
 from listening_portal import register_listening_portal
 from cloud_portal import register_cloud_portal
 from flask import Flask, jsonify, request, send_file
@@ -324,6 +325,7 @@ register_management(app, db_open)
 register_publication(app, db_open)
 register_song_hub(app, db_open)
 register_catalog(app, db_open)
+register_composition(app, db_open, AUDIO_TYPES)
 register_listening_portal(app, db_open)
 register_cloud_portal(app, db_open, lambda: DB.parent)
 register_production(app, db_open, safe_name)
