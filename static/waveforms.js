@@ -4,13 +4,13 @@ const waveCleanups = [];
 const waveCache = new Map();
 let waveGeneration = 0;
 
-function audioFilesMarkup(files) {
+function audioFilesMarkup(files, heading=true) {
     const audio = files.filter(file => file.disponible && /\.(wav|mp3|flac|ogg|m4a|aif|aiff|aac|opus)$/i.test(file.nombre));
     if (!audio.length) return '';
-    return '<h3>Audios de la etapa</h3>' + audio.map(file => `
+    return (heading ? '<h3>Audios de la etapa</h3>' : '') + audio.map(file => `
         <article class="wave-track" data-wave-file="${file.id}" data-wave-size="${file.tamano}"
                  data-wave-revision="${file.modificado || ''}">
-          <div class="wave-track-head"><strong>♫ ${esc(file.nombre)}</strong>
+          <div class="wave-track-head"><strong>♫ ${esc(file.nombre)}</strong><span class="audio-class">${esc(file.clase || ({demo:'Demo',maqueta:'Maqueta',grabacion:'Grabación',mezcla:'Mezcla',mastering:'Master'}[file.etapa] || 'Audio'))} ${esc(file.version_audio || file.version || '')}</span><button type="button" class="alt audio-star" data-star="${file.id}" aria-pressed="${!!file.favorito}" aria-label="Favorito: ${esc(file.nombre)}" onclick="toggleAudioFavorite('${file.id}',this).catch(report)">${file.favorito ? '★' : '☆'}</button><button type="button" class="alt" onclick="audioDetailsDialog('${file.id}').catch(report)">Clasificar / versión</button>
             <audio controls preload="metadata" aria-label="Reproducir ${esc(file.nombre)}"
                 src="/api/produccion/archivo/${file.id}"></audio></div>
           <canvas class="wave-seek" tabindex="0" role="slider" aria-label="Posición de ${esc(file.nombre)}"
@@ -83,7 +83,7 @@ async function bindWaveTrack(track, generation) {
         canvas.setAttribute('aria-valuetext', formatWaveTime(audio.currentTime) + ' de ' + formatWaveTime(audio.duration));
     }
     const timeUpdate = () => draw();
-    const pauseOthers = () => document.querySelectorAll('#songPane audio').forEach(other => {
+    const pauseOthers = () => document.querySelectorAll('main audio').forEach(other => {
         if (other !== audio) other.pause();
     });
     audio.addEventListener('play',pauseOthers);

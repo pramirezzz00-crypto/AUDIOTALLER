@@ -7,3 +7,10 @@ __pycache__/
 .env
 build/
 dist/
+
+# Credenciales locales: nunca se distribuyen con el código.
+*.dpapi
+*client_secret*.json
+*service-account*.json
+.firebase/
+.firebaserc

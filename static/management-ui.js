@@ -55,8 +55,8 @@ function renderPersonPreview() {
     panel.hidden = false;
     panel.innerHTML = `<div class="heading"><div class="project-art">${projectImage(person.imagen, artistInitials(person.nombre))}</div>
       <h2>${esc(person.nombre)}</h2></div><p class="muted">${esc(person.roles.join(' · '))}</p>
-      <div class="row"><button class="alt" onclick="editArtist('${person.id}')">Modificar</button><button class="alt" onclick="openArtist('${person.id}')">Ver ficha</button></div>
-      <div class="module-tabs">${[['summary','Resumen'],['projects','Proyectos'],['notes','Notas']].map(([key,label]) =>
+      <div class="row"><button class="alt" onclick="editArtist('${person.id}')">Modificar</button><button class="alt" onclick="openArtist('${person.id}')">Ver ficha</button><button class="alt" onclick="publicationDialog('persona','${person.id}').catch(report)">Identificación profesional</button></div>
+      <div class="module-tabs">${[['summary','Resumen'],['projects','Producciones'],['notes','Notas']].map(([key,label]) =>
         `<button class="alt" aria-pressed="${previewTab === key}" onclick="previewTab='${key}'; renderPersonPreview()">${label}</button>`).join('')}
         <button disabled title="En desarrollo">Archivos</button></div><div id="personPreviewContent"></div>`;
     const target = $('personPreviewContent');
@@ -65,7 +65,7 @@ function renderPersonPreview() {
         return;
     }
     if (previewTab === 'projects') {
-        target.innerHTML = `<button onclick="openArtist('${person.id}',true)">Gestionar proyectos propios</button><h3>Proyectos asociados</h3>
+        target.innerHTML = `<button onclick="openArtist('${person.id}',true)">Gestionar producciones propias</button><h3>Producciones asociadas</h3>
           <div class="list">${person.content.discos.map(album => `<button class="alt" onclick="openGlobalAlbum('${album.id}','${person.id}')">${esc(album.nombre)}</button>`).join('')}
           ${person.creditos.map(credit => `<p>${esc(credit.nombre)} · ${esc(credit.rol)}</p>`).join('') || ''}</div>
           <button class="alt" onclick="creditDialog()">＋ Asociar participación en producción</button>`;
@@ -113,7 +113,7 @@ async function creditDialog() {
     const projects = await api('/api/proyectos');
     const targets = [...projects.discos.map(row => ({...row,entity:'disco_id',label:row.nombre})),
         ...projects.canciones.map(row => ({...row,entity:'cancion_id',label:row.titulo}))];
-    formDialog('Participación en producción', `<label>Proyecto o canción<select name="target">
+    formDialog('Participación en producción', `<label>Disco o canción<select name="target">
         ${targets.map((row,index) => `<option value="${index}">${esc(row.label)} · ${esc(row.artista)}</option>`).join('')}</select></label>
         <label>Rol o crédito<input name="rol" required></label>`, async data => {
             const target = targets[Number(data.target)];
@@ -142,8 +142,8 @@ function renderGlobalProjects() {
         ...globalProductions.discos.map(album=>({...album,entity:'discos',label:album.nombre,states:albumStates(album)})),
         ...globalProductions.canciones.filter(song=>!song.disco_id).map(song=>({...song,entity:'sueltas',label:song.titulo,states:[song.estado || 'En producción']}))
     ];
-    const searched=all.filter(item=>projectText([item.label,item.artista,item.entity==='discos'?projectType(item):'Canción independiente',
-        ...globalProductions.canciones.filter(song=>song.disco_id===item.id).map(song=>song.titulo)].join(' ')).includes(query));
+    const searched=all.filter(item=>projectText([item.label,item.artista,item.busqueda_metadata || '',item.entity==='discos'?projectType(item):'Canción independiente',
+        ...globalProductions.canciones.filter(song=>song.disco_id===item.id).map(song=>song.titulo+' '+(song.busqueda_metadata || ''))].join(' ')).includes(query));
     const typeCounts=type=>searched.filter(item=>item.entity===type && item.states.some(state=>projectStatesSelected.has(state))).length;
     $('globalTypeFilters').innerHTML=[['discos','Discos'],['sueltas','Canciones sueltas']].map(([key,label])=>
         `<label class="filter-box"><input type="checkbox" value="${key}" ${projectTypesSelected.has(key)?'checked':''}>
@@ -172,14 +172,13 @@ function renderGlobalProjects() {
         `<article class="card tile"><button class="artist-open" onclick="openGlobalAlbum('${item.id}','${item.artista_id}')">
           <span class="cover">${projectImage(item.portada,'◉')}</span><span class="tile-body"><strong>${esc(item.nombre)}</strong>
           <span>${esc(item.artista)}</span><small>${esc(projectType(item))} · ${trackCount(item.total)}</small></span></button>
-          ${stateBadges(item)}<button class="alt" onclick="editGlobalAlbum('${item.id}','${item.artista_id}')">Editar proyecto</button></article>`:
+          ${stateBadges(item)}<button class="alt" onclick="editGlobalAlbum('${item.id}','${item.artista_id}')">Editar disco</button></article>`:
         `<article class="card"><h3>♫ ${esc(item.titulo)}</h3><p>${esc(item.artista)} · Canción independiente</p>${stateBadges(item)}
           <button onclick="openSong('${item.id}')">Abrir canción</button></article>`).join('') ||
-        '<p class="muted">No hay proyectos que coincidan con los filtros seleccionados.</p>';
+        '<p class="muted">No hay producciones que coincidan con los filtros seleccionados.</p>';
 }
 async function openGlobalAlbum(id, owner) {
-    await openArtist(owner, true);
-    selectProject(id);
+    await openAlbum(id);
 }
 async function editGlobalAlbum(id, owner) {
     await openGlobalAlbum(id, owner);
@@ -188,6 +187,7 @@ async function editGlobalAlbum(id, owner) {
 
 // Diálogo compartido por relaciones, sesiones y metadatos. Cancelar no altera registros.
 let dialogDirty = false;
+let iterationBusy = false;
 function formDialog(title, fields, save, prepare) {
     const dialog = $('iterationDialog');
     $('iterationTitle').textContent = title;
@@ -200,6 +200,8 @@ function formDialog(title, fields, save, prepare) {
     form.oninput = () => { dialogDirty = true; };
     form.onsubmit = async event => {
         event.preventDefault();
+        if (iterationBusy) return;
+        iterationBusy = true;
         $('iterationSubmit').disabled = true;
         try {
             await save(Object.fromEntries(new FormData(form)));
@@ -208,6 +210,7 @@ function formDialog(title, fields, save, prepare) {
         } catch (error) {
             $('iterationError').textContent = error.message;
         } finally {
+            iterationBusy = false;
             $('iterationSubmit').disabled = false;
         }
     };
@@ -215,6 +218,7 @@ function formDialog(title, fields, save, prepare) {
     dialog.showModal();
 }
 function closeIterationDialog() {
+    if (iterationBusy) { $('iterationError').textContent = 'Hay una operación en curso. Esperá a que termine para cerrar.'; return; }
     if (!dialogDirty || confirm('Hay cambios sin guardar. ¿Querés descartarlos?')) {
         dialogDirty = false;
         $('iterationDialog').close();

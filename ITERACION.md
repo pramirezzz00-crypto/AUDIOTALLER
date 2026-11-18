@@ -63,3 +63,53 @@ Las referencias relativas internas se conservan. Las referencias absolutas o med
 Las nuevas tablas de la migración 3 son revision_sesion, preferencias_daw y operaciones_archivo. La migración realiza un respaldo previo. Los filtros globales permiten combinar discos/canciones sueltas y estados; los estados de un disco se obtienen de sus canciones, por lo que puede figurar en más de un estado. Un disco sin canciones aparece Sin estado.
 
 Las pruebas automatizadas incluyen copias con nombre ocupado, originales conservados, creación con plantilla, proyectos REAPER, copia completa y cancelación ante cambios de archivo. Se verificaron los iconos locales, la apertura de un proyecto vacío en REAPER y los filtros desde la ventana de escritorio. La apertura de plantillas Cubase y la relocalización de una producción real completa requieren todavía una comprobación con el usuario.
+
+## Creación global, créditos e identificación para publicación
+
+Proyectos ofrece Nuevo disco y Nueva canción suelta. Primero se elige el artista principal entre las fichas existentes; el formulario siguiente permite agregar músicos y equipo por referencia a sus fichas, con rol explícito. Al crear o editar un disco se pueden incorporar canciones sueltas del mismo artista. El disco también ofrece Incorporar canciones sueltas. Esta asociación conserva identificadores, notas, archivos, sesiones y créditos: no mueve carpetas ni toca rutas del DAW. Una canción incorporada deja de mostrarse como suelta. Cambiar su asociación posteriormente sigue disponible en Editar canción.
+
+Los paneles Artistas y músicos permiten consultar, agregar y quitar créditos. Los cambios se guardan en una única transacción; cancelar no modifica créditos. Los créditos del disco se conservan a nivel de disco y no se atribuyen automáticamente a cada canción.
+
+Las fichas nuevas abren en lectura y se habilitan con Modificar. Todos sus datos son opcionales:
+
+- Identificación profesional: nombre legal, IPN, IPI Name/CAE, ISNI, sociedades de autores e intérpretes, número de socio/referencia, país y notas.
+- Obra y grabaciones: título original, ISWC, idioma, género, editorial, sociedad, expediente local y titular/año © de la obra. La lista separada de grabaciones admite nombre, versión, ISRC, titular del máster ℗, año del fonograma, fecha de grabación, idioma, contenido explícito y notas. Cada fonograma conserva su identificador interno; no se interpreta cada versión del DAW como una grabación publicable.
+- Ficha de lanzamiento: UPC/EAN, sello, catálogo, distribuidora, fecha, territorios, titular/año © y notas. Para un lanzamiento de una sola canción se puede crear un disco de tipo Single y asociarla.
+
+Se revisaron fuentes oficiales: [SCAPR / IPN](https://www.scapr.org/Services/), [CISAC / IPI](https://www.cisac.org/services/information-services/ipi), [ISWC](https://www.iswc.org/iswc), [IFPI / ISRC y productos UPC/EAN](https://isrc.ifpi.org/faqs). ISRC identifica una grabación, ISWC una obra; IPN e IPI identifican personas o titulares en sus respectivos sistemas. ISNI es complementario. AudioTaller almacena códigos existentes y valida únicamente formatos básicos, sin asignar códigos, verificar titularidad ni registrar automáticamente ante organismos o distribuidoras. No exporta todavía una entrega de distribución.
+
+Migración 4: registro_persona, registro_obra y registro_lanzamiento contienen fichas estructuradas independientes con claves foráneas; registro_grabacion permite varios fonogramas por canción. Se respalda SQLite antes de ampliar el esquema. No se convierten ni sobrescriben los metadatos libres anteriores.
+
+Validación: 14 pruebas de servidor y comprobación con datos temporales en Edge WebView: creación global de disco, asociación de canción suelta, crédito, apertura en lectura, modificación y recuperación de ISWC/ISRC, independencia de notas de obra/grabación y cancelación de una eliminación de crédito.
+
+## Vista de disco y nombre Producciones
+
+La pestaña, el acceso de inicio y las rutas visibles ahora dicen Producciones. Los identificadores internos y las rutas API se conservan para mantener compatibilidad con los datos y funciones existentes.
+
+Abrir un disco desde Producciones o su portada en el explorador del artista lleva a una pantalla independiente: portada cuadrada, nombre del disco como título, artista como subtítulo y canciones en una tabla a todo el ancho. La tabla incluye pista, título, artista, estado y duración cuando está registrada; las duraciones desconocidas se muestran como raya, sin inventarlas. Buscar en este disco filtra la lista. El título de cada canción y Abrir producción abren su flujo de trabajo.
+
+Se mantienen Editar disco, Incorporar canciones sueltas, Ficha de lanzamiento, Artistas y músicos y Agregar canción. Editar/agregar actualiza la pantalla del disco. Atrás vuelve al origen de navegación; desde una canción regresa al disco. El nombre del artista permite abrir su ficha.
+
+Comprobación en Edge WebView con base temporal: apertura directa desde Producciones sin pasar por el artista, portada cuadrada, lista debajo del encabezado, modificación del nombre, incorporación de una canción nueva, búsqueda sin resultados y navegación disco/canción/Atrás. Esta iteración solo cambia la interfaz; no modifica el esquema ni los archivos de producción.
+
+## Ficha unificada, Catálogo y Playlist
+
+La iteración siguiente agrega una ficha de canción con pestañas y guardado conjunto, letra, etiquetas y campos propios de nombre/valor, créditos y preparación editorial. El Catálogo relaciona los audios existentes con etapas, favoritos, clasificación, versiones y grabaciones publicables; permite filtros de metadata y reproducción con ondas. Las playlists ordenan referencias a esos archivos y preparan entregas de selección fija, clave opcional, caducidad, permiso de descarga y revocación. La vista del portal funciona localmente; todavía no se desplegó un servicio público.
+
+La migración 5 conserva las filas anteriores y agrega cinco tablas con respaldo previo. La exportación prepara metadata JSON/CSV, letra y descripción; no sustituye la entrega a una distribuidora. La documentación, fuentes del benchmark, recorrido de uso y límites de alojamiento están en [BENCHMARK_Y_FLUJO.md](BENCHMARK_Y_FLUJO.md). Esta actualización sigue guardada localmente, sin publicar cambios en GitHub.
+
+Corrección del inicio: la primera llamada de navegación espera DOMContentLoaded para que los módulos de audio y las constantes de redes sociales estén inicializados. Se reprodujo el error original en WebView (disposeWavePlayers aún no definido) y se comprobó el arranque corregido, la ficha y edición del artista con selector de redes y el acceso a Catálogo.
+
+## Portal Firebase + Drive (piloto, configuración pendiente)
+
+Se implementó publicación opcional de playlists en un sitio propio Firebase Hosting Spark, con Firebase Authentication para artistas y Firestore para selección/vigencia. Los audios se copian a Drive y se comparten por enlace público según la decisión del usuario. La consulta del portal requiere login, pero no se promete protección ni revocación de los enlaces directos de audio. Reemplazar la playlist conserva su dirección. La migración 6 agrega configuración, publicaciones y caché de copias remotas; las credenciales de Google se cifran con Windows DPAPI fuera de SQLite y del repositorio.
+
+El código no crea un proyecto de Google ni activa facturación por sí solo. El 7 de noviembre se configuró el proyecto piloto `audiotaller-portal-artistas` en Spark y se autorizó la cuenta propietaria, con credenciales cifradas en Windows. La web y las reglas ya están desplegadas. Se publicó un tono sintético en una playlist de prueba aislada, sin subir canciones reales. Se verificó contra Google el ingreso, acceso denegado, vencimiento, revocación, restauración, URL estable y reutilización de copia. Drive devuelve el audio por rangos (206) y el usuario confirmó la escucha correcta en su navegador habitual; el navegador integrado de la herramienta presentó un fallo. Se corrigió la cabecera de referente para compatibilidad con la clave Drive restringida al dominio. La preparación inicial y los límites están en [PORTAL_FIREBASE.md](PORTAL_FIREBASE.md). La integración incluye un asistente en Playlist y se validó con 29 pruebas de servidor y ventanas de interfaz con servicios simulados.
+
+## Devoluciones e invitaciones del portal
+
+El portal reemplaza Abrir en Drive por notas debajo de cada audio, con momento de escucha opcional. El envío fija canción, audio, copia compartida, entrega y fecha del servidor; no se permite alterar comentarios existentes. La bandeja local descarga y conserva las devoluciones, con seguimiento Pendiente/En revisión/Resuelta y notas privadas, accesible desde Playlist y desde cada producción. Reemplazar la selección publicada conserva el enlace y el historial. La migración 7 agrega una tabla con respaldo y preserva las 35 tablas anteriores.
+
+Publicar permite elegir al artista de la agenda, generar la contraseña y copiar una invitación completa para WhatsApp. Los accesos conocidos se guardan cifrados por usuario de Windows y se reutilizan al preparar otras entregas del mismo artista. No se envían mensajes automáticamente. Se simplificó el asistente y se agregó importación de perfil sin código. La versión universal para cualquier productor sigue pendiente de registrar/verificar el cliente OAuth común y resolver/probar el alta de espacios independientes: no se anuncia como completada.
+
+Validación: 34 pruebas de servidor, interfaz local y formulario de artista con servicios simulados; envío real en navegador y sincronización contra Google en base de prueba. Las reglas reales bloquearon falta de login, audio ajeno, versión vieja y edición; aceptaron el comentario válido. Se versionan los recursos web y se revalida la caché para evitar mezclar formularios nuevos con JavaScript viejo. No se publicaron canciones reales ni cambios en GitHub.

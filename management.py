@@ -22,6 +22,18 @@ def labels(value):
     return list(dict.fromkeys(item.strip() for item in value))
 
 
+def song_search_text(db, sid):
+    """Índice de búsqueda interno; jamás se envía al portal de escucha."""
+    values = []
+    for table in ('detalle_cancion','registro_obra','ficha_cancion'):
+        row = db.execute(f'SELECT datos FROM {table} WHERE id=?', (sid,)).fetchone()
+        if row:
+            values.append(json.dumps(json.loads(row['datos']),ensure_ascii=False))
+    values.extend(row['nombre']+' '+row['rol'] for row in db.execute('''SELECT a.nombre,cr.rol FROM creditos cr
+        JOIN artistas a ON a.id=cr.persona_id WHERE cr.cancion_id=?''', (sid,)))
+    return ' '.join(values)
+
+
 def save_roles(db, aid, profile, tipo):
     """Actualiza relaciones en la misma transacción que la ficha principal."""
     roles = labels(profile.get('roles', [DEFAULT_ROLE.get(tipo, tipo)]))
@@ -150,6 +162,8 @@ def register_management(app, connect):
                 e.estado, e.actualizado FROM canciones c JOIN artistas a ON c.artista_id=a.id
                 LEFT JOIN discos d ON c.disco_id=d.id LEFT JOIN detalle_cancion x ON c.id=x.id
                 LEFT JOIN estado_cancion e ON c.id=e.id""")]
+            for row in songs:
+                row['busqueda_metadata'] = song_search_text(db,row['id'])
         for row in albums + songs:
             row.update(json.loads(row.pop('datos') or '{}'))
         return jsonify(discos=albums, canciones=songs)

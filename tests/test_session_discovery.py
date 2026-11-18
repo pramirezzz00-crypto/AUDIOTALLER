@@ -90,10 +90,14 @@ class SessionDiscoveryTest(unittest.TestCase):
             db.execute('DROP TABLE revision_sesion')
             db.execute('DROP TABLE preferencias_daw')
             db.execute('DROP TABLE operaciones_archivo')
+            # Simula una base antigua sin los módulos agregados posteriormente.
+            for table in ('portal_devoluciones','portal_publicaciones','portal_drive','portal_config','entregas_playlist','playlist_items','playlists','catalogo_audio','ficha_cancion',
+                          'registro_persona','registro_obra','registro_lanzamiento','registro_grabacion'):
+                db.execute('DROP TABLE '+table)
             db.execute('UPDATE schema_audio SET version=1')
         before = len(list(self.root.glob('*.respaldo-sesiones-*.sqlite3')))
         with app.db_open() as db:
-            self.assertEqual(db.execute('SELECT version FROM schema_audio').fetchone()[0], 3)
+            self.assertEqual(db.execute('SELECT version FROM schema_audio').fetchone()[0], 7)
         self.assertEqual(len(list(self.root.glob('*.respaldo-sesiones-*.sqlite3'))), before+1)
         with app.db_open() as db:
             self.assertEqual(db.execute('PRAGMA integrity_check').fetchone()[0], 'ok')

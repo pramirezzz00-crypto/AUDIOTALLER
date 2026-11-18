@@ -97,7 +97,9 @@ def register_production(app, connect, safe_name):
                     session['criterio'] = 'Sesión de trabajo sin archivo DAW disponible'
                 session['abrible'] = Path(session['ruta']).suffix.lower() in DAW_PROJECTS and Path(session['ruta']).is_file()
                 session['disponible'] = Path(session['ruta']).exists() if session['ruta'] else False
-            files = [dict(row) for row in db.execute('SELECT * FROM archivos WHERE cancion_id=? ORDER BY creado DESC', (sid,))]
+            files = [dict(row) for row in db.execute('''SELECT f.*, ca.favorito,ca.clase,ca.version AS version_audio
+                FROM archivos f LEFT JOIN catalogo_audio ca ON ca.archivo_id=f.id
+                WHERE f.cancion_id=? ORDER BY f.creado DESC''', (sid,))]
             for file in files:
                 try:
                     stat = Path(file['ruta']).stat()

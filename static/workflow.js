@@ -24,11 +24,10 @@ async function openSong(id) {
     currentSong = data.cancion;
     artist = await api('/api/artistas/' + currentSong.artista_id);
     go('songPane');
-    renderWorkflow();
 }
 function songBreadcrumbs() {
     $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> ›
-        <button onclick="go('projectManager')">Proyectos</button> ›
+        <button onclick="go('projectManager')">Producciones</button> ›
         <button onclick="openArtist('${currentSong.artista_id}',true)">${esc(currentSong.artista)}</button> ›
         ${currentSong.disco_id ? `<button onclick="openGlobalAlbum('${currentSong.disco_id}','${currentSong.artista_id}')">${esc(currentSong.disco)}</button> ›` : ''}
         ${esc(currentSong.titulo)}`;
@@ -62,7 +61,7 @@ function renderWorkflow() {
     }).join('');
     $('workflowMacroTabs').innerHTML = ['pre','prod'].map(macro =>
         `<button class="alt" role="tab" aria-selected="${macro === activeMacro}" data-macro-tab="${macro}"
-            onclick="switchMacro('${macro}')">${macro === 'pre' ? 'Preproducción' : 'Producción'} · ${countLabel(macroCount(macro),'archivo','archivos')}</button>`).join('');
+            onclick="switchMacro('${macro}')">${macro === 'pre' ? 'Preproducción' : 'Producción'} · ${countLabel(macroCount(macro),'archivo','archivos')}</button>`).join('') + `<button class="alt" onclick="openCatalog(currentSong.id)">♫ Audios · Catálogo</button><button class="alt" onclick="feedbackDialog({cancion_id:currentSong.id}).catch(report)">Devoluciones del artista</button>`;
     for (const stage of workflow.etapas) bindStage(stage);
     switchStage('pre',activeStages.pre);
     switchStage('prod',activeStages.prod);

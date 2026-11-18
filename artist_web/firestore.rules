@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /portals/{portalId} {
+      function activePortal() {
+        let portal = get(/databases/$(database)/documents/portals/$(portalId)).data;
+        return request.auth != null && request.auth.uid == portal.artistUid
+          && portal.revoked == false && request.time < portal.expiresAt;
+      }
+      // La lectura se valida en Firestore, no únicamente ocultando la pantalla.
+      // El productor publica con OAuth/IAM de su propio proyecto desde escritorio.
+      allow get: if request.auth != null
+        && request.auth.uid == resource.data.artistUid
+        && resource.data.revoked == false
+        && request.time < resource.data.expiresAt;
+      allow list, create, update, delete: if false;
+      match /feedback/{messageId} {
+        // Cada devolución fija la versión escuchada. El artista no puede
+        // cambiar el audio, la fecha, el destinatario ni comentarios previos.
+        allow get, list: if activePortal();
+        allow create: if activePortal() && validFeedback();
+        allow update, delete: if false;
+        function validFeedback() {
+          let portal = get(/databases/$(database)/documents/portals/$(portalId)).data;
+          let note = request.resource.data;
+          return note.keys().hasAll(['artistUid','audioId','songId','driveId','revision','audioLabel','body','positionSeconds','createdAt'])
+            && note.keys().hasOnly(['artistUid','audioId','songId','driveId','revision','audioLabel','body','positionSeconds','createdAt'])
+            && note.artistUid == request.auth.uid
+            && note.audioId is string && note.audioId in portal.audioKeys
+            && note.driveId == portal.audioKeys[note.audioId]
+            && note.songId == portal.audioSongs[note.audioId]
+            && note.audioLabel == portal.audioLabels[note.audioId]
+            && note.revision is int && note.revision == portal.revision
+            && note.body is string && note.body.size() > 0 && note.body.size() <= 4000
+            && note.positionSeconds is number && note.positionSeconds >= 0 && note.positionSeconds <= 86400
+            && note.createdAt == request.time;
+        }
+      }
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

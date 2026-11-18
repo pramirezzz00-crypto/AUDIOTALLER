@@ -1,8 +1,8 @@
-async function openAlbum(id){currentAlbum=await api('/api/discos/'+id);$('albumTitle').textContent='💿 '+currentAlbum.nombre;go('albumPane');let ss=await api('/api/discos/'+id+'/canciones');$('albumSongs').innerHTML=ss.map(songRow).join('')||'<p class="muted">Disco vacío.</p>'}function songRow(s){return `<div class="item"><b>♫ ${esc(s.titulo)}</b><button onclick="openSong('${s.id}')">Producción</button></div>`}async function version(id){let comentario=prompt('Describe los cambios de esta versión:')||'';try{await api('/api/sesiones/'+id+'/versiones',body({comentario}));openSong(currentSong.id)}catch(e){alert(e.message)}}
+function songRow(s){return `<div class="item"><b>♫ ${esc(s.titulo)}</b><button onclick="openSong('${s.id}')">Producción</button></div>`}async function version(id){let comentario=prompt('Describe los cambios de esta versión:')||'';try{await api('/api/sesiones/'+id+'/versiones',body({comentario}));openSong(currentSong.id)}catch(e){alert(e.message)}}
 const $ = id => document.getElementById(id);
 let artist, currentAlbum, currentSong, editing, photo, selectedPhoto;
 let previewUrl;
-const pages = ['home', 'manager', 'profile', 'editor', 'artistPane', 'albumPane', 'songPane', 'arrangements', 'globalProjects'];
+const pages = ['home', 'manager', 'profile', 'editor', 'artistPane', 'albumPane', 'songPane', 'arrangements', 'globalProjects', 'catalogPane', 'playlistsPane'];
 const trail = ['home'];
 function display() {
     const page = trail.at(-1);
@@ -12,24 +12,30 @@ function display() {
     $('peopleTab').setAttribute('aria-pressed', page === 'manager');
     $('productionsTab').setAttribute('aria-pressed', page === 'projectManager');
     if (page === 'projectManager') loadGlobalProjects();
-    if (page !== 'songPane') document.querySelectorAll('#songPane audio').forEach(audio => audio.pause());
+    if (page !== 'songPane' && page !== 'catalogPane') disposeWavePlayers();
+    document.querySelectorAll('main audio').forEach(audio => audio.pause());
     $('nav').hidden = page === 'home';
     $('sideHome').setAttribute('aria-current', page === 'home' ? 'page' : 'false');
-    $('sideArtists').setAttribute('aria-current', ['home', 'arrangements'].includes(page) ? 'false' : 'page');
+    $('sideArtists').setAttribute('aria-current', ['home', 'arrangements', 'catalogPane', 'playlistsPane'].includes(page) ? 'false' : 'page');
     $('sideArrangements').setAttribute('aria-current', page === 'arrangements' ? 'page' : 'false');
     if (page !== 'arrangements') $('takePlayer').pause();
     const projectPath = trail.includes('projectManager');
-    const manager = projectPath ? 'Gestión de proyectos' : 'Gestión de artistas';
+    const manager = projectPath ? 'Gestión de producciones' : 'Gestión de artistas';
     const artistLabel = ['profile', 'artistPane', 'editor', 'songPane'].includes(page) && artist ? ' › ' + esc(artist.nombre) : '';
     $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="openArtistManager(${projectPath})">${manager}</button>${artistLabel}`;
     if (page === 'arrangements') $('crumbPath').innerHTML = '<button onclick="go(\'home\')">Inicio</button> › Arreglos';
-    if (page === 'songPane' && currentSong) songBreadcrumbs();
+    if (page === 'songPane' && currentSong && workflow) renderWorkflow();
+    if (page === 'albumPane' && currentAlbum) renderAlbumPage();
+    if (page === 'catalogPane') { $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › Catálogo`; loadCatalog(); }
+    if (page === 'playlistsPane') { $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › Playlist`; loadPlaylists(); }
+    $('sideCatalog').setAttribute('aria-current',page === 'catalogPane' ? 'page' : 'false');
+    $('sidePlaylists').setAttribute('aria-current',page === 'playlistsPane' ? 'page' : 'false');
     $('error').textContent = '';
     window.scrollTo(0, 0);
     if (page === 'profile' && artist) renderProfile();
     if (visible === 'manager') {
         const projects = page === 'projectManager';
-        $('managerTitle').textContent = projects ? 'Gestión de proyectos por artistas' : 'Gestión de artistas';
+        $('managerTitle').textContent = projects ? 'Gestión de producciones' : 'Gestión de artistas';
         $('managerDescription').textContent = projects ? 'Elegí un artista para gestionar sus discos y canciones.' : 'Buscá un artista para consultar o modificar su ficha.';
         loadLibrary();
     }
@@ -115,7 +121,7 @@ async function loadLibrary() {
               </button>
               <details><summary aria-label="Opciones de ${esc(row.nombre)}">•••</summary>
                 <button class="alt" onclick="editArtist('${row.id}')">Editar artista</button>
-                <button class="alt" onclick="openArtist('${row.id}', ${!projects})">${projects ? 'Ver ficha' : 'Ver proyectos'}</button>
+                <button class="alt" onclick="openArtist('${row.id}', ${!projects})">${projects ? 'Ver ficha' : 'Ver producciones'}</button>
               </details>
             </article>`).join('') +
             '<button class="card artist-new" onclick="editArtist()"><span>＋</span>Nuevo artista</button>';
@@ -220,7 +226,10 @@ async function saveArtist(event) {
     } catch (error) { report(error); }
     finally { button.disabled = false; }
 }
-display();
+// La primera pantalla depende de funciones de los módulos cargados después.
+// Esperar al documento completo evita cortar este archivo antes de inicializar
+// las redes sociales y los demás controles del artista.
+window.addEventListener('DOMContentLoaded', () => display(), {once:true});
 
 function fileDrag(event) {
     return Array.from(event.dataTransfer?.types || []).includes('Files');

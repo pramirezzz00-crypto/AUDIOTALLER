@@ -27,6 +27,10 @@ def migrate(db, database):
         if exists and db.execute('SELECT version FROM schema_audio').fetchone()[0] >= 1:
             migrate_session_selection(db, database)
             migrate_file_operations(db, database)
+            migrate_publication(db, database)
+            migrate_catalog(db, database)
+            migrate_cloud_portal(db, database)
+            migrate_portal_feedback(db, database)
             return
         db.execute('BEGIN IMMEDIATE')
         backup = database.with_name(database.stem + '.respaldo-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
@@ -101,6 +105,10 @@ def migrate(db, database):
             db.execute('INSERT INTO schema_audio VALUES(2)')
             db.commit()
             migrate_file_operations(db, database)
+            migrate_publication(db, database)
+            migrate_catalog(db, database)
+            migrate_cloud_portal(db, database)
+            migrate_portal_feedback(db, database)
         except Exception:
             db.rollback()
             raise
@@ -148,6 +156,118 @@ def migrate_file_operations(db, database):
             datos TEXT NOT NULL, resultado TEXT, error TEXT, copiados INTEGER DEFAULT 0,
             total INTEGER DEFAULT 0, creado TEXT DEFAULT CURRENT_TIMESTAMP, actualizado TEXT DEFAULT CURRENT_TIMESTAMP)""")
         db.execute('UPDATE schema_audio SET version=3')
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
+def migrate_publication(db, database):
+    """Ficha editorial separada: una obra puede tener varias grabaciones/ISRC.
+
+    No se reinterpretan notas antiguas ni se asignan códigos oficiales. Las
+    claves foráneas conservan los vínculos con las personas y proyectos reales.
+    """
+    if db.execute('SELECT version FROM schema_audio').fetchone()[0] >= 4:
+        return
+    db.execute('BEGIN IMMEDIATE')
+    backup = database.with_name(database.stem + '.respaldo-publicacion-' +
+                                datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
+    try:
+        with closing(sqlite3.connect(database)) as source, closing(sqlite3.connect(backup)) as target:
+            source.backup(target)
+        for table, parent in [('registro_persona', 'artistas'), ('registro_obra', 'canciones'),
+                              ('registro_lanzamiento', 'discos')]:
+            db.execute(f'CREATE TABLE {table}(id TEXT PRIMARY KEY REFERENCES {parent}(id), datos TEXT NOT NULL)')
+        db.execute('''CREATE TABLE registro_grabacion(id TEXT PRIMARY KEY,
+            cancion_id TEXT NOT NULL REFERENCES canciones(id), datos TEXT NOT NULL)''')
+        db.execute('UPDATE schema_audio SET version=4')
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
+def migrate_catalog(db, database):
+    """Catálogo y selecciones de entrega, sin duplicar ni trasladar el audio.
+
+    Cada favorito referencia un archivo concreto. Un enlace conserva una
+    instantánea de selección y permisos, independiente de ediciones posteriores.
+    """
+    if db.execute('SELECT version FROM schema_audio').fetchone()[0] >= 5:
+        return
+    db.execute('BEGIN IMMEDIATE')
+    backup = database.with_name(database.stem + '.respaldo-catalogo-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
+    try:
+        with closing(sqlite3.connect(database)) as source, closing(sqlite3.connect(backup)) as target:
+            source.backup(target)
+        statements = [
+            '''CREATE TABLE ficha_cancion(id TEXT PRIMARY KEY REFERENCES canciones(id), datos TEXT NOT NULL,
+               actualizado TEXT DEFAULT CURRENT_TIMESTAMP)''',
+            '''CREATE TABLE catalogo_audio(archivo_id TEXT PRIMARY KEY REFERENCES archivos(id), favorito INTEGER DEFAULT 0,
+               clase TEXT DEFAULT '', version TEXT DEFAULT '', notas TEXT DEFAULT '',
+               grabacion_id TEXT REFERENCES registro_grabacion(id) ON DELETE SET NULL)''',
+            '''CREATE TABLE playlists(id TEXT PRIMARY KEY, nombre TEXT NOT NULL, notas TEXT DEFAULT '',
+               revision INTEGER DEFAULT 1, creado TEXT DEFAULT CURRENT_TIMESTAMP, actualizado TEXT DEFAULT CURRENT_TIMESTAMP)''',
+            '''CREATE TABLE playlist_items(playlist_id TEXT REFERENCES playlists(id), archivo_id TEXT REFERENCES archivos(id),
+               posicion INTEGER NOT NULL, PRIMARY KEY(playlist_id,archivo_id), UNIQUE(playlist_id,posicion))''',
+            '''CREATE TABLE entregas_playlist(id TEXT PRIMARY KEY, playlist_id TEXT REFERENCES playlists(id), token_hash TEXT UNIQUE NOT NULL,
+               nombre TEXT NOT NULL, instantanea TEXT NOT NULL, descarga INTEGER NOT NULL DEFAULT 0,
+               clave_hash TEXT DEFAULT '', vence REAL NOT NULL, revocada INTEGER DEFAULT 0, creado TEXT DEFAULT CURRENT_TIMESTAMP)''',
+        ]
+        for statement in statements:
+            db.execute(statement)
+        db.execute('UPDATE schema_audio SET version=5')
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
+def migrate_cloud_portal(db, database):
+    """Registro de publicaciones externas; las credenciales se guardan fuera de SQLite."""
+    if db.execute('SELECT version FROM schema_audio').fetchone()[0] >= 6:
+        return
+    db.execute('BEGIN IMMEDIATE')
+    backup=database.with_name(database.stem+'.respaldo-portal-'+datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.sqlite3')
+    try:
+        with closing(sqlite3.connect(database)) as source, closing(sqlite3.connect(backup)) as target:
+            source.backup(target)
+        db.execute('CREATE TABLE portal_config(id INTEGER PRIMARY KEY CHECK(id=1),datos TEXT NOT NULL)')
+        db.execute('''CREATE TABLE portal_publicaciones(id TEXT PRIMARY KEY,playlist_id TEXT NOT NULL REFERENCES playlists(id),
+            proyecto TEXT NOT NULL,email TEXT NOT NULL,artist_uid TEXT DEFAULT '',url TEXT DEFAULT '',estado TEXT DEFAULT '',
+            actualizado TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(playlist_id,proyecto))''')
+        db.execute('''CREATE TABLE portal_drive(archivo_id TEXT REFERENCES archivos(id),proyecto TEXT NOT NULL,
+            sha256 TEXT NOT NULL,datos TEXT NOT NULL,PRIMARY KEY(archivo_id,proyecto,sha256))''')
+        db.execute('UPDATE schema_audio SET version=6')
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
+def migrate_portal_feedback(db, database):
+    """Devoluciones inmutables del artista y seguimiento privado del productor.
+
+    Se conservan incluso si la próxima entrega quita el audio de la playlist.
+    Ninguna contraseña ni token se almacena en esta tabla.
+    """
+    if db.execute('SELECT version FROM schema_audio').fetchone()[0] >= 7:
+        return
+    db.execute('BEGIN IMMEDIATE')
+    backup=database.with_name(database.stem+'.respaldo-devoluciones-'+datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.sqlite3')
+    try:
+        with closing(sqlite3.connect(database)) as source, closing(sqlite3.connect(backup)) as target:
+            source.backup(target)
+        db.execute('''CREATE TABLE portal_devoluciones(
+            id TEXT PRIMARY KEY,publicacion_id TEXT NOT NULL REFERENCES portal_publicaciones(id),
+            playlist_id TEXT NOT NULL REFERENCES playlists(id),email TEXT NOT NULL,
+            archivo_id TEXT NOT NULL,cancion_id TEXT NOT NULL,drive_id TEXT NOT NULL,
+            revision INTEGER NOT NULL,etiqueta TEXT NOT NULL,texto TEXT NOT NULL,
+            segundo REAL NOT NULL DEFAULT 0,creado TEXT NOT NULL,
+            estado TEXT NOT NULL DEFAULT 'Pendiente',nota_interna TEXT NOT NULL DEFAULT '')''')
+        db.execute('CREATE INDEX devoluciones_cancion ON portal_devoluciones(cancion_id,creado)')
+        db.execute('UPDATE schema_audio SET version=7')
         db.commit()
     except Exception:
         db.rollback()

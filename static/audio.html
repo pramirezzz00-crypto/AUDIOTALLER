@@ -14,9 +14,10 @@
 <header class="app-brand"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M2 16h4l3-8 4 16 4-21 4 26 4-15 2 2h3"/></svg> AudioTaller</header>
 <aside class="sidebar" aria-label="Navegación">
   <button aria-label="Inicio" id="sideHome" onclick="go('home')">⌂ <span>Inicio</span></button>
-  <button aria-label="Artistas y proyectos" id="sideArtists" onclick="openArtistManager()">♧ <span>Artistas y proyectos</span></button>
+  <button aria-label="Artistas y producciones" id="sideArtists" onclick="openArtistManager()">♧ <span>Artistas y producciones</span></button>
   <button id="sideArrangements" aria-label="Arreglos" onclick="openArrangements()">♫ <span>Arreglos</span></button>
-  <button aria-label="Biblioteca" disabled title="Pendiente">♫ <span>Biblioteca</span></button>
+  <button id="sidePlaylists" onclick="openPlaylists()">☷ <span>Playlist</span></button>
+  <button id="sideCatalog" onclick="openCatalog()">◫ <span>Catálogo</span></button>
   <button aria-label="Recientes" disabled title="Pendiente">◷ <span>Recientes</span></button>
   <button aria-label="Favoritos" disabled title="Pendiente">☆ <span>Favoritos</span></button>
   <button aria-label="Configuración" class="side-settings" disabled title="Pendiente">⚙ <span>Configuración</span></button>
@@ -29,12 +30,12 @@
   <div class="welcome"><h1>Bienvenidos/as a <span class="mint">AudioTaller</span></h1><p class="muted">Gestión y trazabilidad de tus producciones musicales</p></div>
   <div class="grid">
     <article class="card action"><div class="symbol"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="9" r="4"/><path d="M8 27v-4a8 8 0 0 1 16 0v4M2 24v-3a5 5 0 0 1 5-5m23 8v-3a5 5 0 0 0-5-5"/><circle cx="6" cy="11" r="3"/><circle cx="26" cy="11" r="3"/></svg></div><h2>Gestión de artistas</h2><p class="muted">Consultá las fichas y administrá tus artistas.</p><button onclick="go('manager')">Ver artistas</button></article>
-    <article class="card action"><div class="symbol"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M11 23V8l16-4v15M11 12l16-4"/><ellipse cx="7" cy="24" rx="4" ry="3"/><ellipse cx="23" cy="20" rx="4" ry="3"/></svg></div><h2>Gestión de proyectos por artistas</h2><p class="muted">Administrá discos, EP, singles y canciones.</p><button onclick="go('projectManager')">Gestionar proyectos</button></article>
+    <article class="card action"><div class="symbol"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M11 23V8l16-4v15M11 12l16-4"/><ellipse cx="7" cy="24" rx="4" ry="3"/><ellipse cx="23" cy="20" rx="4" ry="3"/></svg></div><h2>Gestión de producciones</h2><p class="muted">Administrá discos, EP, singles y canciones.</p><button onclick="go('projectManager')">Gestionar producciones</button></article>
   </div>
 </section>
 <div id="moduleTabs" class="module-tabs" hidden>
   <button class="alt" id="peopleTab" onclick="go('manager')">♧ Artistas</button>
-  <button class="alt" id="productionsTab" onclick="go('projectManager')">◉ Proyectos</button>
+  <button class="alt" id="productionsTab" onclick="go('projectManager')">◉ Producciones</button>
 </div>
 <section id="manager" hidden>
   <div class="heading"><div><h1 id="managerTitle">Gestión de artistas</h1><p id="managerDescription" class="muted"></p></div><button onclick="editArtist()">＋ Nuevo artista</button></div>
@@ -50,7 +51,7 @@
     <div id="profileAvatar" class="project-art"></div>
     <div><h1 id="profileName"></h1><p id="profileCounts" class="muted"></p></div>
     <div class="row project-actions">
-      <button class="alt" onclick="editArtist(artist.id)">Editar artista</button><button onclick="openArtist(artist.id, true)">Ver proyectos</button>
+      <button class="alt" onclick="editArtist(artist.id)">Editar artista</button><button class="alt" onclick="publicationDialog('persona',artist.id).catch(report)">Identificación profesional</button><button onclick="openArtist(artist.id, true)">Ver producciones</button>
       <button onclick="openProjectFromProfile('album')">＋ Generar nuevo disco</button>
       <button onclick="openProjectFromProfile('song')">＋ Generar nueva canción</button>
     </div>
@@ -95,19 +96,19 @@
   </form>
 </section>
 <section id="artistPane" hidden>
-  <div class="project-crumb"><button class="alt" onclick="go('home')">Inicio</button> › <button class="alt" onclick="go('home'); go('projectManager')">Gestión de proyectos</button> › <span id="projectArtistCrumb"></span></div>
+  <div class="project-crumb"><button class="alt" onclick="go('home')">Inicio</button> › <button class="alt" onclick="go('home'); go('projectManager')">Gestión de producciones</button> › <span id="projectArtistCrumb"></span></div>
   <div class="project-head">
     <div id="projectArtistCover" class="project-art"></div>
     <div><h1 id="artistName"></h1><p id="projectCounts" class="muted"></p><div id="artistSocials" class="row social-links"></div></div>
     <div class="row project-actions">
-      <button class="alt" onclick="editArtist(artist.id)">Editar artista</button>
+      <button class="alt" onclick="editArtist(artist.id)">Editar artista</button><button class="alt" onclick="publicationDialog('persona',artist.id).catch(report)">Identificación profesional</button>
       <button onclick="projectForm('album')">＋ Generar nuevo disco</button>
       <button onclick="projectForm('song')">＋ Generar nueva canción</button>
     </div>
   </div>
   <div class="filters project-tools">
-    <input id="projectSearch" type="search" aria-label="Buscar proyectos o canciones">
-    <select id="projectType" aria-label="Tipo"><option value="">Todos los proyectos</option><option>Álbum</option><option>EP</option><option>Single</option><option value="loose">Canciones independientes</option></select>
+    <input id="projectSearch" type="search" aria-label="Buscar producciones o canciones">
+    <select id="projectType" aria-label="Tipo"><option value="">Todas las producciones</option><option>Álbum</option><option>EP</option><option>Single</option><option value="loose">Canciones independientes</option></select>
     <select id="projectOrder" aria-label="Orden"><option value="actualizado">Última modificación</option><option value="creado">Fecha de creación</option><option value="nombre">Nombre A–Z</option></select>
     <button class="alt" id="projectGrid" aria-label="Cuadrícula" title="Cuadrícula">▦</button>
     <button class="alt" id="projectList" aria-label="Lista" title="Lista">☰</button>
@@ -119,9 +120,18 @@
   <p id="projectFormError" role="alert"></p>
   <div class="form-actions"><button type="button" class="alt" onclick="document.getElementById('projectDialog').close()">Cancelar</button><button>Guardar</button></div>
 </form></dialog>
-<div id="albumPane" class="card wide" hidden><div class="back" onclick="back()">← Artista</div><h2 id="albumTitle"></h2><div class="row"><input id="songTitle" placeholder="Título de canción"><button onclick="newSong(currentAlbum.id)">＋ Canción</button></div><div id="albumSongs" class="list"></div></div><section id="songPane" hidden>
+<section id="albumPane" hidden>
+  <div id="albumHero" class="album-hero"></div>
+  <div id="albumActions" class="row album-actions"></div>
+  <div id="albumNotes" class="muted"></div>
+  <div class="heading album-song-tools"><h2 id="albumSongsTitle">Canciones</h2>
+    <input id="albumSearch" type="search" aria-label="Buscar canciones del disco" placeholder="Buscar en este disco…" oninput="renderAlbumSongs()">
+    <button onclick="projectForm('song',currentAlbum.id)">＋ Agregar canción</button></div>
+  <div class="album-song-scroll"><table class="album-track-table"><thead><tr><th scope="col">#</th><th scope="col">Título</th><th scope="col">Artista</th><th scope="col">Estado</th><th scope="col">Duración</th><th scope="col"><span class="muted">Acción</span></th></tr></thead><tbody id="albumSongs"></tbody></table></div>
+  <p id="albumEmpty" class="muted" hidden></p>
+</section><section id="songPane" hidden>
   <div class="heading"><h1 id="songHeading"></h1><div>
-    <button class="alt" onclick="editProductionSong()">Editar canción</button><button class="alt" onclick="productionCopyDialog()">Incorporar producción a AudioTaller</button>
+    <button onclick="songDataDialog(currentSong.id).catch(report)">Datos de la canción</button><button class="alt" onclick="productionCopyDialog()">Incorporar producción a AudioTaller</button>
     <button onclick="sessionDialog()">Vincular sesión DAW</button>
   </div></div>
   <div id="songSummary" class="card song-summary"></div>
@@ -133,7 +143,7 @@
   <details class="card"><summary>Historial de producción</summary><div id="songHistory"></div></details>
 </section>
 <section id="globalProjects" hidden>
-  <div class="heading"><div><h1>Proyectos</h1><p class="muted">Todos los discos y canciones de tu biblioteca.</p></div></div>
+  <div class="heading"><div><h1>Producciones</h1><p class="muted">Todos los discos y canciones de tu biblioteca.</p></div><div class="row"><button onclick="newGlobalProject('album').catch(report)">＋ Nuevo disco</button><button onclick="newGlobalProject('song').catch(report)">＋ Nueva canción suelta</button></div></div>
   <div class="filters"><input id="globalSearch" type="search" placeholder="Buscar disco, canción, artista o tipo…" oninput="renderGlobalProjects()">
 
   </div>
@@ -156,4 +166,31 @@
     </article>
   </div>
 </section>
-</main><script src="/static/navigation.js"></script><script src="/static/projects.js"></script><script src="/static/arrangements.js"></script><script src="/static/management-ui.js"></script><script src="/static/waveforms.js"></script><script src="/static/workflow.js"></script><script src="/static/session-operations.js"></script></html>
+<section id="catalogPane" hidden>
+  <div class="heading"><div><h1>Catálogo de audios</h1><p class="muted">Encontrá mezclas, masters y referencias por metadata. Cada favorito conserva su archivo y versión.</p></div><button onclick="importCatalogAudio().catch(report)">＋ Incorporar audio</button></div>
+  <form id="catalogFilters" class="catalog-filters" onsubmit="event.preventDefault();loadCatalog(true)">
+    <label class="catalog-query">Buscar<input name="q" placeholder="Canción, artista, letra, etiquetas, créditos…"></label>
+    <label>Tipo<select name="clase"><option value="">Todos</option><option>Demo</option><option>Maqueta</option><option>Grabación</option><option>Mezcla</option><option>Master</option><option>Referencia</option><option>Otro</option></select></label>
+    <label>Artista<select name="artista_id" id="catalogArtist"><option value="">Todos</option></select></label>
+    <label>Disco<select name="disco_id" id="catalogAlbum"><option value="">Todos</option></select></label>
+    <label>Estado<select name="estado"><option value="">Todos</option><option>Idea</option><option>En preproducción</option><option>En producción</option><option>Finalizada</option><option>En pausa</option></select></label>
+    <label>Género<input name="genero" list="catalogGenres"></label><datalist id="catalogGenres"></datalist>
+    <label>Tonalidad<input name="tonalidad" list="catalogKeys"></label><datalist id="catalogKeys"></datalist>
+    <label>Idioma<input name="idioma" list="catalogLanguages"></label><datalist id="catalogLanguages"></datalist>
+    <label>Año<input name="anio" inputmode="numeric" maxlength="4"></label><label>Publicación<select name="enlaces"><option value="">Todos</option><option value="1">Con enlaces de publicación</option><option value="0">Sin enlaces de publicación</option></select></label>
+    <label>BPM desde<input type="number" name="bpm_min" min="0" max="1000" step="any"></label><label>BPM hasta<input type="number" name="bpm_max" min="0" max="1000" step="any"></label>
+    <label class="filter-box"><input type="checkbox" name="favoritos" value="1"> ★ Solo favoritos</label>
+    <input type="hidden" name="cancion_id"><button>Aplicar filtros</button><button type="button" class="alt" onclick="clearCatalogFilters()">Limpiar</button>
+  </form>
+  <div class="heading"><p id="catalogCount" role="status"></p><div class="row"><button class="alt" onclick="addSelectedToPlaylist().catch(report)">＋ Seleccionados a playlist</button><button class="alt" onclick="playlistFromFavorites().catch(report)">Crear desde favoritos</button></div></div>
+  <div id="catalogAudios"></div><div class="row"><button class="alt" id="catalogPrev" onclick="catalogPage(-1)">Anterior</button><button class="alt" id="catalogNext" onclick="catalogPage(1)">Siguiente</button></div>
+</section>
+<section id="playlistsPane" hidden>
+  <div class="heading"><div><h1>Playlist</h1><p class="muted">Selecciones de audios para revisar y preparar entregas al artista.</p></div><div class="row"><button class="alt" onclick="portalSetupDialog().catch(report)">Conectar portal web</button><button onclick="newPlaylistDialog().catch(report)">＋ Nueva playlist</button></div></div>
+  <div class="playlist-layout"><aside id="playlistLibrary" class="list"></aside><article id="playlistDetail" class="card"><p>Elegí una playlist o creá una desde los favoritos del Catálogo.</p></article></div>
+</section>
+<dialog id="songDataDialog" class="card song-data-dialog"><form id="songDataForm"><div class="heading"><h2 id="songDataTitle">Datos de la canción</h2><button type="button" class="alt" onclick="closeSongData()">Cerrar</button></div>
+  <div id="songDataTabs" class="module-tabs" role="tablist"></div><div id="songDataFields"></div><p id="songDataError" role="alert"></p>
+  <div class="form-actions"><a id="songDataExport" class="mint" target="_blank" rel="noopener">Exportar ficha guardada</a><button type="button" class="alt" onclick="closeSongData()">Cancelar</button><button id="saveSongData">Guardar todos los cambios</button></div></form></dialog>
+<dialog id="portalPreview" class="card portal-preview"><div class="heading"><h2>Vista previa de entrega</h2><button class="alt" onclick="closePortalPreview()">Cerrar</button></div><p class="muted">Vista local: requiere AudioTaller abierto. No es todavía un enlace público de Internet.</p><iframe id="portalFrame" title="Portal del artista" sandbox="allow-scripts allow-same-origin allow-forms allow-downloads"></iframe></dialog>
+</main><script src="/static/navigation.js"></script><script src="/static/projects.js"></script><script src="/static/arrangements.js"></script><script src="/static/management-ui.js"></script><script src="/static/waveforms.js"></script><script src="/static/workflow.js"></script><script src="/static/session-operations.js"></script><script src="/static/publication.js"></script><script src="/static/album.js"></script><link rel="stylesheet" href="/static/catalog.css"><script src="/static/song-data.js"></script><script src="/static/catalog-ui.js"></script><script src="/static/cloud-ui.js"></script></html>

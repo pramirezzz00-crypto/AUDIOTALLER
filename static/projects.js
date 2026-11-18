@@ -19,10 +19,16 @@ async function loadProjects(reset = false, selection) {
     $('artistName').textContent = owner.nombre;
     $('projectArtistCrumb').textContent = owner.nombre;
     $('projectArtistCover').innerHTML = projectImage(owner.imagen, '♫');
-    $('projectSearch').placeholder = 'Buscar en los proyectos de ' + owner.nombre + '…';
+    $('projectSearch').placeholder = 'Buscar en las producciones de ' + owner.nombre + '…';
     $('projectCounts').textContent = owner.tipo + ' · ' + countLabel(projects.discos.length, 'disco', 'discos') + ' · ' +
         countLabel(projects.canciones.length, 'canción', 'canciones');
     renderProjects();
+    // Editar el disco, agregar canciones o asociar sueltas actualiza también la
+    // vista del lanzamiento sin regresar al explorador de artistas.
+    if (trail.at(-1) === 'albumPane' && currentAlbum?.artista_id === owner.id) {
+        albumOwner = owner;
+        renderAlbumPage();
+    }
 }
 
 const countLabel = (count, singular, plural) => count + ' ' + (count === 1 ? singular : plural);
@@ -42,7 +48,7 @@ function renderProjects() {
     const query = projectText($('projectSearch').value.trim());
     const filter = $('projectType').value;
     const order = $('projectOrder').value;
-    const matches = song => projectText(song.titulo).includes(query);
+    const matches = song => projectText(song.titulo+' '+(song.busqueda_metadata || '')).includes(query);
     const albums = projects.discos.filter(album => filter !== 'loose' && (!filter || projectType(album) === filter) &&
         (projectText(album.nombre).includes(query) || albumTracks(album.id).some(matches)));
     albums.sort((a, b) => (order === 'nombre' ? 0 : (b[order] || '').localeCompare(a[order] || '')) ||
@@ -55,7 +61,7 @@ function renderProjects() {
     $('projectList').setAttribute('aria-pressed', projectMode === 'list');
     $('projectTiles').innerHTML = `<div class="project-tiles ${projectMode === 'list' ? 'list-mode' : ''}">
         ${albums.map(album => `<article class="project-tile ${album.id === selectedProject ? 'selected' : ''}">
-            <button class="project-select" aria-pressed="${album.id === selectedProject}" onclick="selectProject('${album.id}')">
+            <button class="project-select" aria-label="Abrir disco ${esc(album.nombre)}" onclick="openAlbum('${album.id}')">
               <span class="project-art">${projectImage(album.portada, '◉')}</span><span><strong>${esc(album.nombre)}</strong></span>
               <span class="muted">${esc(projectType(album))} · ${trackCount(albumTracks(album.id))}</span>
             </button><details><summary aria-label="Opciones del disco">⋯</summary>
@@ -63,7 +69,7 @@ function renderProjects() {
         </article>`).join('')}</div>
         ${loose.length ? `<h3 class="project-subhead">Canciones independientes</h3>
           <button class="alt" aria-pressed="${selectedProject === 'loose'}" onclick="selectProject('loose')">♫ ${trackCount(loose)} · Ver canciones</button>` : ''}
-        ${!albums.length && !loose.length ? '<p class="muted">No hay proyectos que coincidan.</p>' : ''}`;
+        ${!albums.length && !loose.length ? '<p class="muted">No hay producciones que coincidan.</p>' : ''}`;
     const album = albums.find(item => item.id === selectedProject);
     const allSongs = album ? albumTracks(album.id) : loose;
     const songs = album && query && !projectText(album.nombre).includes(query) ? allSongs.filter(matches) : allSongs;
@@ -74,7 +80,7 @@ function renderProjects() {
 function renderProjectDetail(album, songs, total) {
     const panel = $('projectDetail');
     if (!selectedProject) {
-        panel.innerHTML = '<h2>Proyectos del artista</h2><p class="muted">Seleccioná un disco o creá un proyecto para empezar.</p>';
+        panel.innerHTML = '<h2>Producciones del artista</h2><p class="muted">Seleccioná un disco o creá una producción para empezar.</p>';
         return;
     }
     const date = value => value ? esc(value.slice(0, 10)) : 'Sin registro';
@@ -85,6 +91,7 @@ function renderProjectDetail(album, songs, total) {
       ${album ? `<p class="muted">Creado: ${date(album.creado)} · Última edición: ${date(album.actualizado)}</p>` : ''}</div>
       ${album ? `<button class="alt" onclick="projectForm('album', '${album.id}')">Editar disco</button>` : ''}
     </div>
+    ${album ? `<div class="row"><button class="alt" onclick="associateLooseSongs('${album.id}').catch(report)">Incorporar canciones sueltas</button><button class="alt" onclick="publicationDialog('lanzamiento','${album.id}').catch(report)">Ficha de lanzamiento</button><button class="alt" onclick="productionCreditsDialog('disco','${album.id}').catch(report)">Artistas y músicos</button></div>` : ''}
     ${album?.lanzamiento ? `<p>Lanzamiento previsto: ${esc(album.lanzamiento)}</p>` : ''}
     ${album?.notas ? `<p>${esc(album.notas)}</p>` : ''}
     <div class="heading"><h3>♫ Canciones (${songs.length})</h3><button class="alt" onclick="projectForm('song', '${album?.id || ''}')">＋ Agregar canción</button></div>
@@ -95,8 +102,9 @@ function renderProjectDetail(album, songs, total) {
       '<p class="muted">Todavía no hay canciones.</p>'}</div>`;
 }
 
-function projectForm(kind, id = '') {
+async function projectForm(kind, id = '') {
     const ownerId = artist.id;
+    const participants = await api('/api/personas');
     const isAlbum = kind === 'album';
     const album = isAlbum ? projects.discos.find(item => item.id === id) : null;
     const dialog = $('projectDialog');
@@ -109,12 +117,15 @@ function projectForm(kind, id = '') {
         <label>Lanzamiento previsto <input type="date" name="lanzamiento" value="${esc(album?.lanzamiento)}"></label>
         <label>Notas <textarea name="notas">${esc(album?.notas)}</textarea></label>` : `
         <label>Título <input name="titulo" required maxlength="150"></label>
-        <label>Proyecto <select name="disco_id"><option value="">Canción independiente</option>${projects.discos.map(item =>
+        <label>Disco <select name="disco_id"><option value="">Canción independiente</option>${projects.discos.map(item =>
             `<option value="${item.id}" ${item.id === id ? 'selected' : ''}>${esc(item.nombre)}</option>`).join('')}</select></label>
         <label id="trackField">Número de pista <input name="pista" type="number" min="1" max="99999"></label>
         <label>BPM <input name="bpm" type="number" min="1" step="any"></label>
         <label>Tonalidad <input name="tonalidad"></label>
         <label>Notas <textarea name="metadata"></textarea></label>`;
+    // Las canciones existentes se asocian sin mover sus sesiones o sus archivos.
+    if (isAlbum) $('projectFormFields').insertAdjacentHTML('beforeend', looseSongFields(projects.sueltas));
+    $('projectFormFields').insertAdjacentHTML('beforeend', collaboratorFields(participants));
     let cover;
     const form = $('projectForm');
     if (isAlbum) {
@@ -142,6 +153,8 @@ function projectForm(kind, id = '') {
         submit.disabled = true;
         try {
             const data = Object.fromEntries(new FormData(form));
+            data.creditos = readCollaborators(form);
+            if (isAlbum) data.canciones = [...form.querySelectorAll('[data-loose]:checked')].map(input => input.value);
             if (isAlbum) data.portada = cover ? await readProjectCover(cover) : (album?.portada || '');
             const endpoint = isAlbum ? '/discos' + (album ? '/' + album.id : '') : '/canciones';
             const result = await api('/api/artistas/' + ownerId + endpoint, body(data));

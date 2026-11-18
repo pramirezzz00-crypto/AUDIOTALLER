@@ -1,10 +1,15 @@
 import json
 from contextlib import contextmanager
 from migrations import migrate
-from management import register_management, save_roles
+from management import register_management, save_roles, song_search_text
 from production import register_production
 from daw_operations import register_daw_operations
 from folder_migration import register_folder_migration
+from publication import register_publication, validate_collaborators, add_collaborators, validate_loose_songs, attach_songs
+from song_hub import register_song_hub
+from catalog import register_catalog
+from listening_portal import register_listening_portal
+from cloud_portal import register_cloud_portal
 from flask import Flask, jsonify, request, send_file
 from itsdangerous import BadSignature, URLSafeSerializer
 from pathlib import Path
@@ -106,6 +111,8 @@ def artist_content(aid):
             """SELECT c.*, x.datos, e.estado, e.actualizado FROM canciones c LEFT JOIN detalle_cancion x ON x.id=c.id
                LEFT JOIN estado_cancion e ON e.id=c.id
                WHERE c.artista_id=? ORDER BY c.creado, c.id""", (aid,))]
+        for row in songs:
+            row['busqueda_metadata'] = song_search_text(db,row['id'])
     for row in albums + songs:
         row.update(json.loads(row.pop('datos') or '{}'))
     return jsonify(discos=albums, canciones=songs, sueltas=[row for row in songs if not row['disco_id']])
@@ -125,6 +132,11 @@ def album_new(aid, did=None):
     details = json.dumps(dict(tipo=tipo, portada=portada, lanzamiento=data.get('lanzamiento', ''), notas=data.get('notas', '')))
     editing = did is not None
     with db_open() as db:
+        db.execute('BEGIN IMMEDIATE')
+        songs = data.get('canciones', [])
+        collaborators = data.get('creditos', [])
+        validate_loose_songs(db, aid, songs)
+        validate_collaborators(db, collaborators)
         if editing:
             result = db.execute('UPDATE discos SET nombre=? WHERE id=? AND artista_id=?', (name, did, aid))
             if not result.rowcount:
@@ -141,6 +153,8 @@ def album_new(aid, did=None):
             folder.mkdir(parents=True, exist_ok=False)
             db.execute('INSERT INTO discos VALUES(?,?,?,?)', (did, aid, name, str(folder)))
             db.execute('INSERT INTO detalle_disco(id,datos,creado) VALUES(?,?,CURRENT_TIMESTAMP)', (did, details))
+        attach_songs(db, did, songs)
+        add_collaborators(db, did, 'disco', collaborators)
     return jsonify(id=did), 200 if editing else 201
 
 
@@ -154,6 +168,8 @@ def song_new(aid):
     data=request.get_json() or {};title=data.get('titulo','').strip()
     if not title:return jsonify(error='Ingresá el título de la canción.'),400
     with db_open() as db:
+        collaborators = data.get('creditos', [])
+        validate_collaborators(db, collaborators)
         artist=db.execute('SELECT * FROM artistas WHERE id=?',(aid,)).fetchone()
         if not artist:return jsonify(error='Artista no encontrado.'),404
         album=db.execute('SELECT * FROM discos WHERE id=? AND artista_id=?',(data.get('disco_id',''),aid)).fetchone() if data.get('disco_id') else None
@@ -169,6 +185,7 @@ def song_new(aid):
         db.execute('INSERT INTO canciones(id,artista_id,disco_id,titulo,metadata,carpeta) VALUES(?,?,?,?,?,?)',(sid,aid,data.get('disco_id',''),title,data.get('metadata',''),str(folder)))
         db.execute('INSERT INTO detalle_cancion VALUES(?,?)', (sid, json.dumps(
             dict(pista=int(pista) if pista else None, bpm=data.get('bpm', ''), tonalidad=data.get('tonalidad', '')))))
+        add_collaborators(db, sid, 'cancion', collaborators)
         if album:
             db.execute("""INSERT INTO detalle_disco(id,datos) VALUES(?, '{}')
                           ON CONFLICT(id) DO UPDATE SET actualizado=CURRENT_TIMESTAMP""", (album['id'],))
@@ -303,6 +320,11 @@ def arrangements_audio(token):
 
 
 register_management(app, db_open)
+register_publication(app, db_open)
+register_song_hub(app, db_open)
+register_catalog(app, db_open)
+register_listening_portal(app, db_open)
+register_cloud_portal(app, db_open, lambda: DB.parent)
 register_production(app, db_open, safe_name)
 register_daw_operations(app, db_open, safe_name)
 register_folder_migration(app, db_open, lambda: DB)

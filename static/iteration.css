@@ -69,3 +69,10 @@
 .daw-choice:has(input:checked){border-color:var(--mint);background:#12434b}.daw-choice small{display:block;color:var(--muted);font-size:10px;overflow-wrap:anywhere}
 
 .state-5{--state:#87919b}
+
+/* Selecciones de participantes: las casillas no heredan el ancho de texto. */
+.credit-choice{display:grid;grid-template-columns:minmax(140px,1fr) 2fr;gap:12px;align-items:center}
+.credit-choice input[type=checkbox]{width:auto;margin-right:8px}
+#publicationRecordings fieldset{margin-bottom:18px}
+#publicationMain:disabled input,#publicationMain:disabled textarea,#publicationRecordings fieldset:disabled input,#publicationRecordings fieldset:disabled textarea{opacity:1;color:var(--muted)}
+@media(max-width:600px){.credit-choice{grid-template-columns:1fr}}
