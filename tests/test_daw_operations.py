@@ -53,7 +53,7 @@ class DawOperationsTest(unittest.TestCase):
         exe=self.root/'reaper.exe';exe.touch()
         daws=[dict(id='reaper',nombre='REAPER',ejecutable=str(exe),extension='.rpp',plantilla='',vacio=True,plantillas=[]),
               dict(id='cubase',nombre='Cubase',ejecutable=str(exe),extension='.cpr',plantilla='',vacio=False,plantillas=[])]
-        with patch('daw_operations.installed_daws',return_value=daws),patch('daw_operations.subprocess.Popen') as launch:
+        with patch('daw_operations.installed_daws',return_value=daws),patch('daw_operations.launch_daw') as launch:
             reaper=self.c.post(self.url+'/crear-en-daw',json={'nombre':'Grabación','etapa':'grabacion','daw_id':'reaper'})
             self.assertEqual(reaper.status_code,201,reaper.data)
             self.assertIn('<REAPER_PROJECT',Path(reaper.json['ruta']).read_text())

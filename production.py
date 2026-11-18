@@ -9,6 +9,7 @@ from flask import jsonify, request, send_file
 from management import required_row
 from migrations import LEGACY_STAGE
 from daw_operations import ensure_revisions
+from runtime_paths import open_path
 
 
 # Extensiones de proyecto. El lanzador solo abre archivos de estos tipos mediante Windows.
@@ -202,9 +203,9 @@ def register_production(app, connect, safe_name):
             raise ValueError('Seleccioná un archivo de sesión DAW disponible, por ejemplo un .cpr.')
         # startfile usa la asociación de Windows y recibe una ruta, sin construir comandos.
         try:
-            os.startfile(str(path.resolve()))
+            open_path(str(path.resolve()))
         except OSError as error:
-            raise ValueError('No se pudo abrir la sesión. Revisá la asociación del archivo con su DAW en Windows.') from error
+            raise ValueError('No se pudo abrir la sesión. Revisá la asociación del archivo con su DAW en el sistema.') from error
         return jsonify(ok=True)
 
     def scan_daw_folder(folder, recursive):

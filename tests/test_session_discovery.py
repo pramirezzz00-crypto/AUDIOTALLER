@@ -59,7 +59,7 @@ class SessionDiscoveryTest(unittest.TestCase):
         self.assertEqual(self.client.post(self.url+'/vigente/'+ids[1], json={'activa':False}).status_code, 200)
         self.assertFalse(any(row['vigente'] for row in self.client.get(self.url).json['sesiones']))
         self.client.post(self.url+'/vigente/'+ids[1], json={'activa':True})
-        with patch('production.os.startfile') as launch:
+        with patch('production.open_path') as launch:
             response = self.client.post(self.url+'/sesiones/'+ids[1]+'/abrir', json={})
             self.assertEqual(response.status_code, 200)
             launch.assert_called_once_with(str(Path(found[1]['ruta']).resolve()))

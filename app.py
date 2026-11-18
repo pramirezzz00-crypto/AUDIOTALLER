@@ -16,7 +16,8 @@ from pathlib import Path
 import os, re, sqlite3, uuid
 
 app = Flask(__name__)
-ROOT = Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'AudioTaller'
+from runtime_paths import data_directory
+ROOT = data_directory()
 LIBRARY = ROOT / 'Artistas'
 DB = ROOT / 'audiotaller.sqlite3'
 STAGES = ('01. DEMO', '02. MAQUETADO', '03. GRABACIÓN', '04. PRODUCCIÓN')

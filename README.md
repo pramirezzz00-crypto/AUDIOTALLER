@@ -12,6 +12,11 @@ La integración web es un piloto con proyecto propio Firebase Spark y copias de 
 
 ## Arranque en Windows
 
+La versión instalable de prueba es **0.2.0 beta para Windows x64**. Su compilación,
+componentes incluidos y validaciones se describen en
+[Instalador de Windows](packaging/README.md). No requiere Python ni VS Code en la
+computadora de destino. La integración del portal sigue siendo un piloto.
+
 Desde la carpeta del repositorio, con Python instalado:
 
 ```powershell

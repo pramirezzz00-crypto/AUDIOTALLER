@@ -1,0 +1,32 @@
+AUDIOTALLER 0.2.0 BETA PARA MAC
+
+1. Elegí arm64 para Apple Silicon (M1 o posterior), o x86_64 para Intel.
+2. Abrí el DMG y arrastrá AudioTaller a Aplicaciones.
+3. Abrí AudioTaller desde Aplicaciones.
+
+Esta beta no tiene firma Developer ID ni notarización de Apple. macOS puede
+bloquear su primera apertura. Tras intentar abrirla, revisá Configuración del
+Sistema > Privacidad y seguridad > Abrir de todos modos, solo si confiás en
+la procedencia de esta descarga. No hace falta desactivar la seguridad general.
+Requiere macOS 13 o posterior. No hace falta instalar Python.
+
+DATOS Y ACTUALIZACIONES
+Los datos se guardan en ~/Library/Application Support/AudioTaller.
+Reemplazar la app no elimina las producciones ni la base de datos.
+Realizá una copia de esa carpeta y de los audios antes de cambiar de equipo.
+Las rutas de proyectos de Windows deben volver a vincularse en la Mac.
+Las credenciales se guardan en el Llavero de macOS. Debés reconectar Google
+en cada equipo; los archivos cifrados de Windows no se pueden trasladar.
+
+DAW Y PORTAL
+Se detectan aplicaciones DAW compatibles en /Applications y ~/Applications.
+Para crear sesiones de formatos propietarios se necesita una plantilla nativa.
+Cubase y cada DAW deben estar instalados en la Mac; no se incluyen.
+El portal de artistas continúa siendo piloto: requiere preparar el proyecto
+Firebase y conectar Google como explica el instructivo PDF incluido en la app.
+No activa facturación. Esta descarga no incluye cuentas, claves ni audios.
+
+VALIDACIÓN
+Compilación y diagnóstico automático en macOS nativo, por arquitectura.
+Todavía requiere prueba de uso completa en una Mac física: DAW, audio y OAuth.
+Los avisos de terceros están dentro de la app, en Contents/Resources/third_party.

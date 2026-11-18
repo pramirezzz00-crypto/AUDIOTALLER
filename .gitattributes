@@ -1,2 +1,6 @@
 # Conservar los bytes del instructivo al clonar en Windows y otros sistemas.
 *.pdf binary
+
+*.sh text eol=lf
+*.yml text eol=lf
+*.icns binary

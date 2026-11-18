@@ -37,7 +37,7 @@ async function portalSetupDialog(){
       <label id="cloudClientDrop" class="drop-zone">Arrastrá o elegí el JSON del cliente OAuth de escritorio<input type="file" accept="application/json,.json"><span role="status"></span></label></details>
       <h3>Conectar tu Google</h3><p id="cloudGoogleState" role="status">${esc(state.google.estado)} · ${state.google.cliente?'Conexión preparada':'Falta el perfil de conexión'}</p>
       <div class="row"><button type="button" class="alt" id="cloudConnect">Autorizar Google</button><button type="button" class="alt" id="cloudDisconnect">Desconectar en esta PC</button></div>
-      <p class="muted">Google solicitará acceso a los archivos de esta app y administración de los recursos de tu proyecto para desplegar el portal. Los tokens se cifran para tu cuenta de Windows. Desconectar no borra publicaciones.</p>
+      <p class="muted">Google solicitará acceso a los archivos de esta app y administración de los recursos de tu proyecto para desplegar el portal. Las credenciales se protegen con tu cuenta de Windows o el Llavero de macOS. Desconectar no borra publicaciones.</p>
       <h3>4. Instalar la web</h3><label><input type="checkbox" id="cloudDedicated"> Confirmo que este proyecto es exclusivo de AudioTaller. La instalación configura las reglas de Firestore y la web del sitio indicado.</label>
       <button type="button" id="cloudInstall">Instalar / actualizar portal en Firebase</button><p id="cloudInstallState" role="status"></p>
       <p class="muted">No activa Blaze, Cloud Storage ni facturación. Los audios van a tu Drive y quedan compartidos por enlace. Google aplica sus límites gratuitos.</p>`,async data=>{

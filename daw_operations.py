@@ -3,6 +3,8 @@ import base64
 import hashlib
 import os
 import re
+import sys
+from runtime_paths import launch_daw
 import shutil
 import subprocess
 import uuid
@@ -63,6 +65,15 @@ def ensure_revisions(db, sid):
 def installed_daws(db):
     roots = list(dict.fromkeys(Path(os.environ[key]) for key in ('ProgramFiles','ProgramFiles(x86)','ProgramData') if os.environ.get(key)))
     found = {}
+    if sys.platform == 'darwin':
+        mac_specs = [(name, ext) for name, ext, _ in DAW_SPECS]
+        for root in (Path('/Applications'), Path.home()/'Applications'):
+            for bundle in list(root.glob('*.app')) + list(root.glob('*/*.app')):
+                for name, extension in mac_specs:
+                    if name.lower().replace(' ', '') in bundle.stem.lower().replace(' ', ''):
+                        key = hashlib.sha256(path_key(bundle).encode()).hexdigest()[:20]
+                        found[key] = dict(id=key,nombre=bundle.stem,ejecutable=str(bundle),extension=extension,plantilla='')
+                        break
     for name,extension,patterns in DAW_SPECS:
         for root in roots:
             for pattern in patterns:
@@ -72,7 +83,7 @@ def installed_daws(db):
                     key = hashlib.sha256(path_key(executable).encode()).hexdigest()[:20]
                     found[key] = dict(id=key,nombre=name,ejecutable=str(executable),extension=extension,plantilla='')
     for row in db.execute('SELECT * FROM preferencias_daw'):
-        if Path(row['ejecutable']).is_file():
+        if Path(row['ejecutable']).is_file() or (sys.platform == 'darwin' and Path(row['ejecutable']).is_dir() and Path(row['ejecutable']).suffix.lower() == '.app'):
             found[row['id']] = dict(row)
     for item in found.values():
         templates = []
@@ -152,8 +163,9 @@ def register_daw_operations(app,connect,safe_name):
         executable=Path(data.get('ejecutable',''))
         extension=data.get('extension','').lower()
         name=data.get('nombre','').strip()
-        if not executable.is_absolute() or not executable.is_file() or executable.suffix.lower()!='.exe':
-            raise ValueError('Elegí el ejecutable .exe instalado del DAW.')
+        valid = executable.is_dir() and executable.suffix.lower()=='.app' if sys.platform=='darwin' else executable.is_file() and executable.suffix.lower()=='.exe'
+        if not executable.is_absolute() or not valid:
+            raise ValueError('Elegí la aplicación .app del DAW en macOS o su ejecutable .exe en Windows.')
         if not name or len(name)>100 or not re.fullmatch(r'\.[a-z0-9]{1,10}',extension):
             raise ValueError('Indicá el nombre y extensión de proyecto del DAW, por ejemplo .cpr.')
         template=data.get('plantilla','').strip()
@@ -263,7 +275,7 @@ def register_daw_operations(app,connect,safe_name):
         # El guardado y el registro ya están confirmados. Un error al abrir no pierde la sesión.
         warning=''
         try:
-            subprocess.Popen([daw['ejecutable'],str(file)],shell=False,cwd=str(folder))
+            launch_daw(daw['ejecutable'], file, folder)
         except OSError:
             warning='La sesión quedó guardada. No se pudo iniciar el DAW; podés abrirla con Abrir en DAW.'
         return jsonify(id=identity,ruta=str(file),advertencia=warning),201

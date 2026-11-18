@@ -1,0 +1,29 @@
+AudioTaller 0.2.0 beta para Windows x64
+
+INSTALAR Y ABRIR
+Ejecutá AudioTaller-0.2.0-beta-Setup-x64.exe y seguí el asistente en español.
+Se instala para tu usuario, con accesos en Inicio y una opción para el Escritorio.
+No necesitás instalar Python ni Visual Studio Code.
+Si falta Microsoft Edge WebView2 Runtime, el asistente lo instala desde Microsoft;
+en ese caso hace falta conexión a Internet. Windows 10/11 x64 y .NET Framework 4.8.
+
+DATOS Y ACTUALIZACIONES
+Los artistas, canciones y credenciales se guardan por usuario en:
+%LOCALAPPDATA%\AudioTaller
+Tus sesiones externas conservan sus ubicaciones. Desinstalar la aplicación no
+borra esa carpeta ni las producciones. Cerrá AudioTaller antes de actualizar.
+El instalador no incluye datos ni cuentas del desarrollador.
+
+PORTAL DEL ARTISTA
+La aplicación local se puede probar sin Google. Para publicar una playlist web
+hace falta configurar tu espacio Firebase y autorizar Google Drive. La conexión
+universal para cualquier productor sigue en desarrollo; esta beta no crea ese
+servicio automáticamente. El instructivo PDF se incluye en el menú Inicio.
+
+Esta compilación piloto no tiene firma digital de editor. No reemplaza las
+pruebas en otras computadoras y con proyectos de respaldo antes de uso diario.
+
+COMPONENTES
+Incluye Python y bibliotecas de código abierto, con sus licencias en
+_internal\third_party. El componente WebView2 se distribuye sin modificaciones
+y pertenece a Microsoft. El instalador se construye con Inno Setup.

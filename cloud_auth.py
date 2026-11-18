@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import secrets
+import sys
 import threading
 import time
 import urllib.parse
@@ -85,14 +86,32 @@ def protect(data, decrypt=False):
         ctypes.windll.kernel32.LocalFree(result.data)
 
 
+def mac_keyring():
+    # Backend explícito: jamás usar un almacén alternativo en texto plano.
+    from keyring.backends.macOS import Keyring
+    return Keyring()
+
+
+def using_keychain():
+    return sys.platform == 'darwin'
+
+
 class CredentialStore:
     def __init__(self,path):
         self.path=Path(path)
+    def keychain_account(self):
+        return hashlib.sha256(str(self.path.resolve()).encode()).hexdigest()
     def read(self):
+        if using_keychain():
+            value = mac_keyring().get_password('org.audiotaller.desktop', self.keychain_account())
+            return json.loads(value) if value else {}
         if not self.path.exists():
             return {}
         return json.loads(protect(self.path.read_bytes(),decrypt=True))
     def write(self,values):
+        if using_keychain():
+            mac_keyring().set_password('org.audiotaller.desktop', self.keychain_account(), json.dumps(values))
+            return
         self.path.parent.mkdir(parents=True,exist_ok=True)
         temporary=self.path.with_suffix('.tmp')
         temporary.write_bytes(protect(json.dumps(values).encode()))

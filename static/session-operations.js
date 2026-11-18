@@ -79,8 +79,8 @@ async function newNativeSessionDialog(stage) {
 }
 function associateDawDialog(stage) {
     formDialog('Asociar DAW instalado',
-        '<label>Nombre<input name="nombre" required></label><label>Ejecutable del DAW<input name="ejecutable" required></label>'+
-        '<button type="button" class="alt" id="pickDawExe">Elegir ejecutable</button>'+
+        '<label>Nombre<input name="nombre" required></label><label>Aplicación del DAW (.app en Mac / .exe en Windows)<input name="ejecutable" required></label>'+
+        '<button type="button" class="alt" id="pickDawExe">Elegir aplicación</button>'+
         '<label>Extensión de sus proyectos<input name="extension" placeholder=".cpr, .rpp, .song…" required></label>'+
         '<label>Plantilla nativa (opcional)<input name="plantilla"></label><button type="button" class="alt" id="pickDawTemplate">Elegir plantilla</button>',
         async data=>{

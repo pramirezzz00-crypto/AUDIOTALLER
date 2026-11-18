@@ -1,2 +1,4 @@
 Flask
 pywebview
+
+keyring>=25,<26; sys_platform == "darwin"

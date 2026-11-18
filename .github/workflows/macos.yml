@@ -1,0 +1,41 @@
+name: Instaladores macOS
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/gestion-y-produccion]
+    paths:
+      - '**.py'
+      - 'requirements.txt'
+      - 'packaging/**'
+      - 'static/**'
+      - '.github/workflows/macos.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    name: Mac ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compilar y comprobar instalador
+        run: bash packaging/macos/build.sh
+      - name: Guardar instalador y diagnóstico
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AudioTaller-macos-${{ matrix.arch }}
+          path: output/macos/
+          if-no-files-found: warn
+          retention-days: 30
