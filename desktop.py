@@ -25,6 +25,16 @@ def self_test(output):
     if sys.platform == 'darwin':
         from webview.platforms import cocoa
         native['cocoa'] = True
+        from cloud_auth import CredentialStore, mac_keyring
+        import uuid
+        probe = CredentialStore(Path(tempfile.gettempdir())/('audiotaller-diagnostico-'+uuid.uuid4().hex))
+        try:
+            probe.write({'diagnostico':'dato sintético temporal'})
+            assert probe.read()=={'diagnostico':'dato sintético temporal'}
+            assert not probe.path.exists()
+            native['llavero'] = True
+        finally:
+            mac_keyring().delete_password('org.audiotaller.desktop', probe.keychain_account())
     else:
         import clr
         clr.AddReference('System.Windows.Forms')
@@ -60,7 +70,34 @@ def self_test(output):
     Path(output).write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
 
 
+def smoke_test(output):
+    """Abre una ventana real con datos aislados y comprueba que renderice la interfaz."""
+    import json
+    import tempfile
+    import webview
+    import app as backend
+    with tempfile.TemporaryDirectory(prefix='AudioTaller-ventana-') as folder:
+        backend.DB=Path(folder)/'prueba.sqlite3'
+        backend.LIBRARY=Path(folder)/'Artistas'
+        result={}
+        window=webview.create_window('AudioTaller - diagnóstico',backend.app,width=1280,height=800)
+        def loaded():
+            try:
+                result['ok']=bool(window.evaluate_js("document.body.innerText.includes('AudioTaller') && document.querySelector('nav') !== null"))
+                result['ventana_nativa']=True
+            except Exception as error:
+                result.update(ok=False,error=str(error))
+            finally:
+                Path(output).write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+                window.destroy()
+        window.events.loaded += loaded
+        webview.start(gui='cocoa' if sys.platform=='darwin' else 'edgechromium',debug=False)
+        assert result.get('ok'), 'La ventana no completó la carga de la interfaz'
+
+
 def main():
+    if len(sys.argv)==3 and sys.argv[1]=='--smoke-test':
+        smoke_test(sys.argv[2]);return
     if len(sys.argv)==3 and sys.argv[1]=='--self-test':
         self_test(sys.argv[2]);return
     # Guardamos los datos por usuario, fuera de la carpeta del programa.

@@ -14,6 +14,7 @@ iconutil -c icns build/AudioTaller.iconset -o build/AudioTaller.icns
 python -m unittest discover -s tests -v
 python -m PyInstaller --noconfirm packaging/macos/AudioTaller.spec
 ./dist/AudioTaller.app/Contents/MacOS/AudioTaller --self-test "$PWD/output/macos/diagnostico-${ARCH}.json"
+python -c 'import subprocess,sys; subprocess.run(["./dist/AudioTaller.app/Contents/MacOS/AudioTaller", "--smoke-test", "output/macos/ventana-"+sys.argv[1]+".json"], check=True, timeout=45)' "$ARCH"
 codesign --verify --deep --strict --verbose=2 dist/AudioTaller.app
 mkdir -p build/dmg
 # ditto conserva enlaces, permisos y firma del bundle.

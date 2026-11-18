@@ -14,7 +14,7 @@ def collect(destination):
         folder=target/name;folder.mkdir(exist_ok=True)
         (folder/'METADATA.txt').write_text(dist.read_text('METADATA') or name,encoding='utf-8')
         for file in dist.files or []:
-            if any(word in file.name.lower() for word in ('license','copying','notice')) and '.py' not in file.name and dist.locate_file(file).is_file():
+            if file.name.lower().split('.')[0] in ('license','licence','copying','notice','copyright') and dist.locate_file(file).is_file():
                 # Se conserva la ubicación relativa para no colisionar licencias.
                 output=folder/Path(str(file))
                 if not output.resolve().is_relative_to(folder.resolve()):output=folder/file.name
