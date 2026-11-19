@@ -2,6 +2,10 @@
 
 Aplicación local de escritorio para organizar artistas, discos, canciones y tomas de audio.
 
+## Continuar el desarrollo con colaboradores u otras IAs
+
+Empezá por el [handover técnico y funcional](docs/HANDOVER_COLABORADORES.md) y el [prompt listo para otra IA](docs/PROMPT_PARA_IA.md). Incluyen la rama integrada, arquitectura, pruebas, decisiones y pendientes.
+
 ## Portal del artista e instructivo
 
 El [instructivo ilustrado en PDF](docs/AudioTaller_Instructivo_Portal_del_Artista.pdf) explica cómo configurar Firebase y Drive, publicar una playlist, copiar la invitación para el artista y recibir sus devoluciones. Incluye un recorrido para recuperar una conexión ya configurada.
