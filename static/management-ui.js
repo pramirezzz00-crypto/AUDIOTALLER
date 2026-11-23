@@ -128,7 +128,7 @@ async function loadGlobalProjects() {
     globalProductions = await api('/api/proyectos');
     renderGlobalProjects();
 }
-const productionStates = ['Idea','En preproducción','En producción','Finalizada','En pausa','Sin estado'];
+const productionStates = ['Borrador','En producción','Finalizado','Lanzado','En pausa'];
 const projectTypesSelected = new Set(['discos','sueltas']);
 const projectStatesSelected = new Set(productionStates);
 

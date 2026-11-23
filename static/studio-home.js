@@ -108,7 +108,7 @@ async function renderHome() {
             if (event.key !== 'Enter') return;
             const value = search.value;
             openArtistManager(true);
-            setTimeout(() => { if ($('globalSearch')) { $('globalSearch').value = value; renderGlobalProjects(); } }, 60);
+            setTimeout(() => { if ($('prodSearch')) { $('prodSearch').value = value; renderGlobalProjects(); } }, 300);
         };
     } catch (error) { report(error); }
 }
@@ -127,6 +127,9 @@ function studioDisplayHook(page) {
     $('sideMyPlaylists')?.setAttribute('aria-current', page === 'playlistsPane' ? 'page' : 'false');
     if (page === 'feedbackPane') { $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="openPlaylists()">Playlist</button> › Devoluciones`; renderFeedbackPane(); }
     else if (typeof fb !== 'undefined') fb.audio.pause();
+    if (page === 'creditsPane') renderCredits();
+    if (page === 'exportPane') renderExport();
+    if (page !== 'albumPane' && typeof albumPlayer !== 'undefined' && albumPlayer.index >= 0) albumPlayer.stop();
     if (page === 'home') renderHome();
     else if (page !== 'songPane') api('/api/inicio').then(data => renderSideRecents(data.recientes)).catch(() => {});
     if (page !== 'songPane' && typeof stopTransport === 'function') stopTransport();

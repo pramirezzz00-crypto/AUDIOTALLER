@@ -178,7 +178,7 @@ def register_management(app, connect):
         if track and (not track.isascii() or not track.isdigit() or not 0 < int(track) < 100000):
             raise ValueError('Número de pista inválido.')
         state = data.get('estado', 'En producción')
-        if state not in ('Idea', 'En preproducción', 'En producción', 'Finalizada', 'En pausa'):
+        if state not in ('Borrador', 'En producción', 'Finalizado', 'Lanzado', 'En pausa', 'Idea', 'En preproducción', 'Finalizada'):
             raise ValueError('Estado de canción inválido.')
         with connect() as db:
             song = required_row(db, 'canciones', sid)

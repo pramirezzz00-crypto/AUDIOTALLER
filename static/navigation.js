@@ -2,13 +2,13 @@ function songRow(s){return `<div class="item"><b>♫ ${esc(s.titulo)}</b><button
 const $ = id => document.getElementById(id);
 let artist, currentAlbum, currentSong, editing, photo, selectedPhoto;
 let previewUrl;
-const pages = ['home', 'manager', 'profile', 'editor', 'artistPane', 'albumPane', 'songPane', 'arrangements', 'globalProjects', 'catalogPane', 'playlistsPane', 'composition', 'beats', 'scores', 'lyrics', 'entidades', 'feedbackPane'];
+const pages = ['home', 'manager', 'profile', 'editor', 'artistPane', 'albumPane', 'songPane', 'arrangements', 'globalProjects', 'catalogPane', 'playlistsPane', 'composition', 'beats', 'scores', 'lyrics', 'entidades', 'feedbackPane', 'creditsPane', 'exportPane'];
 const trail = ['home'];
 function display() {
     const page = trail.at(-1);
     const visible = page === 'projectManager' ? 'globalProjects' : page;
     pages.forEach(id => { $(id).hidden = id !== visible; });
-    $('moduleTabs').hidden = !['manager', 'projectManager'].includes(page);
+    $('moduleTabs').hidden = page !== 'manager';
     $('peopleTab').setAttribute('aria-pressed', page === 'manager');
     $('productionsTab').setAttribute('aria-pressed', page === 'projectManager');
     if (page === 'projectManager') loadGlobalProjects();
@@ -17,7 +17,7 @@ function display() {
     $('nav').hidden = page === 'home';
     $('sideHome').setAttribute('aria-current', page === 'home' ? 'page' : 'false');
     const peoplePage = ['manager', 'profile', 'editor'].includes(page) && !trail.includes('projectManager');
-    const productionPage = ['projectManager', 'artistPane', 'albumPane', 'songPane'].includes(page) || (['profile', 'editor'].includes(page) && trail.includes('projectManager'));
+    const productionPage = ['projectManager', 'artistPane', 'albumPane', 'songPane', 'creditsPane', 'exportPane'].includes(page) || (['profile', 'editor'].includes(page) && trail.includes('projectManager'));
     $('sideArtists').setAttribute('aria-current', peoplePage ? 'page' : 'false');
     $('sideProductions').setAttribute('aria-current', productionPage ? 'page' : 'false');
     $('sideArrangements').setAttribute('aria-current', page === 'arrangements' ? 'page' : 'false');

@@ -248,7 +248,7 @@ async function editProductionSong() {
       <label>Número de pista<input type="number" name="pista" min="1" max="99999" value="${song.pista || ''}"></label>
       <label>BPM<input name="bpm" value="${esc(song.bpm)}"></label>
       <label>Tonalidad<input name="tonalidad" value="${esc(song.tonalidad)}"></label>
-      <label>Estado<select name="estado">${['Idea','En preproducción','En producción','Finalizada','En pausa'].map(state => `<option ${state === song.estado ? 'selected' : ''}>${state}</option>`).join('')}</select></label>
+      <label>Estado<select name="estado">${['Borrador','En producción','Finalizado','Lanzado','En pausa'].map(state => `<option ${state === ({Idea:'Borrador','En preproducción':'Borrador',Finalizada:'Finalizado'}[song.estado] || song.estado) ? 'selected' : ''}>${state}</option>`).join('')}</select></label>
       <label>Notas generales<textarea name="metadata">${esc(song.metadata)}</textarea></label>`,
       async data => {
           await api('/api/canciones/' + song.id + '/editar', body(data));

@@ -15,7 +15,7 @@ from flask import jsonify, request, send_file
 from management import required_row
 from publication import save_registration, clean_fields, ENTITIES, validate_collaborators
 
-STATES = ('Idea', 'En preproducción', 'En producción', 'Finalizada', 'En pausa')
+STATES = ('Borrador', 'En producción', 'Finalizado', 'Lanzado', 'En pausa', 'Idea', 'En preproducción', 'Finalizada')
 
 
 def json_row(db, table, identity):
