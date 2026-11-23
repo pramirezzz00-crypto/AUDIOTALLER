@@ -59,7 +59,7 @@ async function bindWaveTrack(track, generation) {
         const ctx = canvas.getContext('2d');
         ctx.scale(ratio,ratio);
         const middle = 45;
-        ctx.strokeStyle = '#294758';
+        ctx.strokeStyle = '#26262C';
         ctx.beginPath();
         ctx.moveTo(0,middle);
         ctx.lineTo(bounds.width,middle);
@@ -71,13 +71,13 @@ async function bindWaveTrack(track, generation) {
         for (let i = 0; i < envelope.peaks.length; i++) {
             const x = i / envelope.peaks.length * bounds.width;
             const amplitude = envelope.peaks[i] / max * height;
-            ctx.strokeStyle = x <= progress * bounds.width ? '#4ed8c1' : '#3a7787';
+            ctx.strokeStyle = x <= progress * bounds.width ? '#2FD8BF' : '#3A3A42';
             ctx.beginPath();
             ctx.moveTo(x, middle-amplitude);
             ctx.lineTo(x, middle+amplitude);
             ctx.stroke();
         }
-        ctx.fillStyle = '#b7fff1';
+        ctx.fillStyle = '#EDEDF0';
         ctx.fillRect(progress * bounds.width, 3, 1, 84);
         canvas.setAttribute('aria-valuenow', Math.round(progress * 100));
         canvas.setAttribute('aria-valuetext', formatWaveTime(audio.currentTime) + ' de ' + formatWaveTime(audio.duration));

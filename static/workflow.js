@@ -120,7 +120,7 @@ function stageMarkup(stage) {
       ${audioFilesMarkup(files)}
       <h3>Archivos de la etapa (${files.length})</h3><div class="file-table"><table><thead><tr><th>Nombre</th><th>Tipo</th><th>Fecha</th><th>Tamaño</th><th>Sesión</th><th>Acciones</th></tr></thead><tbody>
       ${files.map(file => `<tr><td title="${esc(file.ruta)}">${esc(file.nombre)}<small>${esc(file.modo)} · ${file.disponible ? 'Disponible' : 'No disponible'}</small></td><td>${esc(fileType(file.nombre))}</td>
-      <td>${esc(file.creado)}</td><td>${file.tamano === null ? '—' : (file.tamano / 1024).toFixed(1) + ' KB'}</td><td>${esc(sessionName(file.sesion_id))}</td>
+      <td>${esc(file.creado)}</td><td>${file.tamano === null ? '—' : formatBytes(file.tamano)}</td><td>${esc(sessionName(file.sesion_id))}</td>
       <td>${file.disponible ? `<details><summary>⋯</summary><a href="/api/produccion/archivo/${file.id}" target="_blank" rel="noopener">Abrir / descargar</a><button class="alt" onclick="fileVersionDialog('${file.id}','${stage.clave}')">Registrar versión</button>
 </details>` : 'Ruta inaccesible'}</td></tr>`).join('')}
       </tbody></table></div>

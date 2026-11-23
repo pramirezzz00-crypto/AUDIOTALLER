@@ -13,28 +13,24 @@
 </style><link rel="stylesheet" href="/static/projects.css"><link rel="stylesheet" href="/static/artists.css"><link rel="stylesheet" href="/static/iteration.css">
 <header class="app-brand"><img src="/static/branding/audiotaller-mark.svg" alt="" width="34" height="34"> AudioTaller</header>
 <aside class="sidebar" aria-label="Navegación">
-  <button aria-label="Inicio" id="sideHome" onclick="go('home')">⌂ <span>Inicio</span></button>
-  <button aria-label="Artistas y producciones" id="sideArtists" onclick="openArtistManager()">♧ <span>Artistas y producciones</span></button>
-  <button id="sideArrangements" aria-label="Arreglos" onclick="openArrangements()">♫ <span>Arreglos</span></button>
-  <button id="sideComposition" aria-label="Composición" onclick="go('composition')">✎ <span>Composición</span></button>
-  <button id="sideEntities" aria-label="Entidades" onclick="go('entidades')">▤ <span>Entidades</span></button>
-  <button id="sidePlaylists" onclick="openPlaylists()">☷ <span>Playlist</span></button>
-  <button id="sideCatalog" onclick="openCatalog()">◫ <span>Catálogo</span></button>
-  <button aria-label="Recientes" disabled title="Pendiente">◷ <span>Recientes</span></button>
-  <button aria-label="Favoritos" disabled title="Pendiente">☆ <span>Favoritos</span></button>
-  <button aria-label="Configuración" class="side-settings" disabled title="Pendiente">⚙ <span>Configuración</span></button>
-  <small>AudioTaller v0.2.0 beta</small>
+  <div class="side-brand"><svg viewBox="0 0 26 26" aria-hidden="true"><rect x="2" y="9" width="3" height="8" rx="1.5" fill="#2FD8BF"/><rect x="8" y="4" width="3" height="18" rx="1.5" fill="#2FD8BF"/><rect x="14" y="7" width="3" height="12" rx="1.5" fill="#2FD8BF"/><rect x="20" y="10" width="3" height="6" rx="1.5" fill="#2FD8BF"/></svg><span>AudioTaller</span></div>
+  <button aria-label="Inicio" id="sideHome" onclick="go('home')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Inicio</span></button>
+  <button aria-label="Producciones" id="sideProductions" onclick="openArtistManager(true)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg><span>Producciones</span></button>
+  <button aria-label="Artistas" id="sideArtists" onclick="openArtistManager()"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17 14.5c2.3.2 4 1.8 4.5 4.5"/></svg><span>Artistas</span></button>
+  <button id="sideCatalog" aria-label="Catálogo" onclick="openCatalog()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Catálogo</span></button>
+  <button id="sidePlaylists" aria-label="Playlist" onclick="openPlaylists()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h11M4 11h11M4 16h7"/><path d="M18 8v9.5"/><circle cx="16" cy="18" r="2"/></svg><span>Playlist</span></button>
+  <button id="sideArrangements" aria-label="Arreglos" onclick="openArrangements()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h2l2-6 3 12 3-9 2 5 2-2h4"/></svg><span>Arreglos</span></button>
+  <button id="sideComposition" aria-label="Composición" onclick="go('composition')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4-1 11-11-3-3L5 16z"/></svg><span>Composición</span></button>
+  <button id="sideEntities" aria-label="Entidades" onclick="go('entidades')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10l8-5 8 5M6 10v8M10 10v8M14 10v8M18 10v8M3 20h18"/></svg><span>Entidades</span></button>
+  <div class="side-label" id="sideRecentsLabel" hidden>Recientes</div>
+  <div id="sideRecents"></div>
+  <div class="side-spacer"></div>
+  <small>v0.3 · beta</small>
 </aside>
 <main>
 <nav id="nav" class="breadcrumbs" hidden aria-label="Ruta de navegación"><button onclick="back()">← Atrás</button><span id="crumbPath"></span></nav>
 <p id="error" role="alert"></p>
-<section id="home">
-  <div class="welcome"><h1>Bienvenidos/as a <span class="mint">AudioTaller</span></h1><p class="muted">Gestión y trazabilidad de tus producciones musicales</p></div>
-  <div class="grid">
-    <article class="card action"><div class="symbol"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="9" r="4"/><path d="M8 27v-4a8 8 0 0 1 16 0v4M2 24v-3a5 5 0 0 1 5-5m23 8v-3a5 5 0 0 0-5-5"/><circle cx="6" cy="11" r="3"/><circle cx="26" cy="11" r="3"/></svg></div><h2>Gestión de artistas</h2><p class="muted">Consultá las fichas y administrá tus artistas.</p><button onclick="go('manager')">Ver artistas</button></article>
-    <article class="card action"><div class="symbol"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M11 23V8l16-4v15M11 12l16-4"/><ellipse cx="7" cy="24" rx="4" ry="3"/><ellipse cx="23" cy="20" rx="4" ry="3"/></svg></div><h2>Gestión de producciones</h2><p class="muted">Administrá discos, EP, singles y canciones.</p><button onclick="go('projectManager')">Gestionar producciones</button></article>
-  </div>
-</section>
+<section id="home"><div id="homeDash" class="studio-home" aria-live="polite"></div></section>
 <div id="moduleTabs" class="module-tabs" hidden>
   <button class="alt" id="peopleTab" onclick="go('manager')">♧ Artistas</button>
   <button class="alt" id="productionsTab" onclick="go('projectManager')">◉ Producciones</button>
@@ -270,4 +266,4 @@ El contenido de la letra aparecerá acá.</pre>
 <dialog id="scoreCollectionDialog"><form id="scoreCollectionForm"><h2 id="scoreCollectionDialogTitle">Nueva colección</h2><label for="scoreCollectionName">Nombre de la colección</label><input id="scoreCollectionName" maxlength="80" required placeholder="Ej.: Piano / Ideas originales"><div class="row" style="justify-content:flex-end"><button type="button" id="cancelScoreCollection" class="alt">Cancelar</button><button type="submit">Guardar</button></div></form></dialog>
 <dialog id="lyricCollectionDialog"><form id="lyricCollectionForm"><h2 id="lyricCollectionDialogTitle">Nueva colección</h2><label for="lyricCollectionName">Nombre de la colección</label><input id="lyricCollectionName" maxlength="80" required placeholder="Ej.: Canciones propias"><div class="row" style="justify-content:flex-end"><button type="button" id="cancelLyricCollection" class="alt">Cancelar</button><button type="submit">Guardar</button></div></form></dialog>
 
-</main><script src="/static/navigation.js"></script><script src="/static/projects.js"></script><script src="/static/arrangements.js"></script><script src="/static/management-ui.js"></script><script src="/static/waveforms.js"></script><script src="/static/workflow.js"></script><script src="/static/session-operations.js"></script><script src="/static/publication.js"></script><script src="/static/album.js"></script><link rel="stylesheet" href="/static/catalog.css"><script src="/static/song-data.js"></script><script src="/static/catalog-ui.js"></script><script src="/static/cloud-ui.js"></script><link rel="stylesheet" href="/static/composition.css"><script src="/static/composition.js"></script></html>
+</main><script src="/static/navigation.js"></script><script src="/static/projects.js"></script><script src="/static/arrangements.js"></script><script src="/static/management-ui.js"></script><script src="/static/waveforms.js"></script><script src="/static/workflow.js"></script><script src="/static/session-operations.js"></script><script src="/static/publication.js"></script><script src="/static/album.js"></script><link rel="stylesheet" href="/static/catalog.css"><script src="/static/song-data.js"></script><script src="/static/catalog-ui.js"></script><script src="/static/cloud-ui.js"></script><link rel="stylesheet" href="/static/composition.css"><script src="/static/composition.js"></script><link rel="stylesheet" href="/static/theme.css"><link rel="stylesheet" href="/static/studio.css"><script src="/static/studio-home.js"></script><script src="/static/studio-song.js"></script><script src="/static/studio-album.js"></script></html>

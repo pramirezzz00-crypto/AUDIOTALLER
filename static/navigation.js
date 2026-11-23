@@ -16,7 +16,10 @@ function display() {
     document.querySelectorAll('main audio').forEach(audio => audio.pause());
     $('nav').hidden = page === 'home';
     $('sideHome').setAttribute('aria-current', page === 'home' ? 'page' : 'false');
-    $('sideArtists').setAttribute('aria-current', ['home', 'arrangements', 'catalogPane', 'playlistsPane', 'composition', 'beats', 'scores', 'lyrics', 'entidades'].includes(page) ? 'false' : 'page');
+    const peoplePage = ['manager', 'profile', 'editor'].includes(page) && !trail.includes('projectManager');
+    const productionPage = ['projectManager', 'artistPane', 'albumPane', 'songPane'].includes(page) || (['profile', 'editor'].includes(page) && trail.includes('projectManager'));
+    $('sideArtists').setAttribute('aria-current', peoplePage ? 'page' : 'false');
+    $('sideProductions').setAttribute('aria-current', productionPage ? 'page' : 'false');
     $('sideArrangements').setAttribute('aria-current', page === 'arrangements' ? 'page' : 'false');
     const compositionLabels = {composition:'Composición',beats:'Beats',scores:'Partituras',lyrics:'Letras'};
     $('sideComposition').setAttribute('aria-current', compositionLabels[page] ? 'page' : 'false');
@@ -49,6 +52,7 @@ function display() {
         $('managerDescription').textContent = projects ? 'Elegí un artista para gestionar sus discos y canciones.' : 'Buscá un artista para consultar o modificar su ficha.';
         loadLibrary();
     }
+    if (typeof studioDisplayHook === 'function') studioDisplayHook(page);
 }
 function go(page) {
     if (trail.at(-1) === 'songPane' && page !== 'songPane' && hasUnsavedSongNotes() &&

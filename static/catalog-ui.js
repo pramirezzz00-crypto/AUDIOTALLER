@@ -48,9 +48,9 @@ async function loadCatalog(reset=false){
 }
 function audioTechnicalText(audio){
     const info=audio.tecnica || {};
-    return [audio.nombre.split('.').pop().toUpperCase(),info.frecuencia?`${(info.frecuencia/1000).toFixed(1)} kHz`:'',
-        info.bits?`${info.bits} bits`:'',info.canales?`${info.canales} canales`:'',info.duracion?formatWaveTime(info.duracion):'',
-        audio.tamano!==null && audio.tamano!==undefined?`${(audio.tamano/1024/1024).toFixed(1)} MB`:''].filter(Boolean).map(esc).join(' · ');
+    return [audio.nombre.split('.').pop().toUpperCase(),formatRate(info.frecuencia),
+        info.bits?`${info.bits}\u00a0bit`:'',info.canales?(info.canales===1?'mono':info.canales===2?'estéreo':`${info.canales} canales`):'',info.duracion?formatWaveTime(info.duracion):'',
+        audio.tamano!==null && audio.tamano!==undefined?formatBytes(audio.tamano):''].filter(Boolean).map(esc).join(' · ');
 }
 async function toggleAudioFavorite(id,button){
     button.disabled=true;

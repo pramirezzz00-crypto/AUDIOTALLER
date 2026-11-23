@@ -9,6 +9,7 @@ from publication import register_publication, validate_collaborators, add_collab
 from song_hub import register_song_hub
 from catalog import register_catalog
 from composition import register_composition
+from overview import register_overview
 from listening_portal import register_listening_portal
 from cloud_portal import register_cloud_portal
 from flask import Flask, jsonify, request, send_file
@@ -331,6 +332,7 @@ register_cloud_portal(app, db_open, lambda: DB.parent)
 register_production(app, db_open, safe_name)
 register_daw_operations(app, db_open, safe_name)
 register_folder_migration(app, db_open, lambda: DB)
+register_overview(app, db_open)
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1',port=5000,debug=False)
