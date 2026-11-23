@@ -131,6 +131,7 @@ function studioDisplayHook(page) {
     if (page === 'composition') renderCompositionPane();
     if (page === 'entidades') renderEntitiesPane();
     if (page === 'arrangements') renderArrangementsPane();
+    if (page === 'artistsPane') { $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › Artistas`; paintArtists(); }
     else if (typeof arr !== 'undefined' && arr.playing) arrStop();
     if (page !== 'composition' && typeof comp !== 'undefined') { comp.audio.pause(); comp.sync?.audio.pause(); }
     if (page === 'exportPane') renderExport();

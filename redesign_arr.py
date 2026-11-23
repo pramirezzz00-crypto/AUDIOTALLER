@@ -281,3 +281,105 @@ def register_arrangements_redesign(app, connect):
                        (uuid.uuid4().hex, sid, stage['clave'], 'Sesión creada desde un arreglo', identity, target.name))
             db.execute('INSERT INTO estado_cancion(id) VALUES(?) ON CONFLICT(id) DO UPDATE SET actualizado=CURRENT_TIMESTAMP', (sid,))
         return jsonify(ok=True, id=identity, ruta=str(target), nombre=target.name, buses=len(groups)), 201
+
+
+# ── Artistas, Catálogo y Playlists (rediseño) ──
+PROJECT_TYPES = ('Solista', 'Banda', 'Dúo', 'Agrupación / colectivo', 'Ensamble / orquesta', 'Proyecto o alias')
+RELATIONS = ('Del estudio', 'Cliente', 'Colaborador')
+PERSON_ROLES = ('Intérprete', 'Autor/a de letra', 'Autor/a de música', 'Producción / arreglos')
+PLATFORMS = ('spotify', 'apple', 'youtube', 'instagram', 'tiktok', 'bandcamp', 'soundcloud', 'web')
+
+
+def register_people_redesign(app, connect):
+    @app.get('/api/artistas-rediseno')
+    def rp_artists():
+        from overview import song_summaries
+        with connect() as db:
+            artists = [dict(r) for r in db.execute('SELECT id,nombre,tipo,imagen,creado FROM artistas ORDER BY nombre COLLATE NOCASE')]
+            docs = doc_list(db, 'artista')
+            songs = song_summaries(db)
+            albums = [dict(r) for r in db.execute('SELECT id,nombre,artista_id FROM discos')]
+            videos = doc_list(db, 'audiovisual')
+            profiles = {r['id']: json.loads(r['datos'] or '{}') for r in db.execute('SELECT id,datos FROM perfiles_artista')}
+        out = []
+        for artist in artists:
+            doc = docs.get(artist['id'], {})
+            mine = [s for s in songs if s['artista_id'] == artist['id']]
+            people = doc.get('personas', [])
+            alerts = []
+            for person in people:
+                roles = person.get('roles', [])
+                if any(r.startswith('Autor') for r in roles) and not person.get('sadaic'):
+                    alerts.append(f"{person.get('nombre', 'Integrante')}: sin n.º de SADAIC")
+                if 'Intérprete' in roles and not person.get('aadi'):
+                    alerts.append(f"{person.get('nombre', 'Integrante')}: sin n.º de AADI")
+            pending = sum(s['pendientes'] for s in mine)
+            if pending:
+                alerts.append(f'{pending} devoluciones abiertas')
+            legacy = profiles.get(artist['id'], {})
+            out.append(dict(artist, imagen=artist['imagen'] or '', tipo_proyecto=doc.get('tipo_proyecto') or ('Solista' if artist['tipo'] in ('Solista', 'Artista', 'Músico') else 'Banda'),
+                            relacion=doc.get('relacion', 'Cliente'), personas=people, plataformas=doc.get('plataformas', {}),
+                            contacto=doc.get('contacto') or dict(email=str(legacy.get('correos', '') if not isinstance(legacy.get('correos'), list) else ', '.join(legacy['correos'])),
+                                                                 telefono=str(legacy.get('telefonos', ''))),
+                            portal=doc.get('portal', ''), discos=[dict(id=a['id'], nombre=a['nombre']) for a in albums if a['artista_id'] == artist['id']],
+                            canciones=len(mine), videos=sum(1 for v in videos.values() if v.get('artista_id') == artist['id']),
+                            alertas=alerts, completo=bool(people) and not [a for a in alerts if 'SADAIC' in a or 'AADI' in a]))
+        return jsonify(out)
+
+    @app.post('/api/artistas-rediseno/<aid>')
+    def rp_artist_save(aid):
+        data = request.get_json() or {}
+        tipo = data.get('tipo_proyecto', 'Solista')
+        relation = data.get('relacion', 'Cliente')
+        if tipo not in PROJECT_TYPES or relation not in RELATIONS:
+            raise ValueError('Tipo o relación inválidos.')
+        people = data.get('personas', [])
+        if not isinstance(people, list) or len(people) > 40:
+            raise ValueError('Hasta 40 personas por proyecto.')
+        clean = []
+        for person in people:
+            roles = [r for r in person.get('roles', []) if r in PERSON_ROLES]
+            row = {k: short_text(person.get(k, ''), 150) for k in ('nombre', 'nombre_legal', 'sadaic', 'ipi', 'aadi', 'instrumentos', 'email', 'telefono')}
+            if row['ipi'] and not re.fullmatch(r'\d{9,11}', row['ipi'].replace(' ', '')):
+                raise ValueError('El IPI tiene 9 a 11 dígitos.')
+            if row['nombre']:
+                clean.append(dict(row, roles=roles))
+        platforms = {k: short_text(v, 300) for k, v in (data.get('plataformas') or {}).items() if k in PLATFORMS and short_text(v, 300)}
+        contact = {k: short_text((data.get('contacto') or {}).get(k, ''), 200) for k in ('email', 'telefono', 'whatsapp')}
+        with connect() as db:
+            required_row(db, 'artistas', aid)
+            doc_put(db, 'artista', aid, dict(tipo_proyecto=tipo, relacion=relation, personas=clean, plataformas=platforms, contacto=contact,
+                                             portal=short_text(data.get('portal', ''), 200)))
+        return jsonify(ok=True)
+
+    @app.get('/api/catalogo/extra')
+    def rp_catalog_extra():
+        from redesign import measurement
+        ids = [i for i in request.args.get('ids', '').split(',') if re.fullmatch(r'[a-f0-9]{32}', i)][:50]
+        out = {}
+        with connect() as db:
+            meter = app.config['AT_METER']
+            for fid in ids:
+                row = db.execute('SELECT ruta FROM archivos WHERE id=?', (fid,)).fetchone()
+                if not row:
+                    continue
+                lists = [r['nombre'] for r in db.execute('SELECT p.nombre FROM playlist_items i JOIN playlists p ON p.id=i.playlist_id WHERE i.archivo_id=?', (fid,))]
+                out[fid] = dict(measurement(db, meter, fid, row['ruta']), playlists=lists)
+        return jsonify(out)
+
+    @app.get('/api/playlists/<pid>/novedades')
+    def rp_playlist_news(pid):
+        """Audios más nuevos de la misma canción y etapa que los de la playlist (versión más reciente disponible)."""
+        with connect() as db:
+            required_row(db, 'playlists', pid)
+            items = [dict(r) for r in db.execute('''SELECT f.id,f.nombre,f.cancion_id,f.etapa,f.creado FROM playlist_items i
+                JOIN archivos f ON f.id=i.archivo_id WHERE i.playlist_id=?''', (pid,))]
+            inside = {i['id'] for i in items}
+            news = []
+            for item in items:
+                newer = db.execute('''SELECT id,nombre,creado FROM archivos WHERE cancion_id=? AND etapa=? AND creado>? AND id NOT IN (%s)
+                    ORDER BY creado DESC LIMIT 1''' % ','.join('?' * len(inside)), (item['cancion_id'], item['etapa'], item['creado'], *inside)).fetchone()
+                if newer and Path(newer['nombre']).suffix.lower() in ('.wav', '.mp3', '.flac', '.aif', '.aiff', '.m4a', '.ogg'):
+                    news.append(dict(actual=item['id'], actual_nombre=item['nombre'], nuevo=newer['id'], nuevo_nombre=newer['nombre']))
+            publication = db.execute('SELECT url,estado,actualizado FROM portal_publicaciones WHERE playlist_id=? ORDER BY actualizado DESC LIMIT 1', (pid,)).fetchone()
+        return jsonify(novedades=news, publicacion=dict(publication) if publication else None)

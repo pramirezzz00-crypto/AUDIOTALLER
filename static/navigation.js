@@ -2,7 +2,7 @@ function songRow(s){return `<div class="item"><b>♫ ${esc(s.titulo)}</b><button
 const $ = id => document.getElementById(id);
 let artist, currentAlbum, currentSong, editing, photo, selectedPhoto;
 let previewUrl;
-const pages = ['home', 'manager', 'profile', 'editor', 'artistPane', 'albumPane', 'songPane', 'arrangements', 'globalProjects', 'catalogPane', 'playlistsPane', 'composition', 'beats', 'scores', 'lyrics', 'entidades', 'feedbackPane', 'creditsPane', 'exportPane'];
+const pages = ['home', 'manager', 'profile', 'editor', 'artistPane', 'albumPane', 'songPane', 'arrangements', 'globalProjects', 'catalogPane', 'playlistsPane', 'composition', 'beats', 'scores', 'lyrics', 'entidades', 'feedbackPane', 'creditsPane', 'exportPane', 'artistsPane'];
 const trail = ['home'];
 function display() {
     const page = trail.at(-1);
@@ -16,7 +16,7 @@ function display() {
     document.querySelectorAll('main audio').forEach(audio => audio.pause());
     $('nav').hidden = page === 'home';
     $('sideHome').setAttribute('aria-current', page === 'home' ? 'page' : 'false');
-    const peoplePage = ['manager', 'profile', 'editor'].includes(page) && !trail.includes('projectManager');
+    const peoplePage = ['manager', 'profile', 'editor', 'artistsPane'].includes(page) && !trail.includes('projectManager');
     const productionPage = ['projectManager', 'artistPane', 'albumPane', 'songPane', 'creditsPane', 'exportPane'].includes(page) || (['profile', 'editor'].includes(page) && trail.includes('projectManager'));
     $('sideArtists').setAttribute('aria-current', peoplePage ? 'page' : 'false');
     $('sideProductions').setAttribute('aria-current', productionPage ? 'page' : 'false');

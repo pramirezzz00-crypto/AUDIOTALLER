@@ -102,3 +102,24 @@ class ArrangementBusesTest(unittest.TestCase):
         self.assertEqual(len(sessions), 3)
         relearned = self.c.post(f'/api/arreglos/{self.sid}/clasificar', json={'perfil_id': 'mezcla', 'pistas': takes}).json['pistas']
         self.assertEqual({t['nombre']: t['bus'] for t in relearned}['Fx raro.wav'], 'Efectos')
+
+
+class PeopleRedesignTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent)
+        root = Path(self.tmp.name)
+        app.DB = root / 'test.sqlite'; app.LIBRARY = root / 'Artistas'
+        self.c = app.app.test_client()
+        self.aid = self.c.post('/api/artistas', json={'nombre': 'Los Cardos', 'tipo': 'Banda'}).json['id']
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_proyecto_con_personas_roles_y_alertas(self):
+        bad = self.c.post(f'/api/artistas-rediseno/{self.aid}', json={'tipo_proyecto': 'Banda', 'relacion': 'Cliente', 'personas': [{'nombre': 'Ana', 'ipi': '12'}]})
+        self.assertEqual(bad.status_code, 400)
+        self.c.post(f'/api/artistas-rediseno/{self.aid}', json={'tipo_proyecto': 'Banda', 'relacion': 'Del estudio',
+            'personas': [{'nombre': 'Ana', 'roles': ['Autor/a de letra', 'Intérprete'], 'aadi': '123'}], 'plataformas': {'spotify': 'https://open.spotify.com/x'}})
+        artist = self.c.get('/api/artistas-rediseno').json[0]
+        self.assertEqual((artist['tipo_proyecto'], artist['relacion'], artist['completo']), ('Banda', 'Del estudio', False))
+        self.assertIn('Ana: sin n.º de SADAIC', artist['alertas'])
