@@ -197,7 +197,7 @@ def main():
     # Identidad propia en la barra de tareas y el icono del acceso directo.
     if os.name == 'nt':
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('AudioTaller.Desktop')
-    webview.create_window('AudioTaller - '+DISPLAY_VERSION, app, width=1280, height=800, js_api=Dialogs())
+    webview.create_window('AudioTaller - '+DISPLAY_VERSION, app, width=1280, height=800, js_api=Dialogs(), background_color='#000000')
     icon=Path(__file__).parent/'static'/'branding'/'AudioTaller.ico'
     webview.start(gui='cocoa' if sys.platform == 'darwin' else 'edgechromium',debug=False,
                   icon=str(icon) if os.name == 'nt' and icon.is_file() else None)

@@ -101,7 +101,14 @@ def register_production(app, connect, safe_name):
             files = [dict(row) for row in db.execute('''SELECT f.*, ca.favorito,ca.clase,ca.version AS version_audio
                 FROM archivos f LEFT JOIN catalogo_audio ca ON ca.archivo_id=f.id
                 WHERE f.cancion_id=? ORDER BY f.creado DESC''', (sid,))]
+            shared = {}
+            # Audios que el artista ya escuchó: están en una playlist publicada en el portal.
+            for row in db.execute('''SELECT pi.archivo_id, p.nombre FROM playlist_items pi JOIN playlists p ON p.id=pi.playlist_id
+                WHERE pi.archivo_id IN (SELECT id FROM archivos WHERE cancion_id=?)
+                AND EXISTS(SELECT 1 FROM portal_publicaciones pp WHERE pp.playlist_id=p.id)''', (sid,)):
+                shared.setdefault(row['archivo_id'], []).append(row['nombre'])
             for file in files:
+                file['compartido'] = shared.get(file['id'], [])
                 try:
                     stat = Path(file['ruta']).stat()
                     file.update(disponible=True, tamano=stat.st_size, modificado=stat.st_mtime_ns)

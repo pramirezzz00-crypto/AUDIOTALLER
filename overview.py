@@ -61,7 +61,7 @@ def song_summaries(db, where='', params=()):
             audios.setdefault(row['cancion_id'], []).append(dict(row))
     pending = {row['cancion_id']: row['total'] for row in db.execute(
         f'''SELECT cancion_id,COUNT(*) AS total FROM portal_devoluciones
-            WHERE estado!='Resuelta' AND cancion_id IN ({marks}) GROUP BY cancion_id''', ids)}
+            WHERE estado NOT IN ('Resuelta','Sin cambios') AND cancion_id IN ({marks}) GROUP BY cancion_id''', ids)}
     out = []
     for song in songs:
         details = json.loads(song.pop('detalle') or '{}')
@@ -105,8 +105,8 @@ def register_overview(app, connect):
             feedback = [dict(row) for row in db.execute('''SELECT f.id,f.cancion_id,f.archivo_id,f.etiqueta,f.texto,
                 f.segundo,f.estado,f.creado,c.titulo,a.nombre AS artista FROM portal_devoluciones f
                 JOIN canciones c ON c.id=f.cancion_id JOIN artistas a ON a.id=c.artista_id
-                WHERE f.estado!='Resuelta' ORDER BY f.creado DESC LIMIT 6''')]
-            pending_total = db.execute("SELECT COUNT(*) FROM portal_devoluciones WHERE estado!='Resuelta'").fetchone()[0]
+                WHERE f.estado NOT IN ('Resuelta','Sin cambios') ORDER BY f.creado DESC LIMIT 6''')]
+            pending_total = db.execute("SELECT COUNT(*) FROM portal_devoluciones WHERE estado NOT IN ('Resuelta','Sin cambios')").fetchone()[0]
             albums = []
             for row in db.execute('''SELECT d.id,d.nombre,d.artista_id,a.nombre AS artista,x.actualizado
                 FROM discos d JOIN artistas a ON a.id=d.artista_id LEFT JOIN detalle_disco x ON x.id=d.id

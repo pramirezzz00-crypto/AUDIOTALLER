@@ -67,16 +67,6 @@ async function renderHome() {
           ${empty ? `<section class="home-empty card"><h2>Empezá tu biblioteca</h2>
               <p class="muted">Creá un artista y su primera canción. Después vas a poder cargar demos, sesiones de DAW y mezclas en cada etapa.</p>
               <div class="row"><button onclick="editArtist()">+ Nuevo artista</button><button class="btn-primary" onclick="newGlobalProject('song').catch(report)">+ Nueva canción</button></div></section>` : ''}
-          ${data.recientes.length ? `<section aria-labelledby="homeContinue">
-            <div class="section-head"><h2 id="homeContinue">Seguir trabajando</h2><button class="btn-ghost" onclick="openArtistManager(true)">Ver producciones</button></div>
-            <div class="continue-grid">${data.recientes.map(song => `
-              <button class="continue-card" onclick="openSong('${song.id}')">
-                ${artBox(song.portada, song.disco_id || song.id, song.etapa)}
-                <span class="continue-copy"><strong>${esc(song.titulo)}</strong>
-                  <span class="muted">${esc(song.artista)}${song.disco ? ' · ' + esc(song.disco) : ' · Canción suelta'}</span>
-                  <span class="continue-meta"><i class="dot st-${song.etapa || 'historico'}"></i>${esc(stageName(song.etapa))}${song.referencia ? ' · ' + esc(song.referencia) : ''} · ${esc(relativeTime(song.actualizado))}</span></span>
-                <svg class="play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
-              </button>`).join('')}</div></section>` : ''}
           ${empty ? '' : `<div class="home-split">
             <section class="card pipeline" aria-labelledby="homePipeline">
               <div class="section-head"><h2 id="homePipeline">Producción en curso</h2><span class="mono muted">${countLabel(data.canciones_activas, 'canción activa', 'canciones activas')}</span></div>
@@ -88,13 +78,23 @@ async function renderHome() {
             </section>
             <section class="card feedback-box" aria-labelledby="homeFeedback">
               <div class="section-head"><h2 id="homeFeedback">Devoluciones pendientes</h2>${data.devoluciones_total ? `<span class="badge">${data.devoluciones_total}</span>` : ''}</div>
-              ${data.devoluciones.map(note => `<button class="feedback-row" onclick="openSong('${note.cancion_id}','${note.archivo_id}')">
-                  <span class="mono feedback-time">${clockText(note.segundo)}</span>
+              ${data.devoluciones.map(note => `<button class="feedback-row" onclick="openSong('${note.cancion_id}','${note.archivo_id}',${Number(note.segundo) || 0}).catch(report)">
+                  <span class="mono feedback-time"><i class="fb-dot" style="background:${FB_COLORS[note.estado] || '#E5484D'}"></i>${note.segundo > 0 ? clockText(note.segundo) : 'General'}</span>
                   <span><span class="feedback-text">${esc(note.texto)}</span><small>${esc(note.titulo)} · ${esc(note.etiqueta)} · ${esc(note.estado)}</small></span>
                 </button>`).join('') || '<p class="muted">No hay devoluciones pendientes. Las que envíe el artista desde el portal aparecen acá.</p>'}
-              ${data.devoluciones_total ? '<button class="btn-ghost" onclick="feedbackDialog({}).catch(report)">Ver todas y buscar nuevas</button>' : ''}
+              ${data.devoluciones_total ? '<button class="btn-ghost" onclick="openFeedbackPane().catch(report)">Ver todas las devoluciones</button>' : ''}
             </section>
           </div>`}
+          ${data.recientes.length ? `<section aria-labelledby="homeContinue">
+            <div class="section-head"><h2 id="homeContinue">Seguir trabajando</h2><button class="btn-ghost" onclick="openArtistManager(true)">Ver producciones</button></div>
+            <div class="continue-grid">${data.recientes.map(song => `
+              <button class="continue-card" onclick="openSong('${song.id}')">
+                ${artBox(song.portada, song.disco_id || song.id, song.etapa)}
+                <span class="continue-copy"><strong>${esc(song.titulo)}</strong>
+                  <span class="muted">${esc(song.artista)}${song.disco ? ' · ' + esc(song.disco) : ' · Canción suelta'}</span>
+                  <span class="continue-meta"><i class="dot st-${song.etapa || 'historico'}"></i>${esc(stageName(song.etapa))}${song.referencia ? ' · ' + esc(song.referencia) : ''} · ${esc(relativeTime(song.actualizado))}</span></span>
+                <svg class="play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+              </button>`).join('')}</div></section>` : ''}
           ${data.discos.length || data.sueltas ? `<section aria-labelledby="homeAlbums">
             <div class="section-head"><h2 id="homeAlbums">Discos y proyectos</h2><button class="btn-ghost" onclick="openArtistManager(true)">Ver todos</button></div>
             <div class="shelf">${data.discos.map(album => `<button class="shelf-item" onclick="openGlobalAlbum('${album.id}','${album.artista_id}').catch(report)">
@@ -123,6 +123,10 @@ function renderSideRecents(recent) {
 // Se llama al final de display(): agrega el comportamiento de las pantallas nuevas.
 function studioDisplayHook(page) {
     document.body.dataset.page = page;
+    $('sideFeedback')?.setAttribute('aria-current', page === 'feedbackPane' ? 'page' : 'false');
+    $('sideMyPlaylists')?.setAttribute('aria-current', page === 'playlistsPane' ? 'page' : 'false');
+    if (page === 'feedbackPane') { $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="openPlaylists()">Playlist</button> › Devoluciones`; renderFeedbackPane(); }
+    else if (typeof fb !== 'undefined') fb.audio.pause();
     if (page === 'home') renderHome();
     else if (page !== 'songPane') api('/api/inicio').then(data => renderSideRecents(data.recientes)).catch(() => {});
     if (page !== 'songPane' && typeof stopTransport === 'function') stopTransport();

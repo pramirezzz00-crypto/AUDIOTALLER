@@ -32,6 +32,7 @@ def migrate(db, database):
             migrate_cloud_portal(db, database)
             migrate_portal_feedback(db, database)
             migrate_composition(db, database)
+            migrate_redesign(db, database)
             return
         db.execute('BEGIN IMMEDIATE')
         backup = database.with_name(database.stem + '.respaldo-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
@@ -111,6 +112,7 @@ def migrate(db, database):
             migrate_cloud_portal(db, database)
             migrate_portal_feedback(db, database)
             migrate_composition(db, database)
+            migrate_redesign(db, database)
         except Exception:
             db.rollback()
             raise
@@ -288,6 +290,33 @@ def migrate_composition(db, database):
         from composition import create_composition_schema
         create_composition_schema(db)
         db.execute('UPDATE schema_audio SET version=8')
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
+def migrate_redesign(db, database):
+    """Rediseño 0.3: seguimiento completo de devoluciones y datos de las pantallas nuevas.
+
+    Solo agrega columnas y tablas; ningún dato existente cambia de lugar.
+    """
+    if db.execute('SELECT version FROM schema_audio').fetchone()[0] >= 9:
+        return
+    db.execute('BEGIN IMMEDIATE')
+    backup=database.with_name(database.stem+'.respaldo-rediseno-'+datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.sqlite3')
+    try:
+        with closing(sqlite3.connect(database)) as source, closing(sqlite3.connect(backup)) as target:
+            source.backup(target)
+        for column in ("respuesta TEXT NOT NULL DEFAULT ''", "resuelve_archivo TEXT NOT NULL DEFAULT ''",
+                       'bucle_inicio REAL', 'bucle_fin REAL', "actualizado TEXT NOT NULL DEFAULT ''"):
+            existing = {row[1] for row in db.execute('PRAGMA table_info(portal_devoluciones)')}
+            if column.split()[0] not in existing:
+                db.execute('ALTER TABLE portal_devoluciones ADD COLUMN '+column)
+        # Documentos JSON por tipo (campañas, proyectos audiovisuales, letras por secciones, medidas de audio…).
+        db.execute('''CREATE TABLE IF NOT EXISTS rediseno_datos(tipo TEXT NOT NULL,id TEXT NOT NULL,datos TEXT NOT NULL,
+            actualizado TEXT DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(tipo,id))''')
+        db.execute('UPDATE schema_audio SET version=9')
         db.commit()
     except Exception:
         db.rollback()

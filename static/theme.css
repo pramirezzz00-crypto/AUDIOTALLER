@@ -121,3 +121,11 @@ details>summary{cursor:pointer}
   .sidebar{width:60px;padding:14px 8px}.sidebar button span,.side-label,.side-recent,.sidebar small,.side-brand span{display:none}
   main{margin-left:60px!important}
 }
+
+/* Rediseño 0.3: sin destellos blancos y fundido desde negro al cambiar de pantalla. */
+html,body{background:#000!important}
+main>section:not([hidden]),.studio-home{animation:atFade .28s ease-out}
+@keyframes atFade{from{opacity:0}to{opacity:1}}
+.sidebar .side-sub{padding-left:42px;min-height:32px;font-size:13px}
+.side-count{margin-left:auto;font:700 11px var(--at-font);background:#E5484D;color:#fff;border-radius:99px;padding:1px 7px}
+@media (max-width:900px){.sidebar .side-sub{display:none}}

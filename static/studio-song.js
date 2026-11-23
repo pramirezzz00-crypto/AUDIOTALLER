@@ -14,7 +14,8 @@ const ab = {a: null, b: null, side: 'b'};
 const transport = {audio: new Audio(), fileId: null, peaks: null, raf: 0};
 transport.audio.preload = 'metadata';
 
-async function openSong(id, selectFile) {
+let pendingSeek = null;
+async function openSong(id, selectFile, seekAt) {
     if (currentSong?.id !== id && hasUnsavedSongNotes() &&
         !confirm('Hay notas sin guardar. Se conservarán en esta ventana. ¿Querés abrir otra canción?')) return;
     const sequence = ++songLoad;
@@ -26,6 +27,7 @@ async function openSong(id, selectFile) {
     currentSong = data.cancion;
     songFeedback = notes;
     if (selectFile) studioSel = {kind: 'file', id: selectFile};
+    pendingSeek = selectFile && seekAt !== undefined ? {id: selectFile, at: Number(seekAt) || 0} : null;
     artist = await api('/api/artistas/' + currentSong.artista_id);
     go('songPane');
 }
@@ -36,6 +38,8 @@ const fileById = id => workflow.archivos.find(file => file.id === id);
 const sessionById = id => workflow.sesiones.find(session => session.id === id);
 const isAudio = file => AUDIO_EXT.test(file.nombre);
 const fileLabel = file => file.version_audio || (file.clase && file.clase !== 'Otro' ? file.clase : '') || file.nombre.replace(/\.[^.]+$/, '');
+const openNote = note => note.estado === 'Pendiente' || note.estado === 'En revisión';
+const noteColor = note => (typeof FB_COLORS !== 'undefined' && FB_COLORS[note.estado]) || '#E5484D';
 const notesFor = id => songFeedback.filter(note => note.archivo_id === id).sort((a, b) => a.segundo - b.segundo);
 const parseDate = text => { const d = new Date(String(text || '').replace(' ', 'T') + 'Z'); return Number.isNaN(d.getTime()) ? null : d; };
 const shortDate = d => d ? d.toLocaleDateString('es-AR', {day: 'numeric', month: 'short'}) : '';
@@ -104,13 +108,14 @@ function clipMarkup(item) {
             <span class="clip-foot mono">${s.version ? 'V' + String(s.version).padStart(3, '0') : 'sesión'} · ${esc(shortDate(item.date))}</span></button>`;
     }
     const f = item.ref;
-    const notes = notesFor(f.id).filter(note => note.estado !== 'Resuelta').length;
+    const notes = notesFor(f.id).filter(openNote).length;
+    const shared = (f.compartido || [])[0];
     const audio = isAudio(f);
     return `<button class="clip ${audio ? 'clip-audio' : 'clip-doc'} ${selected ? 'is-selected' : ''} ${f.disponible ? '' : 'is-missing'}" data-clip="file:${f.id}"
         style="left:min(${item.left}%, calc(100% - 96px));width:max(${item.width}%, 92px);top:${8 + item.row * 66}px" title="${esc(f.nombre)}"
         aria-pressed="${selected}" aria-label="${audio ? 'Audio' : 'Archivo'} ${esc(f.nombre)}">
         <span class="clip-head">${audio ? '' : `<span class="clip-daw">${esc(f.nombre.split('.').pop().toUpperCase().slice(0, 4))}</span>`}
-          <span class="clip-name">${esc(fileLabel(f))}</span>${f.favorito ? '<span class="clip-star" title="Favorito">★</span>' : ''}${notes ? `<span class="clip-notes" title="Devoluciones pendientes">${notes}</span>` : ''}</span>
+          <span class="clip-name">${esc(fileLabel(f))}</span>${f.favorito ? '<span class="clip-star" title="Favorito">★</span>' : ''}${shared ? `<span class="clip-shared" title="El artista lo escuchó en «${esc(shared)}»">↗ ${esc(shared)}</span>` : ''}${notes ? `<span class="clip-notes" title="Devoluciones abiertas">${notes}</span>` : ''}</span>
         ${audio ? `<canvas class="clip-wave" data-peaks="${f.id}" data-size="${f.tamano ?? ''}" data-rev="${f.modificado || ''}" aria-hidden="true"></canvas>`
                 : `<span class="clip-foot mono">${esc(shortDate(item.date))}</span>`}</button>`;
 }
@@ -131,21 +136,24 @@ function renderWorkflow() {
     const {items, ticks} = timelineItems();
     const lanes = songStages().map(stage => {
         const laneItems = items.filter(item => item.stage === stage.clave);
-        const rows = packRows(laneItems);
-        const files = laneItems.filter(item => item.kind === 'file').length, sessions = laneItems.length - files;
+        const sessionItems = laneItems.filter(item => item.kind === 'session'), audioItems = laneItems.filter(item => item.kind === 'file');
+        const sessionRows = packRows(sessionItems), audioRows = packRows(audioItems);
+        const files = audioItems.length, sessions = sessionItems.length;
         const selected = studioSel.kind === 'stage' && studioSel.id === stage.clave;
-        return `<div class="lane st-${stage.clave}" style="--rows:${rows}">
+        const sub = (label, list, rows, empty) => `<div class="sublane" style="--rows:${rows}"><span class="sublane-label">${label}</span>
+            <div class="lane-body" data-drop-stage="${stage.clave}">${list.length ? list.map(clipMarkup).join('') : `<div class="lane-empty">${empty}</div>`}</div></div>`;
+        return `<div class="lane st-${stage.clave}">
           <div class="lane-head ${selected ? 'is-selected' : ''}">
             <button class="lane-select" data-stage-select="${stage.clave}" aria-pressed="${selected}">
               <span class="lane-macro">${stage.macro === 'pre' ? 'PREPRODUCCIÓN' : 'PRODUCCIÓN'}</span>
               <span class="lane-name">${esc(STAGE_INFO[stage.clave]?.short || stage.nombre)}</span>
-              <span class="lane-count mono">${laneItems.length ? [files && countLabel(files, 'archivo', 'archivos'), sessions && countLabel(sessions, 'sesión', 'sesiones')].filter(Boolean).join(' · ') : 'vacía'}</span>
+              <span class="lane-count mono">${laneItems.length ? [files && countLabel(files, 'audio', 'audios'), sessions && countLabel(sessions, 'sesión', 'sesiones')].filter(Boolean).join(' · ') : 'vacía'}</span>
             </button>
             <button class="lane-add" title="Agregar a ${esc(stage.nombre)}" aria-label="Agregar a ${esc(stage.nombre)}" data-stage-add="${stage.clave}">+</button>
           </div>
-          <div class="lane-body" data-drop-stage="${stage.clave}">
-            ${laneItems.length ? laneItems.map(clipMarkup).join('') :
-              `<div class="lane-empty">Sin material todavía · soltá archivos acá o usá <b>+</b></div>`}
+          <div class="sublanes">
+            ${sub('Sesión', sessionItems, sessionRows, 'Sin sesiones · soltá el proyecto del DAW acá')}
+            ${sub('Audios', audioItems, audioRows, 'Sin audios · soltá bounces, mezclas o masters acá')}
           </div>
         </div>`;
     }).join('');
@@ -175,6 +183,7 @@ function renderWorkflow() {
           <button class="btn-primary" onclick="addMaterialDialog()">+ Agregar audio o sesión</button>
         </div>
       </header>
+      <div id="transport" class="transport" role="region" aria-label="Transporte"></div>
       <div class="studio">
         <section class="arrange" aria-label="Línea de producción">
           <div class="ruler"><span class="ruler-label">Etapas</span><div class="ruler-ticks mono">${ticks.map(tick => `<span>${esc(shortDate(tick))}</span>`).join('')}</div></div>
@@ -184,12 +193,17 @@ function renderWorkflow() {
           </details>
         </section>
         <aside id="inspector" class="inspector" aria-label="Inspector"></aside>
-      </div>
-      <div id="transport" class="transport" role="region" aria-label="Transporte"></div>`;
+      </div>`;
     bindLanes();
     renderInspector();
     renderTransport();
     drawClipWaves();
+    if (pendingSeek && fileById(pendingSeek.id)) {
+        const {id, at} = pendingSeek; pendingSeek = null;
+        if (ab.a !== id && ab.b !== id) { ab.b = id; ab.side = 'b'; } else ab.side = ab.a === id ? 'a' : 'b';
+        loadTransport(id).then(() => { transport.audio.currentTime = Math.max(0, at - 5); renderTransport(); });
+        document.querySelector(`[data-clip="file:${id}"]`)?.scrollIntoView({block: 'nearest', inline: 'center'});
+    }
 }
 function activeStudioStage() {
     if (!studioSel) return 'demo';
@@ -332,6 +346,10 @@ async function renderInspector() {
     root.innerHTML = `<span class="insp-kicker">Inspector · ${audio ? 'audio' : 'archivo'}</span>
       <h2 class="insp-title">${esc(f.nombre)}</h2>
       <span class="insp-type"><i class="dot st-${f.etapa}"></i>${esc(fileLabel(f))} · ${esc(stageName(f.etapa))}${f.favorito ? ' · <span class="star">★ Favorito</span>' : ''}</span>
+      ${notes.length ? `<div class="insp-block insp-feedback"><span class="insp-label">Devoluciones del artista</span>
+        ${notes.map(note => `<button class="note-row" onclick="seekNote('${f.id}',${Number(note.segundo) || 0})">
+          <span class="mono note-time"><i class="fb-dot" style="background:${noteColor(note)}"></i>${note.segundo > 0 ? clockText(note.segundo) : 'General'}</span><span><span>${esc(note.texto)}</span><small>${esc(note.estado === 'Resuelta' ? 'Resuelto' : note.estado)} · ${esc(note.playlist || note.etiqueta)}</small></span></button>`).join('')}
+        <button class="btn-ghost" onclick="feedbackDialog({cancion_id:currentSong.id}).catch(report)">Gestionar devoluciones</button></div>` : ''}
       <dl class="facts mono" id="fileFacts">
         <dt>Fecha</dt><dd>${esc(f.creado)}</dd>
         <dt>Tamaño</dt><dd>${formatBytes(f.tamano)}</dd>
@@ -349,10 +367,7 @@ async function renderInspector() {
           ${audio ? `<a class="btn-link" href="/api/produccion/archivo/${f.id}" target="_blank" rel="noopener">Abrir archivo</a>` : ''}</div>
       </div>
       ${moveBlock('archivo', f)}
-      ${notes.length ? `<div class="insp-block"><span class="insp-label">Devoluciones del artista</span>
-        ${notes.map(note => `<button class="note-row" onclick="seekNote('${f.id}',${Number(note.segundo) || 0})">
-          <span class="mono note-time">${clockText(note.segundo)}</span><span><span>${esc(note.texto)}</span><small>${esc(note.estado)} · ${esc(note.etiqueta)}</small></span></button>`).join('')}
-        <button class="btn-ghost" onclick="feedbackDialog({cancion_id:currentSong.id}).catch(report)">Gestionar devoluciones</button></div>` : ''}`;
+`;
     if (audio && f.disponible) {
         try {
             const info = (await api('/api/catalogo/' + f.id)).tecnica || {};
@@ -475,7 +490,7 @@ function switchSide(side) {
 }
 async function seekNote(id, seconds) {
     if (transport.fileId !== id) await playFile(id);
-    transport.audio.currentTime = Math.max(0, seconds - 2);
+    transport.audio.currentTime = Math.max(0, seconds - 5);
     transport.audio.play().catch(() => {});
 }
 function renderTransport() {
@@ -502,6 +517,8 @@ function renderTransport() {
     const seek = event => {
         if (!audio.duration) return;
         const box = canvas.getBoundingClientRect();
+        const hit = notesFor(transport.fileId).find(note => note.segundo > 0 && Math.abs(note.segundo / audio.duration * box.width - (event.clientX - box.left)) < 7);
+        if (hit && event.clientY - box.top < 14) return seekNote(transport.fileId, hit.segundo);
         audio.currentTime = Math.max(0, Math.min(1, (event.clientX - box.left) / box.width)) * audio.duration;
         drawTransport();
     };
@@ -537,7 +554,7 @@ function drawTransport() {
     if (audio.duration) {
         for (const note of notesFor(transport.fileId)) {
             const x = note.segundo / audio.duration * box.width;
-            ctx.fillStyle = note.estado === 'Resuelta' ? '#8A8A94' : '#FFD166';
+            ctx.fillStyle = noteColor(note);
             ctx.beginPath(); ctx.arc(x, 5, 4, 0, Math.PI * 2); ctx.fill();
         }
         ctx.fillStyle = '#EDEDF0';

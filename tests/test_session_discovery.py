@@ -97,7 +97,7 @@ class SessionDiscoveryTest(unittest.TestCase):
             db.execute('UPDATE schema_audio SET version=1')
         before = len(list(self.root.glob('*.respaldo-sesiones-*.sqlite3')))
         with app.db_open() as db:
-            self.assertEqual(db.execute('SELECT version FROM schema_audio').fetchone()[0], 8)
+            self.assertEqual(db.execute('SELECT version FROM schema_audio').fetchone()[0], 9)
         self.assertEqual(len(list(self.root.glob('*.respaldo-sesiones-*.sqlite3'))), before+1)
         with app.db_open() as db:
             self.assertEqual(db.execute('PRAGMA integrity_check').fetchone()[0], 'ok')

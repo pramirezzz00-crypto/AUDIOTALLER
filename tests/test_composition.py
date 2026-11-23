@@ -71,7 +71,7 @@ class CompositionTest(unittest.TestCase):
             db.execute('UPDATE schema_audio SET version=7')
             before=dict(db.execute('SELECT * FROM playlists WHERE id=?',(self.playlist['id'],)).fetchone())
         with app.db_open() as db:
-            self.assertEqual(db.execute('SELECT version FROM schema_audio').fetchone()[0],8)
+            self.assertEqual(db.execute('SELECT version FROM schema_audio').fetchone()[0],9)
             self.assertEqual(dict(db.execute('SELECT * FROM playlists WHERE id=?',(self.playlist['id'],)).fetchone()),before)
             self.assertEqual(db.execute('PRAGMA integrity_check').fetchone()[0],'ok')
         backups=list(self.root.glob('*.respaldo-composicion-*.sqlite3'))
