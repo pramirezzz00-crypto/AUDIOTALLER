@@ -131,12 +131,16 @@ function studioDisplayHook(page) {
     if (page === 'composition') renderCompositionPane();
     if (page === 'entidades') renderEntitiesPane();
     if (page === 'arrangements') renderArrangementsPane();
+    const crumbs = {launchesPane: 'Lanzamientos', avPane: 'Audiovisual', configPane: 'Configuración'};
+    if (crumbs[page]) $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › ${crumbs[page]}`;
+    $('sideLaunches')?.setAttribute('aria-current', page === 'launchesPane' ? 'page' : 'false');
+    $('sideConfig')?.setAttribute('aria-current', page === 'configPane' ? 'page' : 'false');
     if (page === 'artistsPane') { $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › Artistas`; paintArtists(); }
     else if (typeof arr !== 'undefined' && arr.playing) arrStop();
     if (page !== 'composition' && typeof comp !== 'undefined') { comp.audio.pause(); comp.sync?.audio.pause(); }
     if (page === 'exportPane') renderExport();
     if (page !== 'albumPane' && typeof albumPlayer !== 'undefined' && albumPlayer.index >= 0) albumPlayer.stop();
-    if (page === 'home') renderHome();
+    if (page === 'home') renderHome().then(() => typeof homeUpcoming === 'function' && homeUpcoming());
     else if (page !== 'songPane') api('/api/inicio').then(data => renderSideRecents(data.recientes)).catch(() => {});
     if (page !== 'songPane' && typeof stopTransport === 'function') stopTransport();
 }

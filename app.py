@@ -341,6 +341,8 @@ from redesign_arr import register_arrangements_redesign
 register_arrangements_redesign(app, db_open)
 from redesign_arr import register_people_redesign
 register_people_redesign(app, db_open)
+from redesign_extra import register_extra
+register_extra(app, db_open, lambda: DB.parent)
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1',port=5000,debug=False)

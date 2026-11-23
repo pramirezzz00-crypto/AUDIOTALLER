@@ -123,3 +123,45 @@ class PeopleRedesignTest(unittest.TestCase):
         artist = self.c.get('/api/artistas-rediseno').json[0]
         self.assertEqual((artist['tipo_proyecto'], artist['relacion'], artist['completo']), ('Banda', 'Del estudio', False))
         self.assertIn('Ana: sin n.º de SADAIC', artist['alertas'])
+
+
+class LaunchAndVideoTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent)
+        root = Path(self.tmp.name)
+        app.DB = root / 'test.sqlite'; app.LIBRARY = root / 'Artistas'; self.root = root
+        self.c = app.app.test_client()
+        self.aid = self.c.post('/api/artistas', json={'nombre': 'Luna', 'tipo': 'Solista'}).json['id']
+        self.album = self.c.post(f'/api/artistas/{self.aid}/discos', json={'nombre': 'Viento', 'tipo': 'EP'}).json['id']
+        for t in ('A', 'B', 'C', 'D'):
+            self.c.post(f'/api/artistas/{self.aid}/canciones', json={'titulo': t, 'disco_id': self.album})
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_campana_sugerida_fechas_limite_y_pdf(self):
+        draft = self.c.get(f'/api/discos/{self.album}/campana-sugerida?fecha=2027-03-15').json
+        self.assertEqual([s['tipo'] for s in draft['etapas']], ['Single', 'Single', 'EP'])
+        saved = self.c.post('/api/campanas', json=draft).json
+        self.assertEqual(saved['etapas'][2]['limites'], {'distribuidora': '2027-02-15', 'pitch': '2027-03-08'})
+        self.assertTrue(self.c.get(f"/api/campanas/{saved['id']}/pdf").data.startswith(b'%PDF'))
+        self.assertEqual(next(p for p in self.c.get('/api/producciones').json if p['id'] == self.album)['campana']['id'], saved['id'])
+
+    def test_audiovisual_y_desprender_musica(self):
+        video = self.c.post('/api/audiovisual', json={'nombre': 'Sesión en vivo', 'origen': 'audio_desde_video', 'plantilla': 'Sesión en vivo / Recital'}).json
+        self.assertEqual(video['etapas'][0]['nombre'], 'Preproducción')
+        audio = self.root / 'tema1.wav'
+        with wave.open(str(audio), 'wb') as w:
+            w.setnchannels(1); w.setsampwidth(2); w.setframerate(8000); w.writeframes(struct.pack('<h', 0) * 800)
+        result = self.c.post(f"/api/audiovisual/{video['id']}/desprender", json={'artista_id': self.aid, 'canciones': [{'titulo': 'Tema en vivo', 'ruta': str(audio)}]}).json
+        sid = result['canciones'][0]['id']
+        files = self.c.get(f'/api/produccion/{sid}').json['archivos']
+        self.assertEqual((files[0]['etapa'], files[0]['modo']), ('mezcla', 'vinculado'))
+        self.assertIn(sid, self.c.get('/api/audiovisual').json[0]['canciones'])
+
+    def test_asistente_sin_clave_explica_que_falta(self):
+        self.assertFalse(self.c.get('/api/asistente/config').json['clave'])
+        self.assertEqual(self.c.post('/api/asistente/config', json={'api_key': 'mala'}).status_code, 400)
+        response = self.c.post('/api/asistente/mensaje', json={'mensajes': [{'rol': 'user', 'texto': 'hola'}]})
+        self.assertEqual(response.status_code, 400, response.data[:200])
+        self.assertIn('clave de API', response.get_json(force=True)['error'])

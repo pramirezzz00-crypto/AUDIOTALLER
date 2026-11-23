@@ -26,3 +26,24 @@ Sin cambios de esquema (sigue en la versión 8). Nuevos endpoints en `overview.p
 ## Pruebas
 
 `tests/test_overview.py` (5 pruebas). Total: 45 pruebas.
+
+## Rediseño completo (23 de noviembre de 2026, tandas 1 a 6)
+
+Volcado del mockup navegable (https://claude.ai/artifact/MvHezeGCf1gPjgmKJ4eXSD) a la app. El mockup se conserva para mostrar el funcionamiento.
+
+**Datos.** Migración 9 con respaldo automático: agrega columnas a `portal_devoluciones` (respuesta, versión que resuelve, bucle) y la tabla `rediseno_datos(tipo,id,datos)` para documentos JSON (créditos, letras, beats, partituras, trámites, campañas, audiovisuales, perfiles de buses, artistas, medidas de sonoridad, configuración del asistente). No se borra ni se mueve ningún dato existente. Sin dependencias nuevas.
+
+| Pantalla | Módulos |
+|---|---|
+| Playlist › Devoluciones, marcadores al DAW | `portal_feedback.py`, `feedback_markers.py`, `static/feedback-ui.js` |
+| Inicio, canción (transporte arriba, sub-carriles) | `static/studio-home.js`, `static/studio-song.js` |
+| Producciones, Disco, Créditos, Exportar metadata | `redesign.py`, `loudness.py`, `metadata_export.py`, `static/productions-ui.js`, `studio-album.js`, `credits-ui.js`, `export-ui.js` |
+| Composición y Entidades | `redesign_comp.py`, `entity_guides.py`, `static/composition-ui.js`, `entities-ui.js` |
+| Arreglos y buses, Artistas, Catálogo, Playlist | `redesign_arr.py`, `static/arrangements-ui.js`, `people-ui.js`, `catalog-extra.js` |
+| Lanzamientos, Audiovisual, Asistente, Configuración | `redesign_extra.py`, `static/extra-ui.js` |
+
+**A verificar en la PC de Pedro:** importar un `.dawproject` en Cubase 14.0.20+ (probar primero); parámetros de `ylm2` (Youlean, hoy desactivado salvo `AUDIOTALLER_YOULEAN=1`; se mide con BS.1770 propio); arrastrar beats al DAW desde la ventana.
+
+**Pendiente fuera de la app:** formulario del artista y devoluciones sobre video requieren actualizar el portal de Firebase; Pro Tools requiere el Scripting SDK de Avid; estadísticas con Soundcharts.
+
+Pruebas: `tests/test_redesign_*.py` (19 pruebas nuevas). La falla de `test_importa_perfil_sin_aceptar_tokens_de_terceros` ya existía antes del rediseño.

@@ -2,7 +2,7 @@ function songRow(s){return `<div class="item"><b>♫ ${esc(s.titulo)}</b><button
 const $ = id => document.getElementById(id);
 let artist, currentAlbum, currentSong, editing, photo, selectedPhoto;
 let previewUrl;
-const pages = ['home', 'manager', 'profile', 'editor', 'artistPane', 'albumPane', 'songPane', 'arrangements', 'globalProjects', 'catalogPane', 'playlistsPane', 'composition', 'beats', 'scores', 'lyrics', 'entidades', 'feedbackPane', 'creditsPane', 'exportPane', 'artistsPane'];
+const pages = ['home', 'manager', 'profile', 'editor', 'artistPane', 'albumPane', 'songPane', 'arrangements', 'globalProjects', 'catalogPane', 'playlistsPane', 'composition', 'beats', 'scores', 'lyrics', 'entidades', 'feedbackPane', 'creditsPane', 'exportPane', 'artistsPane', 'launchesPane', 'avPane', 'configPane'];
 const trail = ['home'];
 function display() {
     const page = trail.at(-1);

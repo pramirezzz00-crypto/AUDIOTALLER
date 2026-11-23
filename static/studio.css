@@ -474,3 +474,28 @@ td.missing,dd.missing,.doc-page .missing{color:#E5484D!important;font-weight:600
 .wiz-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}
 .cat-extra{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--at-text2);margin-top:6px}
 .pl-news{border-color:#FFB54766!important;display:flex;flex-direction:column;gap:8px;margin-top:12px}
+
+/* ── Lanzamientos, Audiovisual, Asistente ── */
+.fld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--at-text2)}.fld input,.fld select{margin:0}
+.camp-list{display:flex;flex-direction:column;gap:8px}
+.camp-card{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) minmax(0,1fr);gap:14px;align-items:center;text-align:left;margin:0!important;color:var(--at-text)!important;font-weight:400}
+.camp-card small{display:block}.camp-bar{display:flex;gap:3px}
+.camp-bar i{flex:1;font-style:normal;font-size:10px;font-weight:700;text-align:center;padding:3px 2px;border-radius:3px;background:var(--at-line3);color:var(--at-text)}
+.camp-bar i.st-Publicada{background:#2FD8BF;color:#04211C}.camp-bar i.st-Enviada{background:#5ED17E;color:#000}.camp-bar i.st-Enpreparación{background:#FFB547;color:#000}
+.camp-stages{display:flex;flex-direction:column;gap:12px;margin-bottom:12px}.camp-stage{display:flex;flex-direction:column;gap:10px}
+.camp-stage select[multiple]{height:auto}.spacer{flex:1}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:10px}
+.cal-h{font-size:11px;color:var(--at-text3);text-align:center}.cal-d{min-height:86px;border:1px solid var(--at-line);border-radius:6px;padding:4px;display:flex;flex-direction:column;gap:2px}
+.cal-e{margin:0!important;min-height:0;padding:2px 4px!important;font-size:10px;text-align:left;border-radius:3px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-e.ok{background:#2FD8BF33!important}.cal-e.warn{background:#FFB54733!important}.cal-e.info{background:#5AA7FF33!important}
+.up-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}.up-card{display:flex!important;flex-direction:column;gap:3px;text-align:left;margin:0!important;color:var(--at-text)!important;font-weight:400}
+.av-cover{display:flex!important;align-items:center;justify-content:center;font-size:42px;color:var(--at-accent);background:linear-gradient(160deg,#1E1E23,#0B0B0D)}
+.av-body{display:flex;flex-direction:column;gap:12px}.av-stages{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.av-stage{display:flex;flex-direction:column;gap:4px;padding:10px;border:1px solid var(--at-line2);border-radius:8px}
+.av-rows input,.av-rows select{margin:0;min-width:80px}
+#chatFab{position:fixed;right:24px;bottom:24px;z-index:40;width:52px;height:52px;border-radius:50%!important;padding:0!important;margin:0!important;font-size:24px;background:#D97757!important;color:#fff!important;border:0!important;box-shadow:0 8px 24px #000A}
+body[data-page=albumPane] #chatFab{bottom:110px}
+.chat-panel{position:fixed;right:24px;bottom:88px;z-index:41;width:min(380px,90vw);height:min(520px,70vh);display:flex;flex-direction:column;gap:8px;background:#111114;border:1px solid var(--at-line3);border-radius:12px;padding:12px;box-shadow:0 20px 50px #000C}
+.chat-msgs{flex:1;overflow:auto;display:flex;flex-direction:column;gap:8px}
+.msg{margin:0;padding:8px 10px;border-radius:8px;white-space:pre-wrap;font-size:13px}.msg.user{background:var(--at-accent-soft);align-self:flex-end}.msg.assistant{background:var(--at-raised)}
+.chat-panel form{display:flex;gap:6px}.chat-panel textarea{margin:0;flex:1}
