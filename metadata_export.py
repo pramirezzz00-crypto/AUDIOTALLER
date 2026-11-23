@@ -360,6 +360,10 @@ def wrap(value, size, width, bold=False):
 
 
 def build_pdf(data, options):
+    return render_pdf(document_blocks(data, options), data['titulo'], options['logo'])
+
+
+def render_pdf(blocks, footer_title, logo=True):
     W, H, M = 595, 842, 50
     pages, ops = [], []
     y = H - M
@@ -369,7 +373,7 @@ def build_pdf(data, options):
         if ops:
             pages.append(ops)
         ops, y = [], H - M
-        footer = f"AudioTaller · {data['titulo']} · página {len(pages) + 1}"
+        footer = f"AudioTaller · {footer_title} · página {len(pages) + 1}"
         ops.append(f'BT /F1 8 Tf 0.5 0.5 0.5 rg {M} 28 Td ({pdf_text(footer).decode("latin-1")}) Tj ET')
 
     def text(x, yy, value, size=10, bold=False, color=(0.07, 0.07, 0.08)):
@@ -381,7 +385,7 @@ def build_pdf(data, options):
             new_page()
 
     new_page()
-    if options['logo']:
+    if logo:
         ops.append('0.06 0.13 0.16 rg 50 772 28 28 re f')
         for i, (h, x) in enumerate(((8, 54), (16, 59.5), (22, 65), (16, 70.5), (8, 76))):
             ops.append(f'0.18 0.85 0.75 rg {x - 1.6:.1f} {786 - h / 2:.1f} 3.2 {h} re f')
@@ -389,7 +393,7 @@ def build_pdf(data, options):
         text(W - M - 150, 783, f'generada el {date.today().strftime("%d/%m/%Y")}', 8, False, (0.45, 0.45, 0.45))
         ops.append(f'0.07 0.07 0.08 RG 1.2 w {M} 762 m {W - M} 762 l S')
         y = 740
-    for kind, content in document_blocks(data, options):
+    for kind, content in blocks:
         if kind == 'break':
             new_page()
         elif kind == 'kicker':

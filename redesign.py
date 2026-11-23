@@ -122,6 +122,78 @@ def measurement(db, meter, file_id, path):
     return dict(estado='midiendo')
 
 
+def credits_bundle(db, sid):
+    song = dict(required_row(db, 'canciones', sid))
+    obra = json.loads((db.execute('SELECT datos FROM registro_obra WHERE id=?', (sid,)).fetchone() or {'datos': '{}'})['datos'])
+    recordings = [dict(json.loads(r['datos']), id=r['id']) for r in db.execute(
+        'SELECT * FROM registro_grabacion WHERE cancion_id=? ORDER BY rowid', (sid,))]
+    data = doc_get(db, 'creditos', sid, {})
+    legacy = [dict(r) for r in db.execute('''SELECT cr.rol,a.nombre FROM creditos cr JOIN artistas a ON a.id=cr.persona_id
+        WHERE cr.cancion_id=? OR cr.disco_id=?''', (sid, song['disco_id'] or '-'))]
+    ficha = json.loads((db.execute('SELECT datos FROM ficha_cancion WHERE id=?', (sid,)).fetchone() or {'datos': '{}'})['datos'])
+    details = json.loads((db.execute('SELECT datos FROM detalle_cancion WHERE id=?', (sid,)).fetchone() or {'datos': '{}'})['datos'])
+    state = db.execute('SELECT estado FROM estado_cancion WHERE id=?', (sid,)).fetchone()
+    if not data and legacy:
+        # Primera vez: se sugieren las personas ya cargadas como «Artistas y músicos».
+        data = dict(interpretes=[dict(nombre=r['nombre'], instrumento=r['rol'], aadi='') for r in legacy])
+    authors = data.get('autores', [])
+    total = round(sum(float(a.get('porcentaje') or 0) for a in authors), 2)
+    recording = recordings[0] if recordings else {}
+    missing = []
+    if not obra.get('iswc'):
+        missing.append('ISWC')
+    if not recording.get('isrc'):
+        missing.append('ISRC')
+    if not authors:
+        missing.append('autoría')
+    elif abs(total - 100) > 0.01:
+        missing.append('reparto distinto de 100 %')
+    for role in ('Mezcla', 'Mastering'):
+        if not any(t.get('rol') == role and t.get('nombre') for t in data.get('tecnica', [])):
+            missing.append('crédito de ' + role.lower())
+    return dict(id=sid, titulo=song['titulo'], disco_id=song['disco_id'], pista=details.get('pista'),
+                duracion=details.get('duracion', ''), estado=state_of(state['estado'] if state else ''),
+                iswc=obra.get('iswc', ''), isrc=recording.get('isrc', ''), grabacion_id=recording.get('id', ''),
+                idioma=obra.get('idioma', ''), genero=obra.get('genero', ''), explicito=recording.get('explicito', ''),
+                letra=ficha.get('letra', ''), autores=authors, interpretes=data.get('interpretes', []),
+                produccion=data.get('produccion', []), tecnica=data.get('tecnica', []), total_autoria=total, faltan=missing)
+
+
+
+def export_data(db, scope, identity):
+    if scope == 'disco':
+        album = dict(required_row(db, 'discos', identity))
+        ids = [r['id'] for r in db.execute('SELECT id FROM canciones WHERE disco_id=?', (identity,))]
+        details = json.loads((db.execute('SELECT datos FROM detalle_disco WHERE id=?', (identity,)).fetchone() or {'datos': '{}'})['datos'])
+        release = json.loads((db.execute('SELECT datos FROM registro_lanzamiento WHERE id=?', (identity,)).fetchone() or {'datos': '{}'})['datos'])
+        title, kind, folder, artist_id = album['nombre'], details.get('tipo', 'Álbum'), album['carpeta'], album['artista_id']
+        art = doc_get(db, 'arte', identity, {})
+    else:
+        song = dict(required_row(db, 'canciones', identity))
+        ids = [identity]
+        release, details, art = {}, {}, {}
+        if song['disco_id']:
+            release = json.loads((db.execute('SELECT datos FROM registro_lanzamiento WHERE id=?', (song['disco_id'],)).fetchone() or {'datos': '{}'})['datos'])
+        title, kind, folder, artist_id = song['titulo'], 'Single', song['carpeta'], song['artista_id']
+    artist = required_row(db, 'artistas', artist_id)['nombre']
+    songs = sorted([credits_bundle(db, sid) for sid in ids], key=lambda s: (s['pista'] is None, s['pista'] or 0, s['titulo']))
+    refs = {s['id']: s for s in song_summaries(db, 'WHERE c.id IN (%s)' % ','.join('?' * len(ids)), ids)} if ids else {}
+    for index, song in enumerate(songs, 1):
+        song['n'] = song['pista'] or index
+        ref = refs.get(song['id'], {})
+        song['duracion'] = song['duracion'] or ref.get('duracion', '')
+        master = db.execute('''SELECT f.nombre FROM archivos f WHERE f.cancion_id=? AND f.etapa='mastering'
+            ORDER BY f.creado DESC LIMIT 1''', (song['id'],)).fetchone()
+        song['master'] = master['nombre'] if master else ''
+    return dict(titulo=title, tipo=kind, artista=artist, carpeta=folder, lanzamiento=release, arte=art,
+                portada=bool(details.get('portada')), canciones=songs)
+
+
+
+def export_bundle_for_song(db, sid):
+    return export_data(db, 'cancion', sid)
+
+
 def register_redesign(app, connect):
     meter = Meter(connect)
     app.config['AT_METER'] = meter
@@ -198,42 +270,6 @@ def register_redesign(app, connect):
             return jsonify(measurement(db, meter, fid, row['ruta']))
 
     # ── Créditos ──
-    def credits_bundle(db, sid):
-        song = dict(required_row(db, 'canciones', sid))
-        obra = json.loads((db.execute('SELECT datos FROM registro_obra WHERE id=?', (sid,)).fetchone() or {'datos': '{}'})['datos'])
-        recordings = [dict(json.loads(r['datos']), id=r['id']) for r in db.execute(
-            'SELECT * FROM registro_grabacion WHERE cancion_id=? ORDER BY rowid', (sid,))]
-        data = doc_get(db, 'creditos', sid, {})
-        legacy = [dict(r) for r in db.execute('''SELECT cr.rol,a.nombre FROM creditos cr JOIN artistas a ON a.id=cr.persona_id
-            WHERE cr.cancion_id=? OR cr.disco_id=?''', (sid, song['disco_id'] or '-'))]
-        ficha = json.loads((db.execute('SELECT datos FROM ficha_cancion WHERE id=?', (sid,)).fetchone() or {'datos': '{}'})['datos'])
-        details = json.loads((db.execute('SELECT datos FROM detalle_cancion WHERE id=?', (sid,)).fetchone() or {'datos': '{}'})['datos'])
-        state = db.execute('SELECT estado FROM estado_cancion WHERE id=?', (sid,)).fetchone()
-        if not data and legacy:
-            # Primera vez: se sugieren las personas ya cargadas como «Artistas y músicos».
-            data = dict(interpretes=[dict(nombre=r['nombre'], instrumento=r['rol'], aadi='') for r in legacy])
-        authors = data.get('autores', [])
-        total = round(sum(float(a.get('porcentaje') or 0) for a in authors), 2)
-        recording = recordings[0] if recordings else {}
-        missing = []
-        if not obra.get('iswc'):
-            missing.append('ISWC')
-        if not recording.get('isrc'):
-            missing.append('ISRC')
-        if not authors:
-            missing.append('autoría')
-        elif abs(total - 100) > 0.01:
-            missing.append('reparto distinto de 100 %')
-        for role in ('Mezcla', 'Mastering'):
-            if not any(t.get('rol') == role and t.get('nombre') for t in data.get('tecnica', [])):
-                missing.append('crédito de ' + role.lower())
-        return dict(id=sid, titulo=song['titulo'], disco_id=song['disco_id'], pista=details.get('pista'),
-                    duracion=details.get('duracion', ''), estado=state_of(state['estado'] if state else ''),
-                    iswc=obra.get('iswc', ''), isrc=recording.get('isrc', ''), grabacion_id=recording.get('id', ''),
-                    idioma=obra.get('idioma', ''), genero=obra.get('genero', ''), explicito=recording.get('explicito', ''),
-                    letra=ficha.get('letra', ''), autores=authors, interpretes=data.get('interpretes', []),
-                    produccion=data.get('produccion', []), tecnica=data.get('tecnica', []), total_autoria=total, faltan=missing)
-
     @app.get('/api/creditos/<sid>')
     def rd_credits_get(sid):
         with connect() as db:
@@ -339,34 +375,6 @@ def register_redesign(app, connect):
         return jsonify(ok=True)
 
     # ── Exportar metadata ──
-    def export_data(db, scope, identity):
-        if scope == 'disco':
-            album = dict(required_row(db, 'discos', identity))
-            ids = [r['id'] for r in db.execute('SELECT id FROM canciones WHERE disco_id=?', (identity,))]
-            details = json.loads((db.execute('SELECT datos FROM detalle_disco WHERE id=?', (identity,)).fetchone() or {'datos': '{}'})['datos'])
-            release = json.loads((db.execute('SELECT datos FROM registro_lanzamiento WHERE id=?', (identity,)).fetchone() or {'datos': '{}'})['datos'])
-            title, kind, folder, artist_id = album['nombre'], details.get('tipo', 'Álbum'), album['carpeta'], album['artista_id']
-            art = doc_get(db, 'arte', identity, {})
-        else:
-            song = dict(required_row(db, 'canciones', identity))
-            ids = [identity]
-            release, details, art = {}, {}, {}
-            if song['disco_id']:
-                release = json.loads((db.execute('SELECT datos FROM registro_lanzamiento WHERE id=?', (song['disco_id'],)).fetchone() or {'datos': '{}'})['datos'])
-            title, kind, folder, artist_id = song['titulo'], 'Single', song['carpeta'], song['artista_id']
-        artist = required_row(db, 'artistas', artist_id)['nombre']
-        songs = sorted([credits_bundle(db, sid) for sid in ids], key=lambda s: (s['pista'] is None, s['pista'] or 0, s['titulo']))
-        refs = {s['id']: s for s in song_summaries(db, 'WHERE c.id IN (%s)' % ','.join('?' * len(ids)), ids)} if ids else {}
-        for index, song in enumerate(songs, 1):
-            song['n'] = song['pista'] or index
-            ref = refs.get(song['id'], {})
-            song['duracion'] = song['duracion'] or ref.get('duracion', '')
-            master = db.execute('''SELECT f.nombre FROM archivos f WHERE f.cancion_id=? AND f.etapa='mastering'
-                ORDER BY f.creado DESC LIMIT 1''', (song['id'],)).fetchone()
-            song['master'] = master['nombre'] if master else ''
-        return dict(titulo=title, tipo=kind, artista=artist, carpeta=folder, lanzamiento=release, arte=art,
-                    portada=bool(details.get('portada')), canciones=songs)
-
     @app.get('/api/exportar/vista')
     def rd_export_preview():
         scope, identity = request.args.get('alcance', 'disco'), request.args.get('id', '')

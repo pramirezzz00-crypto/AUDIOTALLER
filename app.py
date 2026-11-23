@@ -335,6 +335,8 @@ register_folder_migration(app, db_open, lambda: DB)
 register_overview(app, db_open)
 from redesign import register_redesign
 register_redesign(app, db_open)
+from redesign_comp import register_composition_redesign
+register_composition_redesign(app, db_open)
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1',port=5000,debug=False)

@@ -136,7 +136,7 @@ def main():
             result = webview.windows[0].create_file_dialog(
                 webview.FileDialog.OPEN, allow_multiple=True,
                 file_types=(
-                    'Partituras (*.pdf;*.png;*.jpg;*.jpeg)',
+                    'Partituras (*.pdf;*.png;*.jpg;*.jpeg;*.mscz;*.sib;*.dorico;*.musx;*.mus;*.musicxml;*.mxl;*.xml)',
                     'Todos los archivos (*.*)',
                 )
             )
@@ -175,6 +175,36 @@ def main():
                 open_path(str(archivo.parent))
                 return True
             except (OSError, RuntimeError):
+                return False
+
+        def open_folder_for(self, kind, identity):
+            # Carpetas que arma AudioTaller (Entregas, Trámites): se resuelven desde la base, nunca desde una ruta del navegador.
+            from app import db_open
+            table = {'disco': 'discos', 'cancion': 'canciones'}.get(str(kind).split(':')[0])
+            if not table:
+                return False
+            with db_open() as db:
+                row = db.execute(f'SELECT carpeta FROM {table} WHERE id=?', (str(identity),)).fetchone()
+            if not row:
+                return False
+            sub = 'Trámites' if str(kind).endswith(':tramites') else 'Entregas'
+            target = Path(row['carpeta']) / sub
+            if not target.is_dir():
+                return False
+            open_path(str(target))
+            return True
+
+        def copy_text(self, text):
+            try:
+                import subprocess
+                if os.name == 'nt':
+                    subprocess.run(['clip'], input=str(text).encode('utf-16-le'), check=True)
+                elif sys.platform == 'darwin':
+                    subprocess.run(['pbcopy'], input=str(text).encode(), check=True)
+                else:
+                    return False
+                return True
+            except Exception:
                 return False
 
         def open_location(self, beat_id):

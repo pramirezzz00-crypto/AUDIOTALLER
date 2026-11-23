@@ -143,7 +143,11 @@ def register_composition(app, db_open, AUDIO_TYPES):
         except (OSError, RuntimeError):
             pass
         return (jsonify(error='El archivo ya no está disponible en su ubicación original.'), 404)
-    SCORE_TYPES = {'.pdf': 'application/pdf', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg'}
+    SCORE_TYPES = {'.pdf': 'application/pdf', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+                   # Archivos de editores de partituras: se guardan y se abren con su programa.
+                   '.mscz': 'application/octet-stream', '.sib': 'application/octet-stream', '.dorico': 'application/octet-stream',
+                   '.musx': 'application/octet-stream', '.mus': 'application/octet-stream', '.musicxml': 'application/vnd.recordare.musicxml+xml',
+                   '.mxl': 'application/vnd.recordare.musicxml', '.xml': 'application/xml'}
 
     @app.get('/api/scores/collections')
     def scores_collections():

@@ -262,7 +262,8 @@ function selectScore(id, items) {
     selectedScoreId = id; $('scoreNow').textContent = item.nombre; $('openScoreFolder').disabled = false;
     const url = '/api/scores/' + encodeURIComponent(id) + '/file';
     if (item.formato === 'PDF') $('scoreViewer').innerHTML = `<iframe title="Vista previa de ${esc(item.nombre)}" src="${url}"></iframe>`;
-    else $('scoreViewer').innerHTML = `<img alt="Vista previa de ${esc(item.nombre)}" src="${url}">`;
+    else if (['PNG', 'JPG', 'JPEG'].includes(item.formato)) $('scoreViewer').innerHTML = `<img alt="Vista previa de ${esc(item.nombre)}" src="${url}">`;
+    else $('scoreViewer').innerHTML = `<p class="muted">Archivo de ${esc(item.formato)}: se abre con su programa. Usá «Abrir ubicación».</p>`;
     renderScores({partituras:items});
 }
 async function addScores() {

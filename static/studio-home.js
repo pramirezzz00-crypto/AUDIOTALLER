@@ -128,6 +128,9 @@ function studioDisplayHook(page) {
     if (page === 'feedbackPane') { $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="openPlaylists()">Playlist</button> › Devoluciones`; renderFeedbackPane(); }
     else if (typeof fb !== 'undefined') fb.audio.pause();
     if (page === 'creditsPane') renderCredits();
+    if (page === 'composition') renderCompositionPane();
+    if (page === 'entidades') renderEntitiesPane();
+    if (page !== 'composition' && typeof comp !== 'undefined') { comp.audio.pause(); comp.sync?.audio.pause(); }
     if (page === 'exportPane') renderExport();
     if (page !== 'albumPane' && typeof albumPlayer !== 'undefined' && albumPlayer.index >= 0) albumPlayer.stop();
     if (page === 'home') renderHome();
@@ -146,3 +149,11 @@ function formatBytes(bytes) {
     return bytes + ' B';
 }
 function formatRate(hertz) { return hertz ? formatDecimal(hertz / 1000) + ' kHz' : ''; }
+
+// Avisos breves (no son errores): aparecen abajo y se van solos.
+function notify(message) {
+    let box = $('toast');
+    if (!box) { box = document.createElement('div'); box.id = 'toast'; box.setAttribute('role', 'status'); document.body.appendChild(box); }
+    box.textContent = message; box.className = 'is-on';
+    clearTimeout(notify.timer); notify.timer = setTimeout(() => { box.className = ''; }, 4200);
+}
