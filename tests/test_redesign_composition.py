@@ -1,4 +1,4 @@
-import io, sys, tempfile, unittest, wave, struct
+import io, sys, tempfile, unittest, wave, struct, zipfile
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import app
@@ -65,3 +65,40 @@ class CompositionRedesignTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ArrangementBusesTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent)
+        root = Path(self.tmp.name)
+        app.DB = root / 'test.sqlite'; app.LIBRARY = root / 'Artistas'; self.root = root
+        self.c = app.app.test_client()
+        aid = self.c.post('/api/artistas', json={'nombre': 'Luna', 'tipo': 'Solista'}).json['id']
+        self.sid = self.c.post(f'/api/artistas/{aid}/canciones', json={'titulo': 'Mareas'}).json['id']
+        self.session = root / 'sesion'; self.session.mkdir()
+        for name in ('Kick In.wav', 'Bajo DI.wav', 'Voz Lead.wav', 'Fx raro.wav'):
+            with wave.open(str(self.session / name), 'wb') as w:
+                w.setnchannels(1); w.setsampwidth(2); w.setframerate(8000); w.writeframes(struct.pack('<h', 0) * 8000)
+        (self.session / 'Mareas.rpp').write_text('<REAPER_PROJECT\n>\n')
+        self.c.post(f'/api/produccion/{self.sid}/sesiones', json={'etapa': 'grabacion', 'ruta': str(self.session / 'Mareas.rpp'), 'daw': 'Reaper', 'nombre': 'Mareas'})
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_clasifica_y_crea_sesiones_nuevas_sin_tocar_la_original(self):
+        takes = self.c.get(f'/api/arreglos/canciones/{self.sid}/tomas').json['tomas']
+        result = self.c.post(f'/api/arreglos/{self.sid}/clasificar', json={'perfil_id': 'mezcla', 'pistas': takes}).json['pistas']
+        buses = {t['nombre']: t['bus'] for t in result}
+        self.assertEqual((buses['Kick In.wav'], buses['Bajo DI.wav'], buses['Voz Lead.wav'], buses['Fx raro.wav']), ('Batería', 'Bajo', 'Voces', ''))
+        items = [dict(token=t['token'], bus=t['bus'] or 'Efectos') for t in result]
+        rpp = self.c.post(f'/api/arreglos/{self.sid}/crear-sesion', json={'daw': 'reaper', 'nombre': 'Base', 'pistas': items, 'aprender': {'fx': 'Efectos'}}).json
+        text = Path(rpp['ruta']).read_text()
+        self.assertIn('ISBUS 1 1', text); self.assertIn('NAME "Batería"', text); self.assertIn('Kick In.wav', text)
+        dawproject = self.c.post(f'/api/arreglos/{self.sid}/crear-sesion', json={'daw': 'dawproject', 'nombre': 'Base', 'pistas': items}).json
+        project = zipfile.ZipFile(dawproject['ruta']).read('project.xml').decode()
+        self.assertIn('role="submix"', project); self.assertIn('Voz Lead.wav', project)
+        self.assertEqual((self.session / 'Mareas.rpp').read_text(), '<REAPER_PROJECT\n>\n')
+        sessions = self.c.get(f'/api/produccion/{self.sid}').json['sesiones']
+        self.assertEqual(len(sessions), 3)
+        relearned = self.c.post(f'/api/arreglos/{self.sid}/clasificar', json={'perfil_id': 'mezcla', 'pistas': takes}).json['pistas']
+        self.assertEqual({t['nombre']: t['bus'] for t in relearned}['Fx raro.wav'], 'Efectos')

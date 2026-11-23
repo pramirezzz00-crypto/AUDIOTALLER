@@ -24,12 +24,12 @@ function display() {
     const compositionLabels = {composition:'Composición',beats:'Beats',scores:'Partituras',lyrics:'Letras'};
     $('sideComposition').setAttribute('aria-current', compositionLabels[page] ? 'page' : 'false');
     $('sideEntities').setAttribute('aria-current', page === 'entidades' ? 'page' : 'false');
-    if (page !== 'arrangements') $('takePlayer').pause();
+    if (page !== 'arrangements') $('takePlayer')?.pause();
     const projectPath = trail.includes('projectManager');
     const manager = projectPath ? 'Gestión de producciones' : 'Gestión de artistas';
     const artistLabel = ['profile', 'artistPane', 'editor', 'songPane'].includes(page) && artist ? ' › ' + esc(artist.nombre) : '';
     $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="openArtistManager(${projectPath})">${manager}</button>${artistLabel}`;
-    if (page === 'arrangements') $('crumbPath').innerHTML = '<button onclick="go(\'home\')">Inicio</button> › Arreglos';
+    if (page === 'arrangements' && $('crumbPath')) $('crumbPath').innerHTML = '<button onclick="go(\'home\')">Inicio</button> › Arreglos';
     if (compositionLabels[page]) {
         $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="go('composition')">Composición</button>${page==='composition'?'':' › '+compositionLabels[page]}`;
         if(page==='beats') loadBeats();

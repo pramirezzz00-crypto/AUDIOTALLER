@@ -337,6 +337,8 @@ from redesign import register_redesign
 register_redesign(app, db_open)
 from redesign_comp import register_composition_redesign
 register_composition_redesign(app, db_open)
+from redesign_arr import register_arrangements_redesign
+register_arrangements_redesign(app, db_open)
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1',port=5000,debug=False)

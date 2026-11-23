@@ -130,6 +130,8 @@ function studioDisplayHook(page) {
     if (page === 'creditsPane') renderCredits();
     if (page === 'composition') renderCompositionPane();
     if (page === 'entidades') renderEntitiesPane();
+    if (page === 'arrangements') renderArrangementsPane();
+    else if (typeof arr !== 'undefined' && arr.playing) arrStop();
     if (page !== 'composition' && typeof comp !== 'undefined') { comp.audio.pause(); comp.sync?.audio.pause(); }
     if (page === 'exportPane') renderExport();
     if (page !== 'albumPane' && typeof albumPlayer !== 'undefined' && albumPlayer.index >= 0) albumPlayer.stop();
