@@ -103,8 +103,10 @@ def register_overview(app, connect):
                 pipeline.append(dict(etapa=key, total=len(inside),
                                      canciones=[dict(id=s['id'], titulo=s['titulo']) for s in inside[:4]]))
             feedback = [dict(row) for row in db.execute('''SELECT f.id,f.cancion_id,f.archivo_id,f.etiqueta,f.texto,
-                f.segundo,f.estado,f.creado,c.titulo,a.nombre AS artista FROM portal_devoluciones f
-                JOIN canciones c ON c.id=f.cancion_id JOIN artistas a ON a.id=c.artista_id
+                f.segundo,f.estado,f.creado,c.titulo,a.nombre AS artista,p.nombre AS playlist,d.nombre AS disco,ar.nombre AS archivo_nombre,ar.etapa AS archivo_etapa
+                FROM portal_devoluciones f
+                JOIN canciones c ON c.id=f.cancion_id JOIN artistas a ON a.id=c.artista_id LEFT JOIN playlists p ON p.id=f.playlist_id
+                LEFT JOIN discos d ON d.id=c.disco_id LEFT JOIN archivos ar ON ar.id=f.archivo_id
                 WHERE f.estado NOT IN ('Resuelta','Sin cambios') ORDER BY f.creado DESC LIMIT 6''')]
             pending_total = db.execute("SELECT COUNT(*) FROM portal_devoluciones WHERE estado NOT IN ('Resuelta','Sin cambios')").fetchone()[0]
             albums = []
@@ -115,7 +117,10 @@ def register_overview(app, connect):
                 albums.append(dict(id=row['id'], nombre=row['nombre'], artista_id=row['artista_id'], artista=row['artista'],
                                    tipo=info.get('tipo', 'Álbum'), portada=info.get('portada', '')))
             loose = sum(1 for s in songs if not s['disco_id'])
-        return jsonify(recientes=recent, etapas=pipeline, devoluciones=feedback, devoluciones_total=pending_total,
+            connect_counts = [dict(r) for r in db.execute('SELECT estado,COUNT(*) AS n FROM portal_devoluciones GROUP BY estado')]
+        import getpass
+        counts = {row['estado']: row['n'] for row in connect_counts}
+        return jsonify(usuario=getpass.getuser().split('.')[0].capitalize(), estados=counts, recientes=recent, etapas=pipeline, devoluciones=feedback, devoluciones_total=pending_total,
                        discos=albums, sueltas=loose, canciones_activas=sum(1 for s in songs if s['etapa_indice'] >= 0))
 
     @app.get('/api/discos/<did>/resumen')

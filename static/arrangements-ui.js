@@ -31,58 +31,99 @@ async function pickArrangementSong(id) {
 function arrBusColor(name) { return arr.buses.find(b => b.nombre === name)?.color || '#8A8A94'; }
 function paintArrangements() {
     const root = $('arrangements');
-    const q = arr.q.toLowerCase();
     const song = arr.songs.find(s => s.id === arr.song);
-    root.innerHTML = `
-      <header class="prod-head"><div><div class="eyebrow">Arreglos</div><h1>${song ? esc(song.titulo) : 'Arreglos'}</h1>
-        <p class="muted">Escuchá las pistas crudas sin abrir el DAW y armá una sesión nueva organizada por buses.</p></div></header>
-      <div class="cr-layout">
-        <aside class="cr-songs"><input id="arrQ" type="search" placeholder="Buscar canción…" value="${esc(arr.q)}">
-          ${arr.songs.filter(s => !q || [s.titulo, s.artista, s.disco].join(' ').toLowerCase().includes(q)).map(s => `<button class="${s.id === arr.song ? 'is-on' : ''}" onclick="pickArrangementSong('${s.id}').catch(report)">
-            <span><strong>${esc(s.titulo)}</strong><small class="muted">${esc([s.artista, s.disco].filter(Boolean).join(' · '))}</small></span></button>`).join('')}</aside>
-        <div class="arr-main">${song ? arrSongView() : '<p class="muted">Elegí una canción para ver sus pistas.</p>'}</div>
-      </div>`;
-    const input = $('arrQ');
-    input.oninput = () => { arr.q = input.value; const pos = input.selectionStart; paintArrangements(); $('arrQ').focus(); $('arrQ').setSelectionRange(pos, pos); };
-}
-function arrSongView() {
+    if (!song) {
+        root.innerHTML = `<header class="mk-head"><h1>Arreglos</h1><p class="muted">Escuchá las pistas crudas de cada canción sin abrir el DAW y armá una sesión nueva organizada por buses.</p></header>
+          <div class="mk-tools"><label class="mk-search"><input id="arrQ" type="search" placeholder="Buscar canción, artista o disco" value="${esc(arr.q)}"></label></div>
+          <div class="arr-pick">${arr.songs.filter(s => !arr.q || [s.titulo, s.artista, s.disco].join(' ').toLowerCase().includes(arr.q.toLowerCase())).map(s => `<button class="arr-song" onclick="pickArrangementSong('${s.id}').catch(report)">
+            <span class="arr-cover" style="${placeholderArt(s.id, 'grabacion')}"></span><strong>${esc(s.titulo)}</strong><small>${esc([s.disco || 'Canción suelta', s.artista].join(' · '))}</small></button>`).join('') || '<p class="muted">No hay canciones.</p>'}</div>`;
+        const input = $('arrQ');
+        input.oninput = () => { arr.q = input.value; const pos = input.selectionStart; paintArrangements(); $('arrQ').focus(); $('arrQ').setSelectionRange(pos, pos); };
+        return;
+    }
     const m = arr.meta;
-    const strip = m ? `<div class="arr-strip"><span>Obra <b class="mono ${m.iswc ? '' : 'warn-amber'}">${esc(m.iswc || 'sin ISWC')}</b></span>
-        <span>Fonograma <b class="mono ${m.isrc ? '' : 'warn-amber'}">${esc(m.isrc || 'sin ISRC')}</b></span>
-        <span>Autoría <b>${m.autores.length ? esc(m.autores.map(a => `${a.nombre} ${formatDecimal(a.porcentaje, 2)} %`).join(', ')) : '<span class="warn-amber">sin cargar</span>'}</b></span>
-        <span>Créditos <b class="${Math.abs(m.total_autoria - 100) < 0.01 ? 'ok-green' : 'warn-amber'}">${formatDecimal(m.total_autoria, 2)} %</b></span>
-        ${m.disco_id ? `<button class="btn-ghost" onclick="openCredits('${m.disco_id}').catch(report)">Créditos</button>` : ''}</div>` : '';
-    return `${strip}<div class="seg tabs">${[['listen', 'Escuchar arreglos'], ['buses', 'Sesión por buses']].map(([id, label]) =>
-        `<button class="${arr.tab === id ? 'is-on' : ''}" onclick="arr.tab='${id}';paintArrangements()">${label}</button>`).join('')}</div>
-      ${!arr.tracks.length ? '<p class="muted">Buscando pistas… Si no aparece ninguna, vinculá la sesión de grabación o de mezcla en la canción.</p>' : arr.tab === 'listen' ? arrListen() : arrBuses()}`;
+    const origins = [...new Set(arr.tracks.map(t => t.origen))];
+    root.innerHTML = `<section class="arr-hero"><span class="arr-cover big" style="${placeholderArt(song.id, 'grabacion')}"></span>
+        <div class="arr-title"><span class="eyebrow">Arreglos · grabaciones originales</span><h1>${esc(song.titulo)}</h1>
+          <p class="muted">${esc([song.disco || 'Canción suelta', song.artista].join(' · '))}${m?.duracion ? ' · <span class="mono">' + esc(m.duracion) + '</span>' : ''}</p>
+          ${m ? `<div class="arr-chips"><span class="mono ${m.iswc ? '' : 'warn'}">ISWC ${esc(m.iswc || 'falta')}</span><span class="mono ${m.isrc ? '' : 'warn'}">ISRC ${esc(m.isrc || 'falta')}</span>
+            <span>Autoría: ${m.autores.length ? esc(m.autores.map(a => `${a.nombre} ${formatDecimal(a.porcentaje, 2)} %`).join(' · ')) : 'sin cargar'}</span>
+            <span class="${Math.abs(m.total_autoria - 100) < 0.01 && !m.faltan.length ? 'ok' : 'warn'}">Créditos ${formatDecimal(Math.round((5 - Math.min(5, m.faltan.length)) / 5 * 100), 0)} %</span></div>` : ''}</div>
+        <div class="arr-source"><label>Pistas tomadas de <select onchange="arr.origin=this.value;paintArrangements()"><option value="">Todas las sesiones</option>${origins.map(o => `<option ${arr.origin === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></label>
+          <small class="muted">Archivos crudos completos: sin efectos, sin recortes ni fundidos</small>
+          <button class="link" onclick="arrStop();arr.song='';paintArrangements()">Cambiar de canción</button></div></section>
+      <nav class="arr-tabs">${[['listen', 'Escuchar arreglos'], ['buses', 'Buses y sesión del DAW']].map(([id, label]) => `<button class="${arr.tab === id ? 'is-on' : ''}" onclick="arr.tab='${id}';paintArrangements()">${label}</button>`).join('')}</nav>
+      ${!arr.tracks.length ? '<p class="muted arr-empty">Buscando pistas… Si no aparece ninguna, vinculá la sesión de grabación o de mezcla en la canción.</p>' : arr.tab === 'listen' ? arrListen() : `<div class="arr-pad">${arrBuses()}</div>`}`;
+    if (arr.tab === 'listen') arrDrawWaves();
 }
+function arrSongView() { return ''; }
 function arrVersionSet(name) {
     if (name === 'Base' || name === 'Todo lo grabado') return null;
     const version = arr.versions.find(v => v.nombre === name);
     return version ? new Set(version.pistas.map(p => p.nombre)) : null;
 }
+function arrInVersion(track) { const set = arrVersionSet(arr.ab ? 'Base' : arr.version); return !set || set.has(track.nombre); }
 function arrAudible(track) {
-    const set = arrVersionSet(arr.ab ? 'Base' : arr.version);
-    if (set && !set.has(track.nombre)) return false;
+    if (!arrInVersion(track)) return false;
     if (arr.solo.size) return arr.solo.has(track.token);
     return !arr.muted.has(track.token);
 }
+const arrLabel = name => name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ');
 function arrListen() {
+    const order = arr.buses.map(b => b.nombre);
+    const tracks = arr.tracks.filter(t => !arr.origin || t.origen === arr.origin).slice(0, ARR_MAX);
     const groups = {};
-    arr.tracks.slice(0, ARR_MAX).forEach(t => (groups[t.bus || 'Sin reconocer'] ||= []).push(t));
-    const versions = ['Base', ...arr.versions.map(v => v.nombre)];
-    return `<div class="arr-transport card">
-        <button class="t-play" onclick="arrToggle()" aria-label="${arr.playing ? 'Pausar' : 'Reproducir'}">${arr.playing ? '❚❚' : '▶'}</button>
-        <span id="arrClock" class="mono">0:00</span><span class="ap-track" onclick="arrSeek(event)"><span id="arrProgress"></span></span>
-        <label>Arreglo <select onchange="arr.version=this.value;arrApplyMix();paintArrangements()">${versions.map(v => `<option ${v === arr.version ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
-        <button class="${arr.ab ? 'is-on' : ''} chip-btn" onclick="arr.ab=!arr.ab;arrApplyMix();paintArrangements()" title="Comparar con la Base sin cortar">A/B con Base</button>
-        <button class="btn-ghost" onclick="saveArrangementVersion().catch(report)">Guardar lo que suena como arreglo</button></div>
-      ${arr.tracks.length > ARR_MAX ? `<p class="insp-help">Se muestran ${ARR_MAX} de ${arr.tracks.length} pistas para que la escucha sea fluida.</p>` : ''}
-      ${Object.entries(groups).map(([bus, list]) => `<section class="arr-group" style="--c:${arrBusColor(bus)}"><span class="insp-label">${esc(bus)}</span>
-        ${list.map(t => `<div class="arr-track ${arrAudible(t) ? '' : 'is-muted'}"><span class="arr-name"><strong>${esc(t.nombre)}</strong><small>${esc(t.origen)}${t.par ? ' · ' + esc(t.par) : ''}</small></span>
-          <button class="ms ${arr.muted.has(t.token) ? 'on-m' : ''}" onclick="arrMS('m','${t.token}')" aria-pressed="${arr.muted.has(t.token)}">M</button>
-          <button class="ms ${arr.solo.has(t.token) ? 'on-s' : ''}" onclick="arrMS('s','${t.token}')" aria-pressed="${arr.solo.has(t.token)}">S</button></div>`).join('')}</section>`).join('')}
-      <p class="insp-help">Pistas completas, sin efectos ni recortes, tal como quedaron en la carpeta de la sesión.</p>`;
+    tracks.forEach(t => (groups[t.bus || 'Sin reconocer'] ||= []).push(t));
+    const sorted = Object.entries(groups).sort((a, b) => (order.indexOf(a[0]) + 1 || 99) - (order.indexOf(b[0]) + 1 || 99));
+    const versions = [['Base', 'Base · grabación', 'Lo que se grabó', tracks.length], ...arr.versions.map(v => [v.nombre, v.nombre, 'Arreglo guardado', v.pistas.length]), ['Todo lo grabado', 'Todo lo grabado', 'Todas las pistas de la sesión', arr.tracks.length]];
+    const sounding = tracks.filter(arrAudible).length;
+    return `<div class="arr-body"><aside class="arr-versions"><span class="eyebrow">Versiones del arreglo</span>
+        ${versions.map(([id, name, desc, n]) => `<button class="arr-ver ${arr.version === id && !arr.ab ? 'is-on' : ''}" onclick="arr.version='${esc(id)}';arr.ab=false;arrApplyMix();paintArrangements()"><strong>${esc(name)}</strong><small>${esc(desc)}</small><small>${countLabel(n, 'pista', 'pistas')}</small></button>`).join('')}
+        <button class="arr-save" onclick="saveArrangementVersion().catch(report)">+ Guardar la mezcla actual como arreglo</button>
+        <div class="arr-compare"><strong>Comparar</strong><div class="seg"><button class="${arr.ab ? 'is-on' : ''}" onclick="arr.ab=true;arrApplyMix();paintArrangements()">A · Base</button><button class="${arr.ab ? '' : 'is-on'}" onclick="arr.ab=false;arrApplyMix();paintArrangements()">B · ${esc(arr.version)}</button></div>
+          <small class="muted">Cambia entre arreglos sin cortar la reproducción.</small></div></aside>
+      <section class="arr-tracks"><div class="arr-transport2"><button class="mk-bigplay" onclick="arrToggle()" aria-label="${arr.playing ? 'Pausar' : 'Reproducir'}">${arr.playing ? '❚❚' : '▶'}</button>
+          <span class="arr-clock mono"><b id="arrClock">0:00</b> / <span id="arrTotal">—</span></span>
+          <span>Sonando: <b>${esc(arr.ab ? 'Base' : arr.version)}</b> · ${sounding} de ${tracks.length} pistas</span><span class="spacer"></span>
+          ${arr.solo.size ? '<button class="mk-btn" onclick="arr.solo.clear();arrApplyMix();paintArrangements()">Quitar solos</button>' : ''}</div>
+        ${sorted.map(([bus, list]) => `<div class="arr-bus" style="--c:${arrBusColor(bus)}"><span class="arr-bus-name">${esc(bus)}</span>
+          ${list.map(t => `<div class="arr-row ${arrAudible(t) ? '' : 'is-off'}"><i class="arr-bar"></i><span class="arr-name"><strong>${esc(arrLabel(t.nombre))}</strong><small class="mono">${esc(t.nombre)}</small></span>
+            <button class="ms ${arr.muted.has(t.token) ? 'on-m' : ''}" onclick="arrMS('m','${t.token}')" aria-pressed="${arr.muted.has(t.token)}">M</button>
+            <button class="ms ${arr.solo.has(t.token) ? 'on-s' : ''}" onclick="arrMS('s','${t.token}')" aria-pressed="${arr.solo.has(t.token)}">S</button>
+            <canvas class="arr-wave" data-wave="${t.token}" onclick="arrSeekWave(event)"></canvas>${arrInVersion(t) ? '<span></span>' : '<small class="muted arr-out">fuera del arreglo</small>'}</div>`).join('')}</div>`).join('')}
+      </section></div>`;
+}
+const arrPeaks = new Map();
+async function arrDrawWaves() {
+    const lead = [...arr.players.values()][0];
+    const progress = lead?.duration ? lead.currentTime / lead.duration : 0;
+    for (const canvas of document.querySelectorAll('canvas[data-wave]')) {
+        const token = canvas.dataset.wave;
+        if (!arrPeaks.has(token)) arrPeaks.set(token, api('/api/arreglos/onda/' + encodeURIComponent(token)).catch(() => ({peaks: []})));
+        const data = await arrPeaks.get(token);
+        if (!canvas.isConnected) continue;
+        const box = canvas.getBoundingClientRect(), ratio = devicePixelRatio || 1;
+        canvas.width = box.width * ratio; canvas.height = box.height * ratio;
+        const ctx = canvas.getContext('2d'); ctx.scale(ratio, ratio);
+        const color = getComputedStyle(canvas.closest('.arr-bus')).getPropertyValue('--c').trim() || '#8A8A94';
+        const peaks = data.peaks || [], max = Math.max(...peaks, 0.01), bars = Math.floor(box.width / 6);
+        const off = canvas.closest('.arr-row').classList.contains('is-off');
+        for (let i = 0; i < bars; i++) {
+            const v = peaks.length ? peaks[Math.floor(i / bars * peaks.length)] / max : 0.3;
+            const h = Math.max(3, v * (box.height - 4));
+            ctx.globalAlpha = off ? 0.18 : 1; ctx.fillStyle = color;
+            ctx.fillRect(i * 6, (box.height - h) / 2, 4, h);
+        }
+        if (progress) { ctx.globalAlpha = 1; ctx.fillStyle = '#EDEDF0'; ctx.fillRect(progress * box.width, 0, 1.5, box.height); }
+    }
+}
+function arrSeekWave(event) {
+    const lead = [...arr.players.values()][0];
+    if (!lead?.duration) { arrToggle(); return; }
+    const box = event.currentTarget.getBoundingClientRect();
+    const t = (event.clientX - box.left) / box.width * lead.duration;
+    arr.players.forEach(p => { p.currentTime = t; });
+    arrTick();
 }
 function arrMS(kind, token) {
     const set = kind === 'm' ? arr.muted : arr.solo;
@@ -90,7 +131,7 @@ function arrMS(kind, token) {
     arrApplyMix(); paintArrangements();
 }
 function arrEnsurePlayers() {
-    for (const t of arr.tracks.slice(0, ARR_MAX)) {
+    for (const t of arr.tracks.filter(t => !arr.origin || t.origen === arr.origin).slice(0, ARR_MAX)) {
         if (!arr.players.has(t.token)) { const a = new Audio('/api/arreglos/audio/' + encodeURIComponent(t.token)); a.preload = 'auto'; arr.players.set(t.token, a); }
     }
 }
@@ -108,7 +149,8 @@ function arrTick() {
     // Corrige el desfase entre pistas cada cuadro (las pistas de una sesión arrancan juntas en 0:00).
     for (const p of arr.players.values()) if (Math.abs(p.currentTime - lead.currentTime) > 0.06 && !p.ended) p.currentTime = lead.currentTime;
     if ($('arrClock')) $('arrClock').textContent = clockText(lead.currentTime);
-    if ($('arrProgress') && lead.duration) $('arrProgress').style.width = (lead.currentTime / lead.duration * 100) + '%';
+    if ($('arrTotal') && lead.duration) $('arrTotal').textContent = clockText(lead.duration);
+    arr.frame = (arr.frame || 0) + 1; if (arr.frame % 15 === 0) arrDrawWaves();
     if (arr.playing) arr.raf = requestAnimationFrame(arrTick);
 }
 function arrSeek(event) {

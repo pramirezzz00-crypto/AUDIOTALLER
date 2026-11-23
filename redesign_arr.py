@@ -383,3 +383,41 @@ def register_people_redesign(app, connect):
                     news.append(dict(actual=item['id'], actual_nombre=item['nombre'], nuevo=newer['id'], nuevo_nombre=newer['nombre']))
             publication = db.execute('SELECT url,estado,actualizado FROM portal_publicaciones WHERE playlist_id=? ORDER BY actualizado DESC LIMIT 1', (pid,)).fetchone()
         return jsonify(novedades=news, publicacion=dict(publication) if publication else None)
+
+
+def register_playlist_options(app, connect):
+    @app.get('/api/playlists/<pid>/opciones')
+    def rp_playlist_options(pid):
+        with connect() as db:
+            required_row(db, 'playlists', pid)
+            doc = doc_get(db, 'playlist_opc', pid, {})
+            stats = db.execute('''SELECT COUNT(*) AS total, SUM(estado IN ('Pendiente','En revisión')) AS abiertas
+                FROM portal_devoluciones WHERE playlist_id=?''', (pid,)).fetchone()
+            publication = db.execute('SELECT url,estado,actualizado FROM portal_publicaciones WHERE playlist_id=? ORDER BY actualizado DESC LIMIT 1', (pid,)).fetchone()
+        result = dict(vence='30', devoluciones=True, descarga=False, mostrar_version=True)
+        result.update(doc, devoluciones_total=stats['total'] or 0, devoluciones_abiertas=stats['abiertas'] or 0,
+                      publicacion=dict(publication) if publication else None)
+        return jsonify(result)
+
+    @app.post('/api/playlists/<pid>/opciones')
+    def rp_playlist_options_save(pid):
+        data = request.get_json() or {}
+        if str(data.get('vence', '30')) not in ('7', '15', '30', '60', '0'):
+            raise ValueError('Vencimiento inválido.')
+        with connect() as db:
+            required_row(db, 'playlists', pid)
+            doc_put(db, 'playlist_opc', pid, dict(vence=str(data.get('vence', '30')), devoluciones=bool(data.get('devoluciones', True)),
+                                                  descarga=bool(data.get('descarga')), mostrar_version=bool(data.get('mostrar_version', True))))
+        return jsonify(ok=True)
+
+
+def register_arrangement_waves(app):
+    @app.get('/api/arreglos/onda/<path:token>')
+    def ra_wave(token):
+        from audio_waveform import pcm_waveform
+        path = path_from_token(token)
+        try:
+            data = pcm_waveform(path, bins=160)
+        except Exception:
+            data = dict(peaks=[], duration=0)
+        return jsonify(data)

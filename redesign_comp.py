@@ -202,6 +202,16 @@ def register_composition_redesign(app, connect):
             doc_put(db, 'beat', bid, doc)
         return jsonify(ok=True)
 
+    @app.get('/api/composicion/beats/<bid>/onda')
+    def rc_beat_wave(bid):
+        from audio_waveform import pcm_waveform
+        with connect() as db:
+            row = required_row(db, 'composition_beats', bid)
+        try:
+            return jsonify(pcm_waveform(row['ruta'], bins=200))
+        except Exception:
+            return jsonify(peaks=[], duration=0)
+
     @app.post('/api/composicion/beats/escanear')
     def rc_beats_scan():
         data = request.get_json() or {}

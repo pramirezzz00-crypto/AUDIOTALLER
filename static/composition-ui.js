@@ -20,18 +20,18 @@ function paintComposition() {
     const root = $('composition');
     const cta = {beats: '+ Importar carpeta de beats', lyrics: '+ Nueva letra', scores: '+ Cargar partitura'}[comp.tab];
     root.innerHTML = `
-      <header class="prod-head"><div><div class="eyebrow">Composición</div><h1>${{beats: 'Beats', lyrics: 'Letras', scores: 'Partituras'}[comp.tab]}</h1>
-        <p class="muted">${{beats: 'Bases instrumentales con BPM, tonalidad, estado y acceso rápido al DAW. Los archivos quedan donde están.',
-          lyrics: 'La letra de cada canción, por secciones y con versiones. Viaja a la ficha, al portal y a los registros.',
-          scores: 'Partituras por canción y por arreglo, con versión vigente.'}[comp.tab]}</p></div>
-        <div class="row"><button class="alt" onclick="go('${comp.tab}')">${comp.tab === 'beats' ? 'Ver listas' : 'Ver colecciones'}</button>
-          <button class="btn-primary" onclick="compNew()">${cta}</button></div></header>
-      <div class="seg tabs" role="tablist">${[['beats', 'Beats'], ['lyrics', 'Letras'], ['scores', 'Partituras']].map(([id, label]) =>
-        `<button role="tab" aria-selected="${comp.tab === id}" class="${comp.tab === id ? 'is-on' : ''}" onclick="compTab('${id}')">${label}</button>`).join('')}</div>
+      <header class="prod-head mk-comp-head"><div><div class="eyebrow">Composición</div><h1>${{beats: 'Beats', lyrics: 'Letras', scores: 'Partituras'}[comp.tab]}</h1>
+        <p class="muted">${{beats: 'Tu banco de beats: organizados, segmentados y listos para llevar al DAW',
+          lyrics: 'Las letras de tus canciones, con versiones y listas para publicar',
+          scores: 'Partituras y particellas con versiones, asociadas a canciones y arreglos'}[comp.tab]}</p></div>
+        <button class="btn-primary" onclick="compNew()">${cta}</button></header>
       <div id="compPanel"></div>
-      <div id="compBody">${comp.tab === 'beats' ? beatsView() : comp.tab === 'lyrics' ? lyricsView() : scoresView()}</div>`;
+      <div id="compBody">${comp.tab === 'beats' ? beatsView() : comp.tab === 'lyrics' ? lyricsView() : scoresView()}</div>
+      <p class="insp-help comp-old">¿Buscás tus listas y colecciones anteriores? <button class="link" onclick="go('${comp.tab}')">${comp.tab === 'beats' ? 'Ver listas de beats' : 'Ver colecciones'}</button></p>`;
     if (comp.panel) paintCompPanel();
     if (comp.tab === 'lyrics') bindLyricEditor();
+    if (comp.tab === 'beats') drawBeatWaves();
+    ['sideBeats', 'sideLyrics', 'sideScores'].forEach((id, k) => $(id)?.setAttribute('aria-current', ['beats', 'lyrics', 'scores'][k] === comp.tab ? 'page' : 'false'));
 }
 function compTab(tab) {
     if (comp.lyricDirty && !confirm('Hay cambios sin guardar en la letra. ¿Salir igual?')) return;
@@ -42,52 +42,71 @@ function compNew() { comp.panel = !comp.panel; comp.scan = null; paintCompositio
 // ── Beats ──
 function beatsView() {
     const q = comp.q.trim().toLowerCase();
+    const ranges = {'': [0, 999], lt90: [0, 89.99], mid: [90, 120], gt120: [120.01, 999]};
+    const [lo, hi] = ranges[comp.bpmRange || ''];
     const list = comp.beats.filter(b => (!q || [b.nombre, b.archivo, b.tonalidad, b.lista, ...b.etiquetas].join(' ').toLowerCase().includes(q))
-        && (!comp.bpmMin || (b.bpm && b.bpm >= Number(comp.bpmMin))) && (!comp.bpmMax || (b.bpm && b.bpm <= Number(comp.bpmMax)))
-        && (!comp.beatState || b.estado === comp.beatState));
-    const sel = comp.beats.find(b => b.id === comp.beat);
-    return `<div class="prod-tools">
-        <label class="search-box"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-          <input id="beatQ" type="search" placeholder="Buscar por nombre, etiqueta o tonalidad…" value="${esc(comp.q)}"></label>
-        <label class="bpm-range">BPM <input id="bpmMin" inputmode="numeric" placeholder="desde" value="${esc(comp.bpmMin)}"> – <input id="bpmMax" inputmode="numeric" placeholder="hasta" value="${esc(comp.bpmMax)}"></label>
-        <div class="chips">${[['', 'Todos'], ...Object.keys(BEAT_COLORS).map(s => [s, s])].map(([id, label]) => `<button class="chip-btn ${comp.beatState === id ? 'is-on' : ''}" onclick="comp.beatState='${id}';paintComposition()">${id ? `<i class="fb-dot" style="background:${BEAT_COLORS[id]}"></i>` : ''}${label}</button>`).join('')}</div>
-      </div>
-      <div class="beat-layout"><div class="beat-table">
-        <div class="beat-row beat-th"><span></span><span>Beat</span><span>BPM</span><span>Tonalidad</span><span>Etiquetas</span><span>Estado</span><span>Stems</span><span></span></div>
-        ${list.map(b => `<div class="beat-row ${b.id === comp.beat ? 'is-selected' : ''} ${b.disponible ? '' : 'is-missing'}" draggable="${b.disponible}" data-beat="${b.id}"
-            ondragstart="beatDrag(event,'${b.id}')" onclick="comp.beat='${b.id}';paintComposition()">
-          <button class="beat-play" aria-label="Escuchar ${esc(b.nombre)}" onclick="event.stopPropagation();beatPlay('${b.id}')">${comp.playing === b.id && !comp.audio.paused ? '❚❚' : '▶'}</button>
-          <span><strong>${esc(b.nombre)}</strong><small>${esc(b.archivo)} · ${esc(b.lista)}</small></span>
-          <span class="mono">${b.bpm || '—'}</span><span>${esc(b.tonalidad || '—')}</span>
-          <span>${b.etiquetas.map(t => `<span class="tag">${esc(t)}</span>`).join(' ')}</span>
-          <span><i class="fb-dot" style="background:${BEAT_COLORS[b.estado]}"></i>${esc(b.estado)}${b.estado !== 'Libre' && (b.cancion || b.para) ? `<small>${esc(b.cancion || b.para)}</small>` : ''}</span>
-          <span class="muted">${esc(b.stems || '—')}</span>
-          <span class="beat-actions"><button class="btn-ghost" title="Mostrar en carpeta" onclick="event.stopPropagation();openBeatFolder('${b.id}')">📁</button>
-            <button class="btn-ghost" title="Copiar ruta" onclick="event.stopPropagation();copyPath(${JSON.stringify(b.ruta).replace(/"/g, '&quot;')})">⧉</button></span>
-        </div>`).join('') || `<p class="muted fb-empty">${comp.beats.length ? 'Ningún beat coincide con los filtros.' : 'Todavía no hay beats. Importá una carpeta.'}</p>`}
-      </div>${sel ? beatDetail(sel) : ''}</div>
-      <p class="insp-help">Arrastrá un beat a una pista del DAW o usá «Copiar ruta» y pegala en el explorador de archivos del DAW. AudioTaller guarda la ruta; no mueve los archivos.</p>`;
+        && (!comp.bpmRange || (b.bpm && b.bpm >= lo && b.bpm <= hi)) && (!comp.beatState || b.estado === comp.beatState));
+    const count = st => comp.beats.filter(b => b.estado === st).length;
+    return `<div class="mk-tools"><label class="mk-search"><input id="beatQ" type="search" placeholder="Buscar por nombre, etiqueta o tonalidad" value="${esc(comp.q)}"></label>
+        ${[['', 'Todos los BPM'], ['lt90', '< 90'], ['mid', '90 – 120'], ['gt120', '120 +']].map(([id, l]) => `<button class="mk-chip ${(comp.bpmRange || '') === id ? 'is-on' : ''}" onclick="comp.bpmRange='${id}';paintComposition()">${l}</button>`).join('')}</div>
+      <div class="mk-chips"><button class="mk-chip ${!comp.beatState ? 'is-on' : ''}" onclick="comp.beatState='';paintComposition()">Todos <span>${comp.beats.length}</span></button>
+        ${Object.entries(BEAT_COLORS).map(([st, c]) => `<button class="mk-chip ${comp.beatState === st ? 'is-on' : ''}" onclick="comp.beatState='${st}';paintComposition()"><i style="background:${c}"></i>${st} <span>${count(st)}</span></button>`).join('')}</div>
+      <div class="beat-cards">${list.map(b => { const playing = comp.playing === b.id && !comp.audio.paused; return `<article class="beat-card ${b.id === comp.beat ? 'is-on' : ''} ${b.disponible ? '' : 'is-missing'}" onclick="if(!event.target.closest('button,a,input,select,label,canvas'))comp.beat=comp.beat==='${b.id}'?'':'${b.id}',paintComposition()">
+          <div class="beat-top"><button class="mk-play big ${playing ? 'is-on' : ''}" aria-label="${playing ? 'Pausar' : 'Escuchar'} ${esc(b.nombre)}" onclick="beatPlay('${b.id}')">${playing ? '❚❚' : '▶'}</button>
+            <span class="beat-name"><strong>${esc(b.nombre)}</strong><small class="mono">${[b.bpm ? b.bpm + ' BPM' : '', b.tonalidad].filter(Boolean).map(esc).join(' · ') || 'sin BPM'}</small></span>
+            <canvas class="beat-wave" data-beat-wave="${b.id}" onclick="beatSeek(event,'${b.id}')"></canvas>
+            <span class="beat-state"><b style="color:${BEAT_COLORS[b.estado]}">${esc(b.estado)}${b.estado !== 'Libre' && (b.cancion || b.para) ? ' · ' + esc(b.cancion || b.para) : ''}</b>
+              <span>${b.etiquetas.map(t => `<span class="beat-tag">${esc(t)}</span>`).join('')}</span></span></div>
+          <div class="beat-bottom"><button class="beat-drag" draggable="${b.disponible}" ondragstart="beatDrag(event,'${b.id}')" title="Arrastralo a una pista del DAW">⠿ Arrastrar al DAW</button>
+            <button class="mk-btn" onclick="openBeatFolder('${b.id}')">Mostrar en carpeta</button><button class="mk-btn" onclick="copyPath(${JSON.stringify(b.ruta).replace(/"/g, '&quot;')})">Copiar ruta</button>
+            <span class="muted">${esc(b.stems || 'sin stems')}</span><span class="spacer"></span><span class="mono beat-path">${esc(b.ruta)}</span></div>
+          ${b.id === comp.beat ? beatDetail(b) : ''}</article>`; }).join('') || `<p class="muted">${comp.beats.length ? 'Ningún beat coincide con los filtros.' : 'Todavía no hay beats. Importá una carpeta.'}</p>`}</div>
+      <p class="insp-help">Las marcas sobre la onda son los segmentos (intro, loop, drop): se pueden exportar sueltos. AudioTaller guarda la ruta, no mueve los archivos.</p>`;
+}
+const beatPeaks = new Map();
+async function drawBeatWaves() {
+    for (const canvas of document.querySelectorAll('canvas[data-beat-wave]')) {
+        const id = canvas.dataset.beatWave, beat = comp.beats.find(b => b.id === id);
+        if (!beatPeaks.has(id)) beatPeaks.set(id, api('/api/composicion/beats/' + id + '/onda').catch(() => ({peaks: []})));
+        const data = await beatPeaks.get(id);
+        if (!canvas.isConnected) continue;
+        const box = canvas.getBoundingClientRect(), ratio = devicePixelRatio || 1;
+        canvas.width = box.width * ratio; canvas.height = box.height * ratio;
+        const ctx = canvas.getContext('2d'); ctx.scale(ratio, ratio);
+        const on = comp.playing === id || comp.beat === id, peaks = data.peaks || [], max = Math.max(...peaks, 0.01), bars = Math.floor(box.width / 7);
+        const duration = data.duration || 1, progress = comp.playing === id && comp.audio.duration ? comp.audio.currentTime / comp.audio.duration : 0;
+        for (let k = 0; k < bars; k++) {
+            const v = peaks.length ? peaks[Math.floor(k / bars * peaks.length)] / max : 0.3, h = Math.max(4, v * (box.height - 16));
+            ctx.fillStyle = on && (!progress || k / bars <= progress) ? '#2FD8BF' : on ? '#1F6F66' : '#3A3A42';
+            ctx.fillRect(k * 7, 12 + (box.height - 12 - h) / 2, 5, h);
+        }
+        ctx.font = '10px Inter, sans-serif';
+        for (const seg of beat?.segmentos || []) {
+            const x0 = seg.inicio / duration * box.width, x1 = seg.fin / duration * box.width;
+            ctx.fillStyle = '#8A8A94'; ctx.fillRect(x0, 1, x1 - x0 - 2, 1.5); ctx.fillText(seg.nombre, x0 + 1, 10);
+        }
+    }
+}
+function beatSeek(event, id) {
+    if (comp.playing !== id) return beatPlay(id);
+    const box = event.currentTarget.getBoundingClientRect();
+    if (comp.audio.duration) comp.audio.currentTime = (event.clientX - box.left) / box.width * comp.audio.duration;
 }
 function beatDetail(b) {
-    return `<aside class="card beat-detail">
-      <span class="insp-kicker">Beat</span><input class="title-input" value="${esc(b.nombre)}" aria-label="Nombre" onchange="saveBeat('${b.id}',{titulo:this.value})">
-      <div class="cr-grid"><label>BPM<input value="${b.bpm || ''}" inputmode="numeric" onchange="saveBeat('${b.id}',{bpm:this.value})"></label>
-        <label>Tonalidad<input value="${esc(b.tonalidad)}" onchange="saveBeat('${b.id}',{tonalidad:this.value})"></label></div>
-      <label>Etiquetas (separadas por coma)<input value="${esc(b.etiquetas.join(', '))}" onchange="saveBeat('${b.id}',{etiquetas:this.value.split(',')})"></label>
-      <label>Estado<select onchange="saveBeat('${b.id}',{estado:this.value})">${Object.keys(BEAT_COLORS).map(s => `<option ${b.estado === s ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
-      ${b.estado === 'Reservado' ? `<label>Reservado para<input value="${esc(b.para)}" placeholder="Artista o proyecto" onchange="saveBeat('${b.id}',{para:this.value})"></label>` : ''}
-      ${b.estado === 'En uso' ? `<label>En la canción<select onchange="saveBeat('${b.id}',{cancion_id:this.value})"><option value="">Elegir…</option>${(comp.songs.length ? comp.songs : []).map(s => `<option value="${s.id}" ${s.id === b.cancion_id ? 'selected' : ''}>${esc(s.titulo)}</option>`).join('')}</select></label>` : ''}
-      <span class="insp-label">Segmentos</span>
-      <div class="seg-list">${b.segmentos.map((s, i) => `<span class="tag">${esc(s.nombre)} · ${clockText(s.inicio)}–${clockText(s.fin)} <button class="btn-ghost" onclick="removeSegment('${b.id}',${i})" aria-label="Quitar">✕</button></span>`).join('') || '<span class="muted">Marcá intro, loop o drop mientras escuchás.</span>'}</div>
-      <div class="row-tight"><input id="segName" placeholder="Loop A" style="width:110px"><button onclick="markSegment('${b.id}','inicio')">Inicio = ${clockText(comp.playing === b.id ? comp.audio.currentTime : 0)}</button><button onclick="markSegment('${b.id}','fin')">Fin y guardar</button></div>
-      <span class="insp-help mono">${esc(b.ruta)}</span></aside>`;
+    return `<div class="beat-edit"><div class="cr-grid"><label class="fld">Nombre<input value="${esc(b.nombre)}" onchange="saveBeat('${b.id}',{titulo:this.value})"></label>
+        <label class="fld">BPM<input value="${b.bpm || ''}" inputmode="numeric" onchange="saveBeat('${b.id}',{bpm:this.value})"></label>
+        <label class="fld">Tonalidad<input value="${esc(b.tonalidad)}" onchange="saveBeat('${b.id}',{tonalidad:this.value})"></label>
+        <label class="fld">Etiquetas<input value="${esc(b.etiquetas.join(', '))}" onchange="saveBeat('${b.id}',{etiquetas:this.value.split(',')})"></label>
+        <label class="fld">Estado<select onchange="saveBeat('${b.id}',{estado:this.value})">${Object.keys(BEAT_COLORS).map(s => `<option ${b.estado === s ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+        ${b.estado === 'Reservado' ? `<label class="fld">Reservado para<input value="${esc(b.para)}" onchange="saveBeat('${b.id}',{para:this.value})"></label>` : ''}
+        ${b.estado === 'En uso' ? `<label class="fld">En la canción<select onchange="saveBeat('${b.id}',{cancion_id:this.value})"><option value="">Elegir…</option>${comp.songs.map(s => `<option value="${s.id}" ${s.id === b.cancion_id ? 'selected' : ''}>${esc(s.titulo)}</option>`).join('')}</select></label>` : ''}</div>
+      <div class="row-tight"><span class="insp-label">Segmentos</span>${b.segmentos.map((g, k) => `<span class="beat-tag">${esc(g.nombre)} ${clockText(g.inicio)}–${clockText(g.fin)} <button class="link" onclick="removeSegment('${b.id}',${k})">✕</button></span>`).join('') || '<span class="muted">Escuchá y marcá intro, loop o drop.</span>'}
+        <input id="segName" placeholder="Loop A" style="width:100px;margin:0"><button class="mk-btn" onclick="markSegment('${b.id}','inicio')">Marcar inicio</button><button class="mk-btn" onclick="markSegment('${b.id}','fin')">Marcar fin y guardar</button></div></div>`;
 }
 function bindBeatFilters() {
     const q = $('beatQ');
     if (!q) return;
     q.oninput = () => { comp.q = q.value; const pos = q.selectionStart; paintComposition(); $('beatQ').focus(); $('beatQ').setSelectionRange(pos, pos); };
-    $('bpmMin').onchange = e => { comp.bpmMin = e.target.value; paintComposition(); };
-    $('bpmMax').onchange = e => { comp.bpmMax = e.target.value; paintComposition(); };
 }
 const _paintComposition = paintComposition;
 paintComposition = function () { _paintComposition(); if (comp.tab === 'beats') bindBeatFilters(); };
@@ -187,48 +206,56 @@ async function loadLyricDoc(id) {
 }
 function lyricsView() {
     const doc = comp.lyric?.letra;
-    return `<div class="cr-layout">
-      <aside class="cr-songs"><input id="lyricSongQ" type="search" placeholder="Buscar canción…" oninput="document.querySelectorAll('[data-lsong]').forEach(b=>b.hidden=!b.textContent.toLowerCase().includes(this.value.toLowerCase()))">
-        ${comp.songs.map(s => `<button data-lsong class="${s.id === comp.song ? 'is-on' : ''}" onclick="pickLyricSong('${s.id}')"><span><strong>${esc(s.titulo)}</strong>
-          <small class="${s.version ? '' : 'muted'}">${s.instrumental ? 'Instrumental' : s.version ? `V${s.version} · ${esc(s.estado)} · ${s.secciones} secciones` : 'Sin letra'} · ${esc(s.disco || 'suelta')}</small></span></button>`).join('')}</aside>
-      ${doc ? lyricEditor(doc) : '<p class="muted">Elegí una canción o creá una letra nueva.</p>'}
-      <aside class="card publish-card"><strong>Para publicar</strong>
-        <span class="muted">La letra se guarda en la ficha de la canción: sale en la exportación de metadata, en el portal del artista y en las guías de DNDA y SADAIC.</span>
-        <span class="muted">Spotify y otras plataformas muestran letras a través de proveedores como Musixmatch: subí ahí el texto final (y el .lrc si está sincronizado).</span>
-        ${doc ? `<div class="row-tight"><a class="btn-link" href="/api/composicion/letras/${comp.song}.txt" download>Exportar .txt</a><a class="btn-link" href="/api/composicion/letras/${comp.song}.lrc" download>Exportar .lrc</a></div>` : ''}</aside>
-    </div>`;
+    const stateClass = st => st === 'Final' ? 'ok-green' : st === 'En revisión' ? 'warn-amber' : 'muted';
+    return `<div class="lyr-layout"><aside class="lyr-songs">
+        ${comp.songs.map(s => `<button class="lyr-song ${s.id === comp.song ? 'is-on' : ''}" onclick="pickLyricSong('${s.id}')"><strong>${esc(s.titulo)}</strong><small>${esc(s.disco || 'Canción suelta · ' + s.artista)}</small>
+          <small class="${s.instrumental ? 'info' : s.version ? stateClass(s.estado) : 'muted'}"><b>${s.instrumental ? 'Instrumental' : s.version ? esc(s.estado) + (s.sincronizada ? ' · sincronizada' : '') : 'Sin letra'}</b></small></button>`).join('')}</aside>
+      <div class="lyr-main">${doc ? lyricEditor(doc) + publishCard(doc) : '<p class="muted">Elegí una canción o creá una letra nueva.</p>'}</div></div>`;
+}
+function publishCard(doc) {
+    const autores = comp.lyric.autoria;
+    const synced = doc.secciones.some(b => (b.tiempos || []).some(t => t !== null && t !== undefined));
+    return `<section class="card lyr-publish"><strong>Para publicar</strong>
+      ${[['Idioma', esc(comp.lyric.idioma || '—')], ['Contenido explícito', esc(doc.explicito || 'No')], ['Sincronizada con el audio', synced ? '<span class="ok-green">Sí</span>' : 'No'],
+        ['Autoría de la letra', autores.length ? esc(autores.map(a => `${a.nombre} ${formatDecimal(a.porcentaje, 2)} %`).join(', ')) : '<span class="warn-amber">Sin cargar</span>']].map(([k, v]) => `<div class="lyr-row"><span>${k}</span><b>${v}</b></div>`).join('')}
+      <div class="row-tight"><button class="mk-btn" onclick="startSync().catch(report)">Sincronizar con el audio</button>
+        <a class="mk-btn" href="/api/composicion/letras/${comp.song}.txt" download>Exportar .txt</a>${synced ? `<a class="mk-btn" href="/api/composicion/letras/${comp.song}.lrc" download>Exportar .lrc</a>` : ''}
+        <button class="mk-btn" onclick="go('entidades')">Usar en el registro (DNDA / SADAIC)</button></div>
+      <small class="muted">La letra viaja con la canción: sale en la ficha del disco, en el portal del artista y en el paquete para la distribuidora. Spotify y otras plataformas muestran letras que les llegan a través de proveedores como Musixmatch, donde el artista puede cargarla y sincronizarla.</small></section>`;
 }
 function lyricEditor(doc) {
     const names = doc.nombres || [];
     const schemes = [['pop', 'Verso / Estribillo'], ['letras', 'A · A′ · B · C'], ['propio', 'Propio']];
     const autores = comp.lyric.autoria;
-    return `<div class="card lyric-editor">
-      <div class="cr-sub"><div><span class="insp-kicker">Letra · V${doc.version}</span><h2 style="margin:2px 0">${esc(comp.lyric.cancion.titulo)}</h2>
-        <small class="muted">${autores.length ? 'Autoría de la letra: ' + autores.map(a => `${esc(a.nombre)} ${formatDecimal(a.porcentaje, 2)} %`).join(', ') : '<span class="warn-amber">Sin autoría cargada</span> · <button class="link" onclick="openCreditsForSong()">completar en Créditos</button>'}</small></div>
-        <div class="row-tight"><select id="lyricState" aria-label="Estado">${['Borrador', 'En revisión', 'Final'].map(s => `<option ${doc.estado === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
-          <input id="lyricLang" value="${esc(comp.lyric.idioma)}" placeholder="Idioma" style="width:110px" aria-label="Idioma"></div></div>
-      <div class="row-tight"><span class="insp-label">Nombres de las secciones</span><div class="seg">${schemes.map(([id, label]) => `<button class="${doc.esquema === id ? 'is-on' : ''}" onclick="setScheme('${id}')">${label}</button>`).join('')}</div>
-        <label class="check"><input type="checkbox" id="lyricInstrumental" ${doc.instrumental ? 'checked' : ''}> Instrumental</label></div>
+    const firstTime = b => (b.tiempos || []).find(t => t !== null && t !== undefined);
+    return `<section class="card lyric-editor">
+      <div class="lyr-head"><div><h2>${esc(comp.lyric.cancion.titulo)}</h2>
+        <small class="muted">Letra: ${autores.length ? esc(autores.map(a => a.nombre).join(', ')) : '<button class="link warn-amber" onclick="openCreditsForSong()">sin autoría (completar en Créditos)</button>'} · versión V${doc.version} ·
+          <select id="lyricState" class="inline-select" aria-label="Estado">${['Borrador', 'En revisión', 'Final'].map(s => `<option ${doc.estado === s ? 'selected' : ''}>${s.toLowerCase()}</option>`).join('')}</select> ·
+          <input id="lyricLang" class="inline-input" value="${esc(comp.lyric.idioma)}" placeholder="idioma" aria-label="Idioma"></small></div>
+        <div class="row-tight"><button class="mk-btn" onclick="openSong('${comp.song}').catch(report)">Ver en la canción</button>
+          <button class="mk-btn" onclick="notify((comp.lyric.letra.historial||[]).map(h=>'V'+h.version+' · '+h.estado).join('  ·  ')||'Todavía no hay versiones anteriores.')">Historial</button></div></div>
+      <div class="lyr-bar"><span class="muted">Forma de la canción</span><div class="seg">${schemes.map(([id, label]) => `<button class="${doc.esquema === id ? 'is-on' : ''}" onclick="setScheme('${id}')">${label}</button>`).join('')}</div>
+        <label class="check"><input type="checkbox" id="lyricInstrumental" ${doc.instrumental ? 'checked' : ''}> Instrumental</label><span class="spacer"></span>
+        <button class="mk-btn" onclick="comp.collapsed.clear();paintComposition()">Desplegar todo</button><button class="mk-btn" onclick="comp.lyric.letra.secciones.forEach((_,i)=>comp.collapsed.add(i));paintComposition()">Achicar todo</button>
+        <label class="mk-btn">⤓ Importar Word o PDF<input type="file" accept=".docx,.pdf,.txt,.lrc" hidden onchange="importIntoLyric(this.files[0]).catch(report)"></label></div>
       <div class="form-bar">${doc.secciones.map((b, i) => `<button style="flex:${Math.max(1, b.lineas.length)};background:${SECTION_COLORS[b.tipo]}" title="${esc(names[i])}" onclick="document.getElementById('sec${i}').scrollIntoView({block:'center'})">${esc(names[i])}</button>`).join('')}</div>
-      <div class="row-tight"><button class="btn-ghost" onclick="comp.collapsed.clear();paintComposition()">Desplegar todo</button><button class="btn-ghost" onclick="comp.lyric.letra.secciones.forEach((_,i)=>comp.collapsed.add(i));paintComposition()">Achicar todo</button>
-        <label class="btn-link">Importar Word / PDF<input type="file" accept=".docx,.pdf,.txt,.lrc" hidden onchange="importIntoLyric(this.files[0]).catch(report)"></label>
-        <button class="btn-ghost" onclick="startSync().catch(report)">${comp.sync ? 'Sincronizando…' : 'Sincronizar con el audio'}</button></div>
       ${comp.sync ? syncBar() : ''}
-      <div id="lyricBlocks">${doc.secciones.map((b, i) => `<section class="lyric-block" id="sec${i}" style="--c:${SECTION_COLORS[b.tipo]}">
-          <div class="lyric-block-head"><button class="btn-ghost" onclick="toggleSection(${i})" aria-label="${comp.collapsed.has(i) ? 'Desplegar' : 'Achicar'}">${comp.collapsed.has(i) ? '▸' : '▾'}</button>
-            <strong>${esc(names[i])}</strong>
+      <div id="lyricBlocks">${doc.secciones.map((b, i) => { const t = firstTime(b); return `<section class="lyric-block" id="sec${i}" style="--c:${SECTION_COLORS[b.tipo]}">
+          <div class="lyric-block-head"><button class="lyr-caret" onclick="toggleSection(${i})" aria-label="${comp.collapsed.has(i) ? 'Desplegar' : 'Achicar'}">${comp.collapsed.has(i) ? '▸' : '▾'}</button>
+            <span class="lyr-chip">${esc(names[i])}</span>
             <select data-sec-kind="${i}" aria-label="Tipo de sección">${Object.entries(SECTION_LABELS).map(([k, l]) => `<option value="${k}" ${b.tipo === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
-            ${doc.esquema === 'propio' ? `<input data-sec-name="${i}" value="${esc(b.nombre || '')}" placeholder="Nombre propio" style="width:130px">` : ''}
-            <label class="check"><input type="checkbox" data-sec-var="${i}" ${b.variacion ? 'checked' : ''}> Variación</label>
-            <span class="muted">${countLabel(b.lineas.length, 'línea', 'líneas')}</span>
-            <span class="spacer"></span><button class="btn-ghost" onclick="moveSection(${i},-1)" aria-label="Subir">↑</button><button class="btn-ghost" onclick="moveSection(${i},1)" aria-label="Bajar">↓</button>
-            <button class="btn-ghost" onclick="removeSection(${i})" aria-label="Quitar sección">✕</button></div>
-          ${comp.collapsed.has(i) ? `<p class="muted lyric-peek">${esc(b.lineas[0] || '')}…</p>` : `<textarea data-sec-text="${i}" rows="${Math.max(2, b.lineas.length + 1)}">${esc(b.lineas.join('\n'))}</textarea>`}
-        </section>`).join('')}</div>
-      <button class="btn-ghost" onclick="addSection()">+ Sección</button>
-      <div class="form-actions"><span id="lyricStatus" class="muted" role="status">${comp.lyricDirty ? 'Sin guardar' : ''}</span>
-        <button onclick="saveLyric(true).catch(report)">Guardar como V${doc.version + 1}</button><button class="btn-primary" onclick="saveLyric(false).catch(report)">Guardar</button></div>
-    </div>`;
+            ${doc.esquema === 'propio' ? `<input data-sec-name="${i}" value="${esc(b.nombre || '')}" placeholder="Nombre propio" style="width:130px;margin:0">` : ''}
+            <label class="check"><input type="checkbox" data-sec-var="${i}" ${b.variacion ? 'checked' : ''}> variación</label>
+            <span class="spacer"></span><span class="lyr-meta"><b class="mono">${t !== undefined ? clockText(t) : ''}</b> ${countLabel(b.lineas.length, 'línea', 'líneas')}</span>
+            <button class="lyr-mini" onclick="moveSection(${i},-1)" aria-label="Subir">↑</button><button class="lyr-mini" onclick="moveSection(${i},1)" aria-label="Bajar">↓</button>
+            <button class="lyr-mini" onclick="removeSection(${i})" aria-label="Quitar sección">✕</button></div>
+          ${comp.collapsed.has(i) ? `<p class="muted lyric-peek">${esc(b.lineas[0] || '')}…</p>` : `<textarea class="lyr-text" data-sec-text="${i}" rows="${Math.max(1, b.lineas.length)}">${esc(b.lineas.join('\n'))}</textarea>`}
+        </section>`; }).join('')}</div>
+      <div class="row-tight"><button class="mk-btn" onclick="addSection()">+ Marcar nueva sección</button><span class="spacer"></span><span id="lyricStatus" class="muted" role="status">${comp.lyricDirty ? 'Sin guardar' : ''}</span>
+        <button class="mk-btn" onclick="saveLyric(true).catch(report)">Guardar como V${doc.version + 1}</button><button class="btn-primary" onclick="saveLyric(false).catch(report)">Guardar</button></div>
+      <p class="insp-help">Para marcar una sección, elegí su tipo; o escribí una línea entre corchetes como [Estribillo] al importar y AudioTaller la reconoce. Los nombres se adaptan al estilo elegido arriba.</p>
+    </section>`;
 }
 function readLyricForm() {
     const doc = comp.lyric.letra;
@@ -339,20 +366,23 @@ document.addEventListener('keydown', event => { if (event.key === 'Enter' && com
 
 // ── Partituras ──
 function scoresView() {
-    const songs = comp.songs.length ? comp.songs : [];
-    return `<div class="score-grid">${comp.scores.map(p => `<article class="card score-card ${p.vigente ? '' : 'is-old'}">
-        <div class="cr-sub"><span class="tag">${esc(p.formato)}</span>${p.vigente ? '<span class="ok-green">vigente</span>' : '<span class="muted">versión anterior</span>'}</div>
-        <input class="title-input" value="${esc(p.titulo)}" onchange="saveScore('${p.id}',{titulo:this.value})" aria-label="Nombre">
-        <label>Canción<select onchange="saveScore('${p.id}',{cancion_id:this.value})"><option value="">Sin asociar</option>${songs.map(s => `<option value="${s.id}" ${s.id === p.cancion_id ? 'selected' : ''}>${esc(s.titulo)}</option>`).join('')}</select></label>
-        <div class="cr-grid"><label>Arreglo<input value="${esc(p.arreglo)}" placeholder="Opcional" onchange="saveScore('${p.id}',{arreglo:this.value})"></label>
-          <label>Instrumento<input value="${esc(p.instrumento)}" placeholder="General" onchange="saveScore('${p.id}',{instrumento:this.value})"></label>
-          <label>Versión<input value="${p.version}" inputmode="numeric" onchange="saveScore('${p.id}',{version:this.value})"></label></div>
-        <label class="check"><input type="checkbox" ${p.vigente ? 'checked' : ''} onchange="saveScore('${p.id}',{vigente:this.checked})"> Versión vigente</label>
-        <div class="row-tight">${['PDF', 'PNG', 'JPG', 'JPEG'].includes(p.formato) ? `<a class="btn-link" href="/api/scores/${p.id}/file" target="_blank" rel="noopener">Ver</a>` : ''}
-          <button class="btn-ghost" onclick="openScoreFolder('${p.id}')">📁 Mostrar en carpeta</button></div>
-        <small class="muted">${esc(p.coleccion)} · ${p.disponible ? 'disponible' : 'archivo no encontrado'}</small></article>`).join('') ||
-        '<p class="muted">Todavía no hay partituras. Cargá PDF, imágenes o archivos de MuseScore, Sibelius, Dorico, Finale o MusicXML.</p>'}</div>
-      <p class="insp-help">Las partituras no se generan desde el audio mezclado. Idea a futuro: un borrador desde el MIDI de la sesión.</p>`;
+    const songs = comp.songs;
+    return `<div class="score-grid2">${comp.scores.map(p => { const edit = comp.scoreEdit === p.id; const siblings = comp.scores.filter(x => x.cancion_id && x.cancion_id === p.cancion_id && x.arreglo === p.arreglo && x.instrumento === p.instrumento);
+      return `<article class="score-card2 ${p.disponible ? '' : 'is-missing'}"><div class="score-top"><span class="score-thumb"><i></i><i></i><i></i><i></i><i></i></span>
+        <div><strong>${esc(p.titulo)}${p.instrumento ? ' · ' + esc(p.instrumento) : ''}</strong><small>${esc(p.cancion || 'Sin canción asociada')}</small><small class="mono">${esc(p.nombre)}</small>
+          <small>${p.arreglo ? `<b class="ok-green">↳ ${esc(p.arreglo)}</b>` : '<b>Canción completa</b>'}</small></div></div>
+        <div class="row-tight">${siblings.filter(x => x.id !== p.id).map(x => `<span class="score-v">v${x.version}</span>`).join('')}<span class="score-v ${p.vigente ? 'on' : ''}">v${p.version}${p.vigente ? ' vigente' : ''}</span></div>
+        <div class="row-tight">${p.disponible ? (['PDF', 'PNG', 'JPG', 'JPEG'].includes(p.formato) ? `<a class="mk-btn" href="/api/scores/${p.id}/file" target="_blank" rel="noopener">Abrir</a>` : `<button class="mk-btn" onclick="openScoreFolder('${p.id}')">Abrir</button>`) : ''}
+          <button class="mk-btn" onclick="comp.scoreEdit=comp.scoreEdit==='${p.id}'?'':'${p.id}';paintComposition()">${edit ? 'Cerrar' : '+ Versión / editar'}</button>
+          <a class="mk-btn" href="https://wa.me/?text=${encodeURIComponent('Te paso la partitura «' + p.titulo + '»' + (p.instrumento ? ' (' + p.instrumento + ')' : '') + '.')}" target="_blank" rel="noopener noreferrer">Compartir con músicos</a></div>
+        ${edit ? `<div class="score-edit cr-grid"><label class="fld">Nombre<input value="${esc(p.titulo)}" onchange="saveScore('${p.id}',{titulo:this.value})"></label>
+          <label class="fld">Canción<select onchange="saveScore('${p.id}',{cancion_id:this.value})"><option value="">Sin asociar</option>${songs.map(s => `<option value="${s.id}" ${s.id === p.cancion_id ? 'selected' : ''}>${esc(s.titulo)}</option>`).join('')}</select></label>
+          <label class="fld">Arreglo<input value="${esc(p.arreglo)}" placeholder="Opcional" onchange="saveScore('${p.id}',{arreglo:this.value})"></label>
+          <label class="fld">Instrumento / particella<input value="${esc(p.instrumento)}" onchange="saveScore('${p.id}',{instrumento:this.value})"></label>
+          <label class="fld">Versión<input value="${p.version}" inputmode="numeric" onchange="saveScore('${p.id}',{version:this.value})"></label>
+          <label class="check"><input type="checkbox" ${p.vigente ? 'checked' : ''} onchange="saveScore('${p.id}',{vigente:this.checked})"> Versión vigente</label></div>` : ''}</article>`; }).join('')}</div>
+      <section class="card score-info"><strong>Cargar una partitura</strong><p>Acepta PDF y los archivos de MuseScore, Sibelius, Dorico, Finale o MusicXML. Se asocia a una canción y, si querés, a un arreglo (por ejemplo «Arreglo de cuerdas» con sus particellas de violín 1, violín 2 y cello). Cada cambio se guarda como versión nueva.</p>
+        <small class="muted">Sacar una partitura confiable directo de un audio mezclado no es viable hoy. Más adelante se podría armar un borrador desde el MIDI de la sesión, exportándolo a MusicXML para terminarlo en el editor de partituras.</small></section>`;
 }
 async function saveScore(id, changes) {
     await api('/api/composicion/partituras/' + id, body(changes)).catch(report);
@@ -372,3 +402,5 @@ async function uploadScores() {
     await renderCompositionPane();
     notify(countLabel(paths.length, 'partitura cargada', 'partituras cargadas') + ': asociala a su canción y arreglo.');
 }
+
+function compGo(tab) { comp.tab = tab; comp.panel = false; if (trail.at(-1) === 'composition') renderCompositionPane(); else go('composition'); }

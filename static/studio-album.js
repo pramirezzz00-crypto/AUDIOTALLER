@@ -31,28 +31,29 @@ async function renderAlbumPage() {
       <section class="release-hero">
         ${artBox(album.portada, album.id, '', 'release-cover')}
         <div class="release-copy">
-          <span class="eyebrow">${esc(projectType(album))}${album.lanzamiento ? ' · lanzamiento ' + esc(album.lanzamiento) : ''}</span>
+          <span class="eyebrow">${esc(projectType(album))}${albumProd?.fecha ? ' · sale el ' + esc(fmtDay(albumProd.fecha)) : album.lanzamiento ? ' · lanzamiento ' + esc(album.lanzamiento) : ''}${albumProd?.campana ? ' · campaña «' + esc(albumProd.campana.nombre) + '»' : ''}</span>
           <h1 id="albumTitle">${esc(album.nombre)}</h1>
           <div class="release-meta"><button class="link strong" onclick="openArtist('${album.artista_id}')">${esc(albumOwner.nombre)}</button>
             <span>·</span><span>${countLabel(albumSummary.length, 'canción', 'canciones')}</span>${seconds ? `<span>·</span><span class="mono">${clockText(seconds)}</span>` : ''}</div>
+          ${albumStepper(albumProd?.estado || 'En producción', album.id)}
           ${counts.length ? `<div class="release-progress" aria-label="Avance de producción">
             <div class="progress-bar">${counts.map(item => `<i class="st-${item.key}" style="flex:${item.total}"></i>`).join('')}</div>
             <div class="progress-legend">${counts.map(item => `<span><i class="dot st-${item.key}"></i>${item.total} en ${esc(stageName(item.key).toLowerCase())}</span>`).join('')}</div>
           </div>` : ''}
         </div>
       </section>
-      ${albumStepper(albumProd?.estado || 'En producción', album.id)}
       <div class="release-actions">
         <button class="release-play" ${playable.length ? '' : 'disabled'} aria-label="Escuchar el disco de corrido" onclick="albumPlayer.start(0)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button>
         <span class="muted release-play-label">${playable.length ? 'Escuchar de corrido' : 'Sin audios todavía'}</span>
-        <button class="pill pill-cal" onclick="typeof openCampaignFor==='function'?openCampaignFor('${album.id}'):report(Error('Las campañas llegan con Lanzamientos.'))" title="Campaña de lanzamiento">📅 ${albumProd?.campana ? esc(albumProd.campana.nombre) + (albumProd.fecha ? ' · ' + esc(fmtDay(albumProd.fecha)) : '') : 'Crear campaña'}</button>
+        <button class="pill pill-cal" onclick="typeof openCampaignFor==='function'?openCampaignFor('${album.id}'):report(Error('Las campañas llegan con Lanzamientos.'))" title="Campaña de lanzamiento">${albumProd?.campana ? 'Campaña' + (albumProd.fecha ? ' · ' + esc(fmtDay(albumProd.fecha)) : '') : 'Crear campaña'}</button>
         <button class="pill" onclick="openCredits('${album.id}').catch(report)">Créditos</button>
         <button class="pill" onclick="openExport('disco','${album.id}').catch(report)">Exportar metadata</button>
-        <button class="pill" onclick="projectForm('album','${album.id}')">Editar disco</button>
-        <button class="pill" onclick="publicationDialog('lanzamiento','${album.id}').catch(report)">Ficha de lanzamiento</button>
-        <button class="pill" onclick="productionCreditsDialog('disco','${album.id}').catch(report)">Artistas y músicos</button>
-        <button class="pill" onclick="associateLooseSongs('${album.id}').catch(report)">Incorporar canciones sueltas</button>
-        <button class="pill pill-accent" onclick="projectForm('song','${album.id}')">+ Agregar canción</button>
+        <details class="menu"><summary class="pill menu-button" aria-label="Más acciones">⋯</summary><div class="menu-list">
+          <button onclick="projectForm('song','${album.id}')">+ Agregar canción</button>
+          <button onclick="associateLooseSongs('${album.id}').catch(report)">Incorporar canciones sueltas</button>
+          <button onclick="projectForm('album','${album.id}')">Editar disco</button>
+          <button onclick="publicationDialog('lanzamiento','${album.id}').catch(report)">Ficha de lanzamiento</button>
+          <button onclick="productionCreditsDialog('disco','${album.id}').catch(report)">Artistas y músicos</button></div></details>
       </div>
       ${album.notas ? `<p class="muted release-notes">${esc(album.notas)}</p>` : ''}
       <div class="tracklist-tools"><label class="search-box"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
@@ -65,7 +66,9 @@ async function renderAlbumPage() {
         <div id="albumSongs"></div>
       </div></div>
       <p id="albumEmpty" class="muted" hidden></p>
+      <div class="release-foot">${albumFoot()}</div>
       <div id="albumPlayerBar" class="album-player" hidden></div>`;
+    api('/api/discos/' + album.id + '/creditos').then(d => { const box = document.querySelector('.release-foot'); if (box) box.innerHTML = albumFoot(d); }).catch(() => {});
     document.querySelector('.tracklist')?.classList.toggle('with-video', albumShowVideo);
     $('albumSearch').oninput = renderAlbumSongs;
     renderAlbumSongs();
@@ -217,3 +220,16 @@ const albumPlayer = {
     },
 };
 function playAlbumReferences() { albumPlayer.start(0); }
+
+function albumFoot(data) {
+    if (!data) return '';
+    const roles = {};
+    for (const song of data.canciones) {
+        song.produccion.forEach(p => { (roles[p.rol || 'Producción'] ||= new Set()).add(p.nombre); });
+        song.tecnica.forEach(t => { (roles[t.rol] ||= new Set()).add(t.nombre); });
+    }
+    const rel = data.disco.lanzamiento || {};
+    const cols = Object.entries(roles).slice(0, 5).map(([k, v]) => [k, [...v].join(', ')]);
+    cols.push(['UPC · Sello', [rel.upc_ean || 'Sin cargar', rel.sello].filter(Boolean).join(' · ')]);
+    return cols.map(([k, v]) => `<div><span class="eyebrow">${esc(k)}</span><span class="${k === 'UPC · Sello' ? 'mono' : ''}">${esc(v)}</span></div>`).join('');
+}

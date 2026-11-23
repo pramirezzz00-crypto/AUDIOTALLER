@@ -341,6 +341,10 @@ from redesign_arr import register_arrangements_redesign
 register_arrangements_redesign(app, db_open)
 from redesign_arr import register_people_redesign
 register_people_redesign(app, db_open)
+from redesign_arr import register_playlist_options
+register_playlist_options(app, db_open)
+from redesign_arr import register_arrangement_waves
+register_arrangement_waves(app)
 from redesign_extra import register_extra
 register_extra(app, db_open, lambda: DB.parent)
 

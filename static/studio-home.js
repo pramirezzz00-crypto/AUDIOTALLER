@@ -56,11 +56,10 @@ async function renderHome() {
         const empty = !data.recientes.length && !data.discos.length;
         root.innerHTML = `
           <header class="home-head">
-            <div><div class="eyebrow">${esc(today)}</div><h1>Sala de control</h1></div>
+            <div class="home-greet"><div class="date">${esc(today.charAt(0).toUpperCase() + today.slice(1))}</div><h1>Hola${data.usuario ? ', ' + esc(data.usuario) : ''}</h1></div>
             <div class="row home-actions">
               <label class="search-box"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-                <input id="homeSearch" type="search" placeholder="Buscar canción, disco o artista…" aria-label="Buscar en producciones"></label>
-              <button class="alt" onclick="newGlobalProject('album').catch(report)">+ Nuevo disco</button>
+                <input id="homeSearch" type="search" placeholder="Buscar canción, artista, archivo…" aria-label="Buscar en producciones"><kbd class="kbd">Ctrl K</kbd></label>
               <button class="btn-primary" onclick="newGlobalProject('song').catch(report)">+ Nueva canción</button>
             </div>
           </header>
@@ -77,12 +76,14 @@ async function renderHome() {
                 </div>`).join('')}</div>
             </section>
             <section class="card feedback-box" aria-labelledby="homeFeedback">
-              <div class="section-head"><h2 id="homeFeedback">Devoluciones pendientes</h2>${data.devoluciones_total ? `<span class="badge">${data.devoluciones_total}</span>` : ''}</div>
+              <div class="section-head"><h2 id="homeFeedback">Devoluciones</h2></div>
+              <div class="fb-counts">${[['Pendiente', 'pendientes'], ['En revisión', 'en revisión'], ['Resuelta', 'resueltas']].map(([k, l]) => `<span><i class="fb-dot" style="background:${FB_COLORS[k]}"></i>${(data.estados || {})[k] || 0} ${l}</span>`).join('')}</div>
+              <button class="mk-btn fb-go" onclick="openFeedbackPane().catch(report)">Ver todas las devoluciones →</button>
               ${data.devoluciones.map(note => `<button class="feedback-row" onclick="openSong('${note.cancion_id}','${note.archivo_id}',${Number(note.segundo) || 0}).catch(report)">
                   <span class="mono feedback-time"><i class="fb-dot" style="background:${FB_COLORS[note.estado] || '#E5484D'}"></i>${note.segundo > 0 ? clockText(note.segundo) : 'General'}</span>
-                  <span><span class="feedback-text">${esc(note.texto)}</span><small>${esc(note.titulo)} · ${esc(note.etiqueta)} · ${esc(note.estado)}</small></span>
+                  <span><span class="feedback-text">${esc(note.texto)}</span><small>${esc([note.disco, note.titulo].filter(Boolean).join(' · '))}${note.archivo_etapa ? ' (' + esc(stageName(note.archivo_etapa)) + ')' : ''} – <span class="mono">${esc(note.archivo_nombre || note.etiqueta)}</span></small></span>${note.playlist ? `<span class="pl-tag">${esc(note.playlist)}</span>` : ''}
                 </button>`).join('') || '<p class="muted">No hay devoluciones pendientes. Las que envíe el artista desde el portal aparecen acá.</p>'}
-              ${data.devoluciones_total ? '<button class="btn-ghost" onclick="openFeedbackPane().catch(report)">Ver todas las devoluciones</button>' : ''}
+
             </section>
           </div>`}
           ${data.recientes.length ? `<section aria-labelledby="homeContinue">
@@ -123,12 +124,17 @@ function renderSideRecents(recent) {
 // Se llama al final de display(): agrega el comportamiento de las pantallas nuevas.
 function studioDisplayHook(page) {
     document.body.dataset.page = page;
+    document.body.classList.toggle('no-crumbs', ['catalogPane', 'playlistsPane', 'arrangements', 'composition', 'entidades', 'launchesPane', 'artistsPane', 'feedbackPane', 'projectManager', 'configPane'].includes(page));
     $('sideFeedback')?.setAttribute('aria-current', page === 'feedbackPane' ? 'page' : 'false');
     $('sideMyPlaylists')?.setAttribute('aria-current', page === 'playlistsPane' ? 'page' : 'false');
     if (page === 'feedbackPane') { $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="openPlaylists()">Playlist</button> › Devoluciones`; renderFeedbackPane(); }
     else if (typeof fb !== 'undefined') fb.audio.pause();
     if (page === 'creditsPane') renderCredits();
     if (page === 'composition') renderCompositionPane();
+    document.querySelectorAll('.comp-sub').forEach(b => { b.hidden = page !== 'composition'; });
+    if (typeof comp !== 'undefined') { $('sideBeats')?.setAttribute('aria-current', page === 'composition' && comp.tab === 'beats' ? 'page' : 'false');
+        $('sideLyrics')?.setAttribute('aria-current', page === 'composition' && comp.tab === 'lyrics' ? 'page' : 'false');
+        $('sideScores')?.setAttribute('aria-current', page === 'composition' && comp.tab === 'scores' ? 'page' : 'false'); }
     if (page === 'entidades') renderEntitiesPane();
     if (page === 'arrangements') renderArrangementsPane();
     const crumbs = {launchesPane: 'Lanzamientos', avPane: 'Audiovisual', configPane: 'Configuración'};
@@ -164,3 +170,5 @@ function notify(message) {
     box.textContent = message; box.className = 'is-on';
     clearTimeout(notify.timer); notify.timer = setTimeout(() => { box.className = ''; }, 4200);
 }
+
+document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && trail.at(-1) === 'home') { e.preventDefault(); $('homeSearch')?.focus(); } });

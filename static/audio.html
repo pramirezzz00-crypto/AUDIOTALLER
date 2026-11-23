@@ -23,7 +23,10 @@
   <button class="side-sub" id="sideMyPlaylists" aria-label="Mis playlists" onclick="openPlaylists()"><span>Mis playlists</span></button>
   <button class="side-sub" id="sideFeedback" aria-label="Devoluciones" onclick="openFeedbackPane()"><span>Devoluciones</span><b id="sideFeedbackCount" class="side-count" hidden></b></button>
   <button id="sideArrangements" aria-label="Arreglos" onclick="openArrangements()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h2l2-6 3 12 3-9 2 5 2-2h4"/></svg><span>Arreglos</span></button>
-  <button id="sideComposition" aria-label="Composición" onclick="go('composition')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4-1 11-11-3-3L5 16z"/></svg><span>Composición</span></button>
+  <button id="sideComposition" aria-label="Composición" onclick="compGo(comp.tab)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4-1 11-11-3-3L5 16z"/></svg><span>Composición</span></button>
+  <button class="side-sub comp-sub" id="sideBeats" onclick="compGo('beats')"><span>Beats</span></button>
+  <button class="side-sub comp-sub" id="sideLyrics" onclick="compGo('lyrics')"><span>Letras</span></button>
+  <button class="side-sub comp-sub" id="sideScores" onclick="compGo('scores')"><span>Partituras</span></button>
   <button id="sideEntities" aria-label="Entidades" onclick="go('entidades')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10l8-5 8 5M6 10v8M10 10v8M14 10v8M18 10v8M3 20h18"/></svg><span>Entidades</span></button>
   <div class="side-label" id="sideRecentsLabel" hidden>Recientes</div>
   <div id="sideRecents"></div>
