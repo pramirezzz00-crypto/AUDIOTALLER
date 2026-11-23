@@ -27,6 +27,6 @@ if ($LASTEXITCODE -ne 0) { throw 'Falló la verificación de recursos.' }
 if ($LASTEXITCODE -ne 0) { throw 'Falló la recopilación de licencias.' }
 & $Iscc "/DBuildRoot=$BuildRoot" "/DToolsRoot=$ToolsRoot" "/DOutputRoot=$OutputRoot" "$PSScriptRoot\installer.iss"
 if ($LASTEXITCODE -ne 0) { throw 'Falló la generación del instalador.' }
-$installer=Join-Path $OutputRoot 'AudioTaller-0.2.0-beta-Setup-x64.exe'
+$installer=Join-Path $OutputRoot 'AudioTaller-0.3.0-beta-Setup-x64.exe'
 (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash+'  '+(Split-Path -Leaf $installer) | Set-Content -Encoding ascii -LiteralPath (Join-Path $OutputRoot 'SHA256SUMS.txt')
 Write-Output $installer

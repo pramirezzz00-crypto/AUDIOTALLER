@@ -1,0 +1,55 @@
+name: Instalador Windows
+on:
+  workflow_dispatch:
+  push:
+    branches: [redisenio-sala-de-control, main]
+    paths:
+      - '**.py'
+      - 'requirements.txt'
+      - 'packaging/**'
+      - 'static/**'
+      - '.github/workflows/windows.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    name: Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Dependencias de compilación
+        run: python -m pip install -r packaging/requirements-build.lock.txt
+      - name: Pruebas
+        continue-on-error: true
+        run: |
+          python -m pip install pytest
+          python -m pytest -q
+      - name: Inno Setup y WebView2
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          New-Item -ItemType Directory -Force tools | Out-Null
+          Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile tools\MicrosoftEdgeWebview2Setup.exe
+      - name: Compilar instalador
+        shell: pwsh
+        run: |
+          $iscc = (Get-ChildItem 'C:\Program Files (x86)\Inno Setup*\ISCC.exe' | Select-Object -First 1).FullName
+          $python = (Get-Command python).Source
+          ./packaging/build.ps1 -Python $python -Iscc $iscc -ToolsRoot "$PWD\tools" -BuildRoot "$PWD\build-win" -OutputRoot "$PWD\output\windows"
+      - name: Diagnóstico del ejecutable
+        shell: pwsh
+        run: |
+          & "$PWD\build-win\AudioTaller\AudioTaller.exe" --self-test "$PWD\output\windows\diagnostico.json"
+          Start-Sleep -Seconds 5
+          Get-Content "$PWD\output\windows\diagnostico.json"
+      - name: Guardar instalador
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AudioTaller-windows-x64
+          path: output/windows/
+          if-no-files-found: warn

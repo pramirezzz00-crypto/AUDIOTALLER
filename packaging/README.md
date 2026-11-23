@@ -1,6 +1,6 @@
 # Instalador de Windows
 
-La beta 0.2.0 se distribuye como `AudioTaller-0.2.0-beta-Setup-x64.exe`.
+La beta 0.3.0 se distribuye como `AudioTaller-0.3.0-beta-Setup-x64.exe`. GitHub Actions lo compila solo (`.github/workflows/windows.yml`) y lo deja en «Artifacts» de cada ejecución.
 Incluye el ejecutable sin consola, Python, Flask, pywebview, recursos de la
 interfaz, icono, avisos de terceros y el instructivo PDF. Instala por usuario en
 `%LOCALAPPDATA%\Programs\AudioTaller`, con desinstalador y accesos directos.
