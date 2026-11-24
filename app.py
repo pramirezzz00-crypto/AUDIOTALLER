@@ -348,5 +348,17 @@ register_arrangement_waves(app)
 from redesign_extra import register_extra
 register_extra(app, db_open, lambda: DB.parent)
 
+from werkzeug.exceptions import HTTPException
+
+
+@app.errorhandler(Exception)
+def unexpected_error(error):
+    """Cualquier error no previsto vuelve como JSON legible y queda en inicio.log con su traza."""
+    if isinstance(error, HTTPException):
+        return jsonify(error=error.description or error.name), error.code
+    app.logger.exception('Error inesperado en %s %s', request.method, request.path)
+    return jsonify(error=('Error interno (' + type(error).__name__ + '): ' + str(error))[:300]), 500
+
+
 if __name__ == '__main__':
     app.run(host='127.0.0.1',port=5000,debug=False)

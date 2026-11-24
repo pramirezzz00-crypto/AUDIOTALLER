@@ -46,6 +46,10 @@ jobs:
           & "$PWD\build-win\AudioTaller\AudioTaller.exe" --self-test "$PWD\output\windows\diagnostico.json"
           Start-Sleep -Seconds 5
           Get-Content "$PWD\output\windows\diagnostico.json"
+          $diag = Get-Content -Raw "$PWD\output\windows\diagnostico.json" | ConvertFrom-Json
+          foreach ($f in $diag.pantallas_fallidas) { Write-Output "::warning title=Pantalla con error::$f" }
+          foreach ($t in $diag.trazas) { Write-Output ("::warning title=Traza::" + ($t -replace "`r?`n", ' | ')) }
+          if (-not $diag.pantallas_fallidas) { Write-Output "::notice title=Pantallas::Todas las pantallas respondieron sin error" }
       - name: Guardar instalador
         if: always()
         uses: actions/upload-artifact@v4

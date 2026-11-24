@@ -64,9 +64,38 @@ def self_test(output):
             assert (ASSETS/'public'/asset).is_file(),'Falta recurso del portal: '+asset
         assert not any(json.loads((ASSETS/'public/config.json').read_text(encoding='utf-8')).values())
         assert (Path(__file__).parent/'docs/AudioTaller_Instructivo_Portal_del_Artista.pdf').is_file()
+        # Recorre las pantallas con la base recién creada: cualquier error 500 queda en el diagnóstico.
+        import logging, re as _re
+        trazas=[]
+        class Captura(logging.Handler):
+            def emit(self, record):
+                if record.exc_info:
+                    import traceback
+                    trazas.append(''.join(traceback.format_exception(*record.exc_info))[-1500:])
+        backend.app.logger.addHandler(Captura())
+        fallas=[]
+        def probar(metodo, ruta, **datos):
+            respuesta=getattr(client, metodo)(ruta, **datos)
+            if respuesta.status_code>=500 or (respuesta.status_code>=400 and not respuesta.is_json):
+                detalle=(respuesta.get_json(silent=True) or {}).get('error') or respuesta.get_data(as_text=True)[:200]
+                fallas.append(f'{metodo.upper()} {ruta} -> {respuesta.status_code}: {detalle}')
+            return respuesta
+        nueva=probar('post','/api/playlists',json={'nombre':'CANCIONES1','notas':'','archivos':[]}).get_json(silent=True) or {}
+        ids={'pid':nueva.get('id',''),'aid':artist,'sid':song,'did':'','fid':file}
+        for regla in backend.app.url_map.iter_rules():
+            ruta=str(regla)
+            if 'GET' not in regla.methods or not ruta.startswith('/api/') or 'onda' in ruta or 'pdf' in ruta or 'audio' in ruta:
+                continue
+            if any(a not in ids or not ids[a] for a in regla.arguments):
+                continue
+            for a in regla.arguments:
+                ruta=_re.sub(r'<(?:[a-z]+:)?'+a+'>', ids[a], ruta)
+            probar('get', ruta)
+        result_extra={'pantallas_fallidas':fallas,'trazas':trazas[:5]}
         result={'ok':True,'version':DISPLAY_VERSION,'frozen':bool(getattr(sys,'frozen',False)),
                 'datos_aislados':True,'recursos':True,**native,
                 'artista_cancion_audio_playlist':True,'recursos_portal':True,'portal_sin_credenciales':True}
+        result.update(result_extra)
     Path(output).write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
 
 
