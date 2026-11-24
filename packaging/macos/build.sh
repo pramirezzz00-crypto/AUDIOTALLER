@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euo pipefail
+trap 'echo "::error title=Fallo en build.sh linea $LINENO::$BASH_COMMAND"' ERR
 cd "$(dirname "$0")/../.."
 ARCH="$(uname -m)"
 mkdir -p build/AudioTaller.iconset output/macos
@@ -11,7 +12,12 @@ for SIZE in 16 32 128 256 512; do
   sips -z "$DOUBLE" "$DOUBLE" static/branding/AudioTaller.png --out "build/AudioTaller.iconset/icon_${SIZE}x${SIZE}@2x.png" >/dev/null
 done
 iconutil -c icns build/AudioTaller.iconset -o build/AudioTaller.icns
-python -m unittest discover -s tests -v
+if ! python -m unittest discover -s tests -v > "output/macos/pruebas-${ARCH}.txt" 2>&1; then
+  grep -E '^(FAIL|ERROR):' "output/macos/pruebas-${ARCH}.txt" | while read -r line; do echo "::warning title=Prueba fallida (${ARCH})::$line"; done
+  grep -E -A3 'Error:|Error\b' "output/macos/pruebas-${ARCH}.txt" | tail -40 | tr '\n' ' ' | cut -c1-900 | sed 's/^/::warning title=Detalle (${ARCH})::/'
+  echo
+fi
+tail -3 "output/macos/pruebas-${ARCH}.txt"
 python -m PyInstaller --noconfirm packaging/macos/AudioTaller.spec
 ./dist/AudioTaller.app/Contents/MacOS/AudioTaller --self-test "$PWD/output/macos/diagnostico-${ARCH}.json"
 python -c 'import subprocess,sys; subprocess.run(["./dist/AudioTaller.app/Contents/MacOS/AudioTaller", "--smoke-test", "output/macos/ventana-"+sys.argv[1]+".json"], check=True, timeout=45)' "$ARCH"
