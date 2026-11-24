@@ -1,4 +1,4 @@
-AUDIOTALLER 0.2.0 BETA PARA MAC
+AUDIOTALLER 0.3.0 BETA PARA MAC
 
 1. Elegí arm64 para Apple Silicon (M1 o posterior), o x86_64 para Intel.
 2. Abrí el DMG y arrastrá AudioTaller a Aplicaciones.
