@@ -21,6 +21,6 @@ mkdir -p build/dmg
 ditto dist/AudioTaller.app build/dmg/AudioTaller.app
 ln -s /Applications build/dmg/Applications
 cp packaging/macos/LEEME.txt build/dmg/LEEME.txt
-hdiutil create -volname AudioTaller -srcfolder build/dmg -format UDZO "output/macos/AudioTaller-0.2.0-beta-macos-${ARCH}.dmg"
+hdiutil create -volname AudioTaller -srcfolder build/dmg -format UDZO "output/macos/AudioTaller-0.3.0-beta-macos-${ARCH}.dmg"
 (cd output/macos && shasum -a 256 ./*.dmg > SHA256SUMS.txt)
 python -m pip freeze > "output/macos/dependencias-${ARCH}.txt"

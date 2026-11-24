@@ -16,6 +16,6 @@ exe = EXE(pyz,a.scripts,[],exclude_binaries=True,name='AudioTaller',console=Fals
           strip=False,upx=False,argv_emulation=False, target_arch=None, codesign_identity=None)
 coll = COLLECT(exe,a.binaries,a.datas,strip=False,upx=False,name='AudioTaller')
 app = BUNDLE(coll,name='AudioTaller.app',icon=str(root/'build/AudioTaller.icns'),
-    bundle_identifier='org.audiotaller.desktop',version='0.2.0',
-    info_plist={'CFBundleDisplayName':'AudioTaller','CFBundleShortVersionString':'0.2.0',
+    bundle_identifier='org.audiotaller.desktop',version='0.3.0',
+    info_plist={'CFBundleDisplayName':'AudioTaller','CFBundleShortVersionString':'0.3.0',
                 'NSHighResolutionCapable':True,'LSMinimumSystemVersion':'13.0'})

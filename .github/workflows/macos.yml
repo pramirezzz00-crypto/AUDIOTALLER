@@ -2,7 +2,7 @@ name: Instaladores macOS
 on:
   workflow_dispatch:
   push:
-    branches: [feature/gestion-y-produccion]
+    branches: [feature/gestion-y-produccion, redisenio-sala-de-control]
     paths:
       - '**.py'
       - 'requirements.txt'
