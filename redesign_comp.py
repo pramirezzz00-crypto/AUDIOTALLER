@@ -229,7 +229,12 @@ def register_composition_redesign(app, connect):
             if not path.is_file() or path.suffix.lower() not in audio or any(part.lower().endswith('stems') or part.lower() == 'stems' for part in path.relative_to(folder).parts[:-1]):
                 continue
             guess = parse_beat_name(path.name)
-            stem_dirs = [d for d in (path.parent / 'Stems', path.parent / 'stems', path.parent / (path.stem + '_stems'), path.parent / (path.stem + ' stems')) if d.is_dir()]
+            stem_dirs, seen_dirs = [], set()
+            for d in (path.parent / 'Stems', path.parent / 'stems', path.parent / (path.stem + '_stems'), path.parent / (path.stem + ' stems')):
+                # En macOS y Windows «Stems» y «stems» son la misma carpeta: se cuenta una sola vez.
+                if d.is_dir() and (ident := (d.stat().st_dev, d.stat().st_ino)) not in seen_dirs:
+                    seen_dirs.add(ident)
+                    stem_dirs.append(d)
             stems = sum(1 for d in stem_dirs for f in d.iterdir() if f.suffix.lower() in audio) if data.get('stems', True) else 0
             found.append(dict(ruta=str(path), archivo=path.name, titulo=clean_title(path.name), bpm=guess['bpm'], tonalidad=guess['tonalidad'],
                               stems=stems, ya=str(path.resolve()) in known))
