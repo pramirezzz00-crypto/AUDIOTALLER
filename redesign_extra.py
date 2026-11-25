@@ -185,6 +185,8 @@ def register_extra(app, connect, data_folder):
                 FROM canciones c JOIN artistas a ON a.id=c.artista_id LEFT JOIN discos d ON d.id=c.disco_id
                 WHERE NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE (p.tipo='artista' AND p.id=a.id) OR (p.tipo='disco' AND p.id=d.id) OR (p.tipo='cancion' AND p.id=c.id))''')}
             artists = {r['id']: r['nombre'] for r in db.execute("SELECT a.id,a.nombre FROM artistas a WHERE NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE p.tipo='artista' AND p.id=a.id)")}
+        # Un audiovisual cuyas canciones están todas en la Papelera (por la canción, su disco o su artista) también se oculta.
+        items = {k: v for k, v in items.items() if not v.get('canciones') or any(s in songs for s in v['canciones'])}
         return jsonify([av_view(k, v, songs, artists) for k, v in items.items()])
 
     def av_view(vid, doc, songs, artists):

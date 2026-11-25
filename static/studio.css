@@ -893,3 +893,23 @@ html[data-theme="light"] .stage-tabs button[aria-pressed="true"]{
   box-shadow:none!important
 }
 html[data-theme="light"] .mk-chip.is-on span{color:var(--at-text2)!important}
+
+/* Tema claro para Audiovisual y el alta de artistas (sus colores eran fijos en oscuro). */
+html[data-theme="light"] .avx-hero{background:linear-gradient(180deg,#DDF3EE 0%,var(--at-panel) 100%)}
+html[data-theme="light"] .avx-thumb{background:radial-gradient(circle at 40% 40%,#7FD3C6 0%,#2E8C80 55%,#1B4F48 100%)}
+html[data-theme="light"] .avx-chip,html[data-theme="light"] .avx-audio,html[data-theme="light"] .avx .avx-open{background:var(--at-panel)!important}
+html[data-theme="light"] .avx-chip.accent,html[data-theme="light"] .avx .link,html[data-theme="light"] .wz .link,html[data-theme="light"] .ppl-photo-cta{color:var(--at-accent)!important}
+html[data-theme="light"] .avx-chip.accent{border-color:var(--at-accent)}
+html[data-theme="light"] .avx-audio.ok span:last-child,html[data-theme="light"] .avx-cell.ok{color:#1E7A3C}
+html[data-theme="light"] .avx-audio.warn span:last-child,html[data-theme="light"] .avx-cell.mid{color:#8A5A00}
+html[data-theme="light"] .avx-cell.bad{color:#B42332}
+html[data-theme="light"] .avx-tabs button.on{border-bottom-color:var(--at-accent)!important}
+html[data-theme="light"] .avx .avx-open.btn-primary,html[data-theme="light"] .wz-chip.on,html[data-theme="light"] .wz-step.on i{background:var(--at-accent)!important;border-color:var(--at-accent)!important;color:#FFFFFF!important}
+html[data-theme="light"] .avx-cutlbl{background:#000000B3;color:#FFFFFF}
+html[data-theme="light"] .avx-play{background:#FFFFFFD9;color:#182127;border-color:#00000022}
+html[data-theme="light"] .wz-path.on{border-color:var(--at-accent)!important;background:var(--at-accent-soft)!important}
+html[data-theme="light"] .wz-photo.over{border-color:var(--at-accent);background:var(--at-accent-soft)}
+html[data-theme="light"] .wz-photo>span{color:var(--at-accent)}
+html[data-theme="light"] .wz-person.open{border-color:var(--at-accent)}
+html[data-theme="light"] .ppl-photo-cta{background:var(--at-panel)}
+html[data-theme="light"] .avx input[type=checkbox],html[data-theme="light"] .wz-check input{accent-color:var(--at-accent)}

@@ -29,6 +29,13 @@ class AudiovisualTest(unittest.TestCase):
         video = self.c.post('/api/audiovisual', json={'nombre': 'Mareas', 'canciones': [self.sid]}).json
         self.assertEqual(video['artista'], 'Luna')
 
+    def test_se_oculta_si_su_artista_va_a_la_papelera(self):
+        self.c.post('/api/audiovisual', json={'nombre': 'Mareas', 'canciones': [self.sid]})
+        self.c.post(f'/api/papelera-entidades/artista/{self.aid}')
+        self.assertEqual([v['nombre'] for v in self.c.get('/api/audiovisual').json], ['Peña de Marce'])
+        self.c.post(f'/api/papelera-entidades/artista:{self.aid}/restaurar')
+        self.assertEqual(len(self.c.get('/api/audiovisual').json), 2)
+
     def test_progreso_por_etapa(self):
         video = self.c.get('/api/audiovisual').json[0]
         stages = [{k: v for k, v in s.items() if k not in ('color', 'progreso')} for s in video['etapas']]
