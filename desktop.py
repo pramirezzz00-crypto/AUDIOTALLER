@@ -153,11 +153,15 @@ def main():
             result = webview.windows[0].create_file_dialog(kind, allow_multiple=False)
             return result[0] if result else ''
 
-        def choose_audio_files(self):
+        def choose_audio_files(self, audio_only=False):
             # El usuario puede seleccionar varios archivos de audio en una sola operación.
-            result = webview.windows[0].create_file_dialog(
-                webview.FileDialog.OPEN, allow_multiple=True
-            )
+            options = {'allow_multiple': True}
+            if audio_only:
+                options['file_types'] = (
+                    'Audio (*.wav;*.mp3;*.flac;*.ogg;*.m4a;*.aac;*.opus;*.aif;*.aiff)',
+                    'Todos los archivos (*.*)',
+                )
+            result = webview.windows[0].create_file_dialog(webview.FileDialog.OPEN, **options)
             return list(result) if result else []
 
         def choose_score_files(self):

@@ -295,11 +295,16 @@ def register_people_redesign(app, connect):
     def rp_artists():
         from overview import song_summaries
         with connect() as db:
-            artists = [dict(r) for r in db.execute('SELECT id,nombre,tipo,imagen,creado FROM artistas ORDER BY nombre COLLATE NOCASE')]
+            artists = [dict(r) for r in db.execute("""SELECT id,nombre,tipo,imagen,creado FROM artistas a
+                WHERE NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE p.tipo='artista' AND p.id=a.id)
+                ORDER BY nombre COLLATE NOCASE""")]
             docs = doc_list(db, 'artista')
             songs = song_summaries(db)
-            albums = [dict(r) for r in db.execute('SELECT id,nombre,artista_id FROM discos')]
-            videos = doc_list(db, 'audiovisual')
+            albums = [dict(r) for r in db.execute("""SELECT d.id,d.nombre,d.artista_id FROM discos d
+                WHERE NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE (p.tipo='artista' AND p.id=d.artista_id) OR (p.tipo='disco' AND p.id=d.id))""")]
+            deleted = {(r['tipo'],r['id']) for r in db.execute('SELECT tipo,id FROM entidades_papelera')}
+            videos = {key:value for key,value in doc_list(db,'audiovisual').items()
+                      if ('audiovisual',key) not in deleted and ('artista',value.get('artista_id','')) not in deleted}
             profiles = {r['id']: json.loads(r['datos'] or '{}') for r in db.execute('SELECT id,datos FROM perfiles_artista')}
         out = []
         for artist in artists:
@@ -368,6 +373,161 @@ def register_people_redesign(app, connect):
                                              primer_lanzamiento=bool(data.get('primer_lanzamiento'))))
         return jsonify(ok=True)
 
+    @app.get('/api/papelera-entidades')
+    def rp_entity_trash_list():
+        with connect() as db:
+            rows = [dict(row) for row in db.execute('''SELECT tipo,id,grupo,eliminado_en FROM entidades_papelera
+                WHERE tipo IN ('artista','disco','cancion','audiovisual') ORDER BY eliminado_en DESC''')]
+            out = []
+            seen = set()
+            for row in rows:
+                if row['grupo'] in seen:
+                    continue
+                seen.add(row['grupo'])
+                root = next((item for item in rows if item['grupo'] == row['grupo'] and item['id'] == row['grupo'].split(':', 1)[-1]), row)
+                tipo, identity = root['tipo'], root['id']
+                if tipo == 'artista':
+                    found = db.execute('SELECT nombre FROM artistas WHERE id=?', (identity,)).fetchone()
+                    name = found['nombre'] if found else 'Artista'
+                    children = db.execute('SELECT COUNT(*) FROM discos WHERE artista_id=?', (identity,)).fetchone()[0] + db.execute('SELECT COUNT(*) FROM canciones WHERE artista_id=?', (identity,)).fetchone()[0]
+                elif tipo == 'disco':
+                    found = db.execute('SELECT nombre FROM discos WHERE id=?', (identity,)).fetchone()
+                    name = found['nombre'] if found else 'Disco'
+                    children = db.execute('SELECT COUNT(*) FROM canciones WHERE disco_id=?', (identity,)).fetchone()[0]
+                elif tipo == 'cancion':
+                    found = db.execute('SELECT titulo FROM canciones WHERE id=?', (identity,)).fetchone()
+                    name = found['titulo'] if found else 'Canción'
+                    children = 0
+                else:
+                    found = db.execute("SELECT datos FROM rediseno_datos WHERE tipo='audiovisual' AND id=?", (identity,)).fetchone()
+                    name = json.loads(found['datos']).get('nombre', 'Producción audiovisual') if found else 'Producción audiovisual'
+                    children = 0
+                out.append(dict(tipo=tipo,id=identity,grupo=root['grupo'],nombre=name,elementos=children,eliminado_en=row['eliminado_en']))
+        return jsonify(out)
+
+    @app.post('/api/papelera-entidades/<tipo>/<identity>')
+    def rp_entity_trash_move(tipo, identity):
+        if tipo not in ('artista','disco','cancion','audiovisual'):
+            raise ValueError('Tipo de elemento no compatible con la Papelera.')
+        with connect() as db:
+            if tipo == 'artista':
+                row = db.execute('SELECT id FROM artistas WHERE id=?', (identity,)).fetchone()
+            elif tipo == 'disco':
+                row = db.execute('SELECT id FROM discos WHERE id=?', (identity,)).fetchone()
+            elif tipo == 'cancion':
+                row = db.execute('SELECT id FROM canciones WHERE id=?', (identity,)).fetchone()
+            else:
+                row = db.execute("SELECT id FROM rediseno_datos WHERE tipo='audiovisual' AND id=?", (identity,)).fetchone()
+            if not row:
+                raise ValueError('No se encontró el elemento.')
+            group = f'{tipo}:{identity}'
+            if tipo == 'disco':
+                db.execute('INSERT OR IGNORE INTO entidades_papelera(tipo,id,grupo) SELECT \'cancion\',id,? FROM canciones WHERE disco_id=?', (group, identity))
+            db.execute('INSERT OR IGNORE INTO entidades_papelera(tipo,id,grupo) VALUES(?,?,?)', (tipo,identity,group))
+        return jsonify(ok=True,grupo=group)
+
+    @app.post('/api/papelera-entidades/<grupo>/restaurar')
+    def rp_entity_trash_restore(grupo):
+        with connect() as db:
+            result = db.execute('DELETE FROM entidades_papelera WHERE grupo=?', (grupo,))
+            if not result.rowcount:
+                raise ValueError('El elemento ya no está en la Papelera.')
+        return jsonify(ok=True)
+
+    @app.delete('/api/papelera-entidades/<grupo>')
+    def rp_entity_trash_delete(grupo):
+        def delete_ids(db, table, column, ids):
+            ids = list(set(ids))
+            if not ids:
+                return
+            marks = ','.join('?' for _ in ids)
+            db.execute(f'DELETE FROM {table} WHERE {column} IN ({marks})', ids)
+
+        with connect() as db:
+            archived = [dict(row) for row in db.execute('SELECT tipo,id FROM entidades_papelera WHERE grupo=?', (grupo,))]
+            if not archived:
+                raise ValueError('El elemento ya no está en la Papelera.')
+            root = next((row for row in archived if grupo == f"{row['tipo']}:{row['id']}"), archived[0])
+            kind, identity = root['tipo'], root['id']
+            artist_ids, album_ids, song_ids, audiovisual_ids = [], [], [], []
+            if kind == 'artista':
+                artist_ids = [identity]
+                album_ids = [r['id'] for r in db.execute('SELECT id FROM discos WHERE artista_id=?', (identity,))]
+                song_ids = [r['id'] for r in db.execute('SELECT id FROM canciones WHERE artista_id=?', (identity,))]
+            elif kind == 'disco':
+                album_ids = [identity]
+                song_ids = [r['id'] for r in db.execute('SELECT id FROM canciones WHERE disco_id=?', (identity,))]
+            elif kind == 'cancion':
+                song_ids = [identity]
+            elif kind == 'audiovisual':
+                audiovisual_ids = [identity]
+            else:
+                raise ValueError('Tipo de elemento no compatible con la Papelera.')
+
+            # Un audiovisual que usa una canción eliminada también sale de la Papelera
+            # junto con ella; se mantienen todos sus archivos en la ubicación original.
+            if song_ids or artist_ids:
+                songs_set = set(song_ids)
+                for row in db.execute("SELECT id,datos FROM rediseno_datos WHERE tipo='audiovisual'"):
+                    doc = json.loads(row['datos'] or '{}')
+                    if (doc.get('artista_id') in artist_ids or songs_set.intersection(doc.get('canciones', []))):
+                        audiovisual_ids.append(row['id'])
+
+            campaign_ids = []
+            for row in db.execute("SELECT id,datos FROM rediseno_datos WHERE tipo='campana'"):
+                if json.loads(row['datos'] or '{}').get('disco_id') in album_ids:
+                    campaign_ids.append(row['id'])
+
+            file_ids = [r['id'] for r in db.execute('SELECT id FROM archivos WHERE cancion_id IN (%s)' %
+                       ','.join('?' for _ in song_ids), song_ids)] if song_ids else []
+            session_ids = [r['id'] for r in db.execute('SELECT id FROM sesiones WHERE cancion_id IN (%s)' %
+                          ','.join('?' for _ in song_ids), song_ids)] if song_ids else []
+            playlist_ids = [r['playlist_id'] for r in db.execute('SELECT DISTINCT playlist_id FROM playlist_items WHERE archivo_id IN (%s)' %
+                            ','.join('?' for _ in file_ids), file_ids)] if file_ids else []
+
+            db.execute('BEGIN IMMEDIATE')
+            delete_ids(db, 'portal_devoluciones', 'cancion_id', song_ids)
+            delete_ids(db, 'playlist_items', 'archivo_id', file_ids)
+            for playlist_id in playlist_ids:
+                db.execute('UPDATE playlists SET revision=revision+1,actualizado=CURRENT_TIMESTAMP WHERE id=?', (playlist_id,))
+            delete_ids(db, 'portal_drive', 'archivo_id', file_ids)
+            delete_ids(db, 'catalogo_audio', 'archivo_id', file_ids)
+            delete_ids(db, 'eventos', 'cancion_id', song_ids)
+            delete_ids(db, 'notas_etapa', 'cancion_id', song_ids)
+            delete_ids(db, 'estado_cancion', 'id', song_ids)
+            delete_ids(db, 'ficha_cancion', 'id', song_ids)
+            delete_ids(db, 'registro_obra', 'id', song_ids)
+            delete_ids(db, 'registro_grabacion', 'cancion_id', song_ids)
+            delete_ids(db, 'sesion_vigente', 'cancion_id', song_ids)
+            delete_ids(db, 'revision_sesion', 'sesion_id', session_ids)
+            delete_ids(db, 'revision_sesion', 'original_id', session_ids)
+            delete_ids(db, 'sesion_info', 'id', session_ids)
+            delete_ids(db, 'archivos', 'id', file_ids)
+            delete_ids(db, 'sesiones', 'id', session_ids)
+            delete_ids(db, 'operaciones_archivo', 'cancion_id', song_ids)
+            delete_ids(db, 'creditos', 'cancion_id', song_ids)
+            delete_ids(db, 'creditos', 'disco_id', album_ids)
+            delete_ids(db, 'creditos', 'persona_id', artist_ids)
+            delete_ids(db, 'detalle_cancion', 'id', song_ids)
+            delete_ids(db, 'detalle_disco', 'id', album_ids)
+            delete_ids(db, 'registro_lanzamiento', 'id', album_ids)
+            delete_ids(db, 'rediseno_datos', 'id', song_ids + album_ids + artist_ids + audiovisual_ids + campaign_ids)
+            if song_ids:
+                marks = ','.join('?' for _ in song_ids)
+                db.execute(f"DELETE FROM rediseno_datos WHERE tipo IN ('arreglo','creditos','letra','tramites') AND id IN ({marks})", song_ids)
+            if artist_ids:
+                delete_ids(db, 'participaciones', 'grupo_id', artist_ids)
+                delete_ids(db, 'participaciones', 'persona_id', artist_ids)
+                delete_ids(db, 'roles_artista', 'artista_id', artist_ids)
+                delete_ids(db, 'etiquetas_artista', 'artista_id', artist_ids)
+                delete_ids(db, 'perfiles_artista', 'id', artist_ids)
+                delete_ids(db, 'registro_persona', 'id', artist_ids)
+            delete_ids(db, 'canciones', 'id', song_ids)
+            delete_ids(db, 'discos', 'id', album_ids)
+            delete_ids(db, 'artistas', 'id', artist_ids)
+            db.execute('DELETE FROM entidades_papelera WHERE grupo=?', (grupo,))
+        return jsonify(ok=True,archivos_conservados=len(file_ids),carpetas_conservadas=True)
+
     @app.get('/api/catalogo/extra')
     def rp_catalog_extra():
         from redesign import measurement
@@ -376,7 +536,7 @@ def register_people_redesign(app, connect):
         with connect() as db:
             meter = app.config['AT_METER']
             for fid in ids:
-                row = db.execute('SELECT ruta FROM archivos WHERE id=?', (fid,)).fetchone()
+                row = db.execute("SELECT ruta FROM archivos WHERE id=? AND eliminado_en=''", (fid,)).fetchone()
                 if not row:
                     continue
                 lists = [r['nombre'] for r in db.execute('SELECT p.nombre FROM playlist_items i JOIN playlists p ON p.id=i.playlist_id WHERE i.archivo_id=?', (fid,))]
@@ -389,11 +549,11 @@ def register_people_redesign(app, connect):
         with connect() as db:
             required_row(db, 'playlists', pid)
             items = [dict(r) for r in db.execute('''SELECT f.id,f.nombre,f.cancion_id,f.etapa,f.creado FROM playlist_items i
-                JOIN archivos f ON f.id=i.archivo_id WHERE i.playlist_id=?''', (pid,))]
+                JOIN archivos f ON f.id=i.archivo_id WHERE i.playlist_id=? AND f.eliminado_en='' ''', (pid,))]
             inside = {i['id'] for i in items}
             news = []
             for item in items:
-                newer = db.execute('''SELECT id,nombre,creado FROM archivos WHERE cancion_id=? AND etapa=? AND creado>? AND id NOT IN (%s)
+                newer = db.execute('''SELECT id,nombre,creado FROM archivos WHERE cancion_id=? AND etapa=? AND creado>? AND eliminado_en='' AND id NOT IN (%s)
                     ORDER BY creado DESC LIMIT 1''' % ','.join('?' * len(inside)), (item['cancion_id'], item['etapa'], item['creado'], *inside)).fetchone()
                 if newer and Path(newer['nombre']).suffix.lower() in ('.wav', '.mp3', '.flac', '.aif', '.aiff', '.m4a', '.ogg'):
                     news.append(dict(actual=item['id'], actual_nombre=item['nombre'], nuevo=newer['id'], nuevo_nombre=newer['nombre']))

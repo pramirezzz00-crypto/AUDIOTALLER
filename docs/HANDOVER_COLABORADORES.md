@@ -46,6 +46,7 @@ Decisiones funcionales que deben conservarse:
 | Organización de carpetas | Vista previa de copia completa, trabajo en segundo plano, verificación SHA-256 y reasociación de rutas después de verificar. No es una reescritura interna de los proyectos del DAW. |
 | Arreglos | Exploración y escucha de tomas encontradas en las carpetas vinculadas; no realiza separación de instrumentos por IA. |
 | Catálogo | Audios con clasificación y versión, favoritos, encabezados WAV y búsqueda por metadata, créditos, letra y etiquetas. |
+| Papelera | Archivos de producción con restauración; la eliminación definitiva borra copias administradas, nunca el audio original vinculado. |
 | Playlist | Selección y orden de audios existentes; entregas locales y publicación web; actualización de la web manteniendo su dirección. |
 | Portal del artista | Inicio con correo/contraseña, escucha, vencimiento, revocación y devoluciones por audio con momento de escucha opcional. |
 | Devoluciones | Sincronización hacia AudioTaller y seguimiento privado del productor; conservar la referencia a la versión comentada. |
@@ -141,7 +142,7 @@ Al añadir una pantalla: registrar su sección en `audio.html`, incluirla en `pa
 - La instalación del programa y sus datos son independientes.
 - El clon del repositorio no incluye la biblioteca de Pedro ni las rutas/archivos existentes de sus canciones.
 
-### Esquema actual: versión 9
+### Esquema actual: versión 11
 
 `schema_audio` registra la versión. Las migraciones son incrementales y crean respaldos SQLite con fecha antes de ampliar el esquema.
 
@@ -155,6 +156,8 @@ Al añadir una pantalla: registrar su sección en `audio.html`, incluirla en `pa
 | 7 | Devoluciones del artista y seguimiento del productor. |
 | 8 | `composition_playlists`, `composition_beats`, `composition_score_collections`, `composition_scores`, `composition_lyric_collections`, `composition_lyrics`. |
 | 9 | Rediseño 0.3: respuesta, versión que resuelve y bucle en `portal_devoluciones`; tabla `rediseno_datos(tipo,id,datos)` con documentos JSON (créditos, campañas, audiovisuales, arreglos, artistas, sonoridad, asistente). Usar `doc_get`/`doc_put`/`doc_list` de `redesign.py`. |
+| 10 | Columna `archivos.eliminado_en` para la Papelera recuperable. Las relaciones con playlists se conservan al enviar y restaurar; la eliminación definitiva retira referencias locales. |
+| 11 | Tabla `entidades_papelera` para archivar, restaurar y purgar perfiles de artista, discos con sus canciones, canciones sueltas y producciones audiovisuales. El purgado conserva carpetas y archivos del equipo. |
 
 No reutilizar `playlists` para Beats. No confundir el favorito de un audio con el favorito de todas las versiones de una canción. Mantener identificadores y relaciones al mover una canción de disco.
 
@@ -195,7 +198,7 @@ Desde la raíz del repositorio:
 .venv/bin/python -m unittest discover -s tests -q
 ```
 
-Resultado actual (0.3.0): **63 pruebas correctas**; 1 fallo conocido en Linux (`test_importa_perfil_sin_aceptar_tokens_de_terceros`, requiere el almacén seguro de Windows/Mac). El diagnóstico de Windows en CI recorre todas las pantallas del ejecutable. Cubren migraciones, sesiones, copia de carpetas, metadata, catálogo, entrega editorial, portal/devoluciones simulados, Composición y soporte por plataforma. En Mac hay pruebas específicas de DPAPI que se omiten por diseño. Los tests no deben publicar canciones ni modificar cuentas reales.
+La suite de esta rama tiene **79 pruebas**. En Windows, 74 pasan y una falla por un problema conocido de codificación en `test_clasifica_y_crea_sesiones_nuevas_sin_tocar_la_original`; en Linux puede fallar además una prueba que requiere el almacén seguro de Windows/Mac. El diagnóstico de Windows en CI recorre todas las pantallas del ejecutable. Cubren migraciones, papelera/restauración, sesiones, copia de carpetas, metadata, catálogo, entrega editorial, portal/devoluciones simulados, Composición y soporte por plataforma. En Mac hay pruebas específicas de DPAPI que se omiten por diseño. Los tests no deben publicar canciones ni modificar cuentas reales.
 
 Comprobación opcional de sintaxis, si Node está instalado:
 

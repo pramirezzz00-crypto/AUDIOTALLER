@@ -182,7 +182,7 @@ def export_data(db, scope, identity):
         song['n'] = song['pista'] or index
         ref = refs.get(song['id'], {})
         song['duracion'] = song['duracion'] or ref.get('duracion', '')
-        master = db.execute('''SELECT f.nombre FROM archivos f WHERE f.cancion_id=? AND f.etapa='mastering'
+        master = db.execute('''SELECT f.nombre FROM archivos f WHERE f.cancion_id=? AND f.etapa='mastering' AND f.eliminado_en=''
             ORDER BY f.creado DESC LIMIT 1''', (song['id'],)).fetchone()
         song['master'] = master['nombre'] if master else ''
     return dict(titulo=title, tipo=kind, artista=artist, carpeta=folder, lanzamiento=release, arte=art,
@@ -208,7 +208,8 @@ def register_redesign(app, connect):
             campaigns = doc_list(db, 'campana')
             videos = doc_list(db, 'audiovisual')
             albums = [dict(row) for row in db.execute('''SELECT d.id,d.nombre,d.artista_id,a.nombre AS artista,x.actualizado
-                FROM discos d JOIN artistas a ON a.id=d.artista_id LEFT JOIN detalle_disco x ON x.id=d.id''')]
+                FROM discos d JOIN artistas a ON a.id=d.artista_id LEFT JOIN detalle_disco x ON x.id=d.id
+                WHERE NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE (p.tipo='artista' AND p.id=a.id) OR (p.tipo='disco' AND p.id=d.id))''')]
         with_video = {song for v in videos.values() for song in v.get('canciones', [])}
         for song in songs:
             song['estado'] = state_of(song.get('estado'))

@@ -38,6 +38,8 @@ def clock(seconds):
 
 def song_summaries(db, where='', params=()):
     """Etapa actual, versión de referencia y devoluciones pendientes por canción."""
+    active = "(NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE (p.tipo='artista' AND p.id=a.id) OR (p.tipo='disco' AND p.id=d.id) OR (p.tipo='cancion' AND p.id=c.id)))"
+    where = (where + ' AND ' + active) if where else ('WHERE ' + active)
     songs = [dict(row) for row in db.execute(f'''SELECT c.id,c.titulo,c.artista_id,c.disco_id,a.nombre AS artista,
         d.nombre AS disco, x.datos AS detalle, e.estado, e.actualizado
         FROM canciones c JOIN artistas a ON a.id=c.artista_id LEFT JOIN discos d ON d.id=c.disco_id
@@ -48,7 +50,7 @@ def song_summaries(db, where='', params=()):
     marks = ','.join('?' * len(ids))
     stage_rank = {key: index for index, key in enumerate(WORK_STAGES)}
     reached = {}
-    for row in db.execute(f'''SELECT cancion_id,etapa FROM archivos WHERE cancion_id IN ({marks})
+    for row in db.execute(f'''SELECT cancion_id,etapa FROM archivos WHERE cancion_id IN ({marks}) AND eliminado_en=''
                               UNION SELECT cancion_id,etapa FROM sesiones WHERE cancion_id IN ({marks})''', ids + ids):
         key = LEGACY_STAGE.get(row['etapa'], row['etapa'])
         if key in stage_rank:
@@ -56,7 +58,7 @@ def song_summaries(db, where='', params=()):
     audios = {}
     for row in db.execute(f'''SELECT f.id,f.cancion_id,f.etapa,f.nombre,f.ruta,f.creado,ca.favorito,ca.version AS etiqueta
         FROM archivos f LEFT JOIN catalogo_audio ca ON ca.archivo_id=f.id
-        WHERE f.cancion_id IN ({marks}) ORDER BY f.creado DESC,f.rowid DESC''', ids):
+        WHERE f.cancion_id IN ({marks}) AND f.eliminado_en='' ORDER BY f.creado DESC,f.rowid DESC''', ids):
         if Path(row['nombre']).suffix.lower() in AUDIO:
             audios.setdefault(row['cancion_id'], []).append(dict(row))
     pending = {row['cancion_id']: row['total'] for row in db.execute(
@@ -107,11 +109,14 @@ def register_overview(app, connect):
                 FROM portal_devoluciones f
                 JOIN canciones c ON c.id=f.cancion_id JOIN artistas a ON a.id=c.artista_id LEFT JOIN playlists p ON p.id=f.playlist_id
                 LEFT JOIN discos d ON d.id=c.disco_id LEFT JOIN archivos ar ON ar.id=f.archivo_id
-                WHERE f.estado NOT IN ('Resuelta','Sin cambios') ORDER BY f.creado DESC LIMIT 6''')]
+                WHERE f.estado NOT IN ('Resuelta','Sin cambios') AND NOT EXISTS
+                (SELECT 1 FROM entidades_papelera p WHERE (p.tipo='artista' AND p.id=c.artista_id) OR (p.tipo='disco' AND p.id=c.disco_id) OR (p.tipo='cancion' AND p.id=c.id))
+                ORDER BY f.creado DESC LIMIT 6''')]
             pending_total = db.execute("SELECT COUNT(*) FROM portal_devoluciones WHERE estado NOT IN ('Resuelta','Sin cambios')").fetchone()[0]
             albums = []
             for row in db.execute('''SELECT d.id,d.nombre,d.artista_id,a.nombre AS artista,x.actualizado
                 FROM discos d JOIN artistas a ON a.id=d.artista_id LEFT JOIN detalle_disco x ON x.id=d.id
+                WHERE NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE (p.tipo='artista' AND p.id=a.id) OR (p.tipo='disco' AND p.id=d.id))
                 ORDER BY x.actualizado DESC,d.rowid DESC LIMIT 8'''):
                 info = covers.get(row['id'], {})
                 albums.append(dict(id=row['id'], nombre=row['nombre'], artista_id=row['artista_id'], artista=row['artista'],
@@ -171,6 +176,8 @@ def _managed(song, stage):
 
 
 def _file(db, song, stage, row, origin, copy):
+    if row['eliminado_en']:
+        raise ValueError('El archivo está en la Papelera. Restauralo para volver a usarlo.')
     target = stage['clave']
     if not copy:
         # La sesión de origen pertenece a la otra etapa: el archivo queda sin sesión asociada.

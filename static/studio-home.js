@@ -60,12 +60,19 @@ async function renderHome() {
             <div class="row home-actions">
               <label class="search-box"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
                 <input id="homeSearch" type="search" placeholder="Buscar canción, artista, archivo…" aria-label="Buscar en producciones"><kbd class="kbd">Ctrl K</kbd></label>
-              <button class="btn-primary" onclick="newGlobalProject('song').catch(report)">+ Nueva canción</button>
+              <button class="alt" onclick="editArtist()">Nuevo Artista</button>
+              <details class="home-create-menu"><summary class="btn-primary">Crear Proyecto <span aria-hidden="true">▾</span></summary>
+                <div class="home-project-options" role="menu">
+                  <button role="menuitem" onclick="newGlobalProject('song').catch(report)">Nueva Canción</button>
+                  <button role="menuitem" onclick="newGlobalProject('album').catch(report)">Nuevo Disco</button>
+                  <button role="menuitem" onclick="newAvProject().catch(report)">Producción Audiovisual</button>
+                </div>
+              </details>
             </div>
           </header>
           ${empty ? `<section class="home-empty card"><h2>Empezá tu biblioteca</h2>
-              <p class="muted">Creá un artista y su primera canción. Después vas a poder cargar demos, sesiones de DAW y mezclas en cada etapa.</p>
-              <div class="row"><button onclick="editArtist()">+ Nuevo artista</button><button class="btn-primary" onclick="newGlobalProject('song').catch(report)">+ Nueva canción</button></div></section>` : ''}
+              <p class="muted">Creá un artista y organizá sus canciones, discos y producciones audiovisuales desde “Crear Proyecto”. Después vas a poder cargar demos, sesiones de DAW y mezclas en cada etapa.</p>
+              </section>` : ''}
           ${empty ? '' : `<div class="home-split">
             <section class="card pipeline" aria-labelledby="homePipeline">
               <div class="section-head"><h2 id="homePipeline">Producción en curso</h2><span class="mono muted">${countLabel(data.canciones_activas, 'canción activa', 'canciones activas')}</span></div>

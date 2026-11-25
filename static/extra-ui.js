@@ -82,7 +82,7 @@ function campRead() {
 async function campSave() { const c = campRead(); await api('/api/campanas/' + c.id, body(c)); await loadLaunches(); notify('Campaña guardada.'); }
 function campStageAdd() { const c = campRead(); c.etapas.push({nombre: 'Nueva etapa', tipo: 'Single', fecha: '', distribuidora: 'AMA', canciones: [], estado: 'Planificada', chequeo: {}, limites: {}}); paintLaunches(); }
 function campStageRemove(i) { const c = campRead(); c.etapas.splice(i, 1); paintLaunches(); }
-async function campDelete() { if (!confirm('¿Borrar esta campaña? Las canciones y discos no se tocan.')) return; await api('/api/campanas/' + camp.sel + '/borrar', body({})); camp.sel = ''; await loadLaunches(); }
+async function campDelete() { if (!await appConfirm({title: 'Borrar campaña', message: '¿Borrar esta campaña?', detail: 'Las canciones y los discos no se modifican.', confirmLabel: 'Borrar campaña'})) return; await api('/api/campanas/' + camp.sel + '/borrar', body({})); camp.sel = ''; await loadLaunches(); }
 async function newBlankCampaign() { const c = await api('/api/campanas', body({nombre: 'Nueva campaña', etapas: [{tipo: 'Single', nombre: 'Single'}]})); camp.sel = c.id; await loadLaunches(); }
 async function homeUpcoming() {
     const list = await api('/api/campanas').catch(() => []);
@@ -307,7 +307,7 @@ function paintAv() {
     const audioOk = m?.estado === 'al-dia', audioNew = m?.estado === 'nuevo';
     const fmtDate = d => d ? new Date(d + 'T12:00').toLocaleDateString('es-AR', {day: 'numeric', month: 'short'}) : '';
     root.innerHTML = `<div class="avx">
-      <div class="avx-top"><button class="btn-ghost" onclick="prod.media='audiovisual';openArtistManager(true)">← Audiovisuales</button></div>
+      <div class="avx-top"><button class="btn-ghost" onclick="prod.media='audiovisual';openArtistManager(true)">← Audiovisuales</button><button class="menu-danger" onclick="moveEntityToTrash('audiovisual','${v.id}').catch(report)">Mover a Papelera</button></div>
       <header class="avx-hero">
         <button class="avx-thumb" ${lastCut ? `onclick="avOpen('version',${lastCutIndex}).catch(report)" title="Abrir ${esc(avBase(lastCut.ruta))}"` : 'disabled title="Vinculá un corte en Postproducción para verlo desde acá"'}><span class="avx-play">▶</span>${lastCut ? `<span class="avx-cutlbl">${esc(lastCut.numero || lastCut.tipo || 'Corte')}</span>` : ''}</button>
         <div class="avx-info"><div class="eyebrow">${esc(v.plantilla)} · ${esc(origin)}</div><h1>${esc(v.nombre)}</h1>
@@ -356,6 +356,7 @@ function setTheme(theme) {
     const selected = theme === 'light' ? 'light' : 'dark';
     document.documentElement.dataset.theme = selected;
     try { localStorage.setItem('audiotaller-theme', selected); } catch {}
+    api('/api/preferencias', body({tema: selected})).catch(() => notify('No se pudo guardar el tema. Probá de nuevo.'));
 }
 
 async function openConfig() {

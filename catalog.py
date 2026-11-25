@@ -74,6 +74,8 @@ def catalog_rows(db):
             FROM archivos f JOIN canciones c ON c.id=f.cancion_id JOIN artistas a ON a.id=c.artista_id
             LEFT JOIN discos d ON d.id=c.disco_id LEFT JOIN sesion_info si ON si.id=f.sesion_id
             LEFT JOIN revision_sesion r ON r.sesion_id=f.sesion_id LEFT JOIN catalogo_audio ca ON ca.archivo_id=f.id
+            WHERE f.eliminado_en='' AND NOT EXISTS
+            (SELECT 1 FROM entidades_papelera p WHERE (p.tipo='artista' AND p.id=a.id) OR (p.tipo='disco' AND p.id=d.id) OR (p.tipo='cancion' AND p.id=c.id))
             ORDER BY f.creado DESC,f.rowid DESC'''):
         row = dict(raw)
         if Path(row['nombre']).suffix.lower() not in AUDIO_EXTENSIONS:
@@ -111,6 +113,8 @@ def catalog_rows(db):
 
 def audio_row(db, identity):
     file = required_row(db,'archivos',identity)
+    if file['eliminado_en']:
+        raise ValueError('El audio está en la Papelera. Restauralo para volver a usarlo.')
     if Path(file['nombre']).suffix.lower() not in AUDIO_EXTENSIONS:
         raise ValueError('Seleccioná un archivo de audio.')
     return file
@@ -201,7 +205,9 @@ def register_catalog(app, connect):
     def playlists():
         with connect() as db:
             return jsonify([dict(row) for row in db.execute('''SELECT p.*,
-                (SELECT COUNT(*) FROM playlist_items WHERE playlist_id=p.id) AS total FROM playlists p ORDER BY p.actualizado DESC,p.rowid DESC''')])
+                (SELECT COUNT(*) FROM playlist_items pi JOIN archivos f ON f.id=pi.archivo_id
+                    WHERE pi.playlist_id=p.id AND f.eliminado_en='') AS total
+                FROM playlists p ORDER BY p.actualizado DESC,p.rowid DESC''')])
 
     @app.get('/api/playlists/<pid>')
     def playlist(pid):
@@ -221,17 +227,28 @@ def register_catalog(app, connect):
             raise ValueError('Elegí hasta 500 audios distintos, en el orden deseado.')
         with connect() as db:
             db.execute('BEGIN IMMEDIATE')
+            archived_ids = []
             if pid:
                 old = required_row(db,'playlists',pid)
                 if data.get('revision') != old['revision']:
                     raise ValueError('La playlist cambió. Volvé a abrirla antes de guardar.')
+                archived_ids = [row['archivo_id'] for row in db.execute('''SELECT pi.archivo_id FROM playlist_items pi
+                    JOIN archivos f ON f.id=pi.archivo_id WHERE pi.playlist_id=? AND f.eliminado_en<>''
+                    ORDER BY pi.posicion''', (pid,))]
             for identity in ids:
                 audio_row(db,identity)
             if pid:
                 db.execute('UPDATE playlists SET nombre=?,notas=?,revision=revision+1,actualizado=CURRENT_TIMESTAMP WHERE id=?',(name,notes,pid))
-                db.execute('DELETE FROM playlist_items WHERE playlist_id=?',(pid,))
+                if archived_ids:
+                    placeholders = ','.join('?' * len(archived_ids))
+                    db.execute('UPDATE playlist_items SET posicion=posicion+1000000 WHERE playlist_id=? AND archivo_id IN (' + placeholders + ')',
+                               (pid, *archived_ids))
+                db.execute("DELETE FROM playlist_items WHERE playlist_id=? AND archivo_id IN (SELECT id FROM archivos WHERE eliminado_en='')",(pid,))
             else:
                 pid=uuid.uuid4().hex
                 db.execute('INSERT INTO playlists(id,nombre,notas) VALUES(?,?,?)',(pid,name,notes))
             db.executemany('INSERT INTO playlist_items VALUES(?,?,?)',[(pid,identity,index) for index,identity in enumerate(ids)])
+            for index, identity in enumerate(archived_ids, start=len(ids)):
+                db.execute('UPDATE playlist_items SET posicion=? WHERE playlist_id=? AND archivo_id=?',
+                           (index, pid, identity))
             return jsonify(playlist_data(db,pid))

@@ -53,7 +53,8 @@ async function renderAlbumPage() {
           <button onclick="associateLooseSongs('${album.id}').catch(report)">Incorporar canciones sueltas</button>
           <button onclick="projectForm('album','${album.id}')">Editar disco</button>
           <button onclick="publicationDialog('lanzamiento','${album.id}').catch(report)">Ficha de lanzamiento</button>
-          <button onclick="productionCreditsDialog('disco','${album.id}').catch(report)">Artistas y músicos</button></div></details>
+          <button onclick="productionCreditsDialog('disco','${album.id}').catch(report)">Artistas y músicos</button>
+          <button class="menu-danger" onclick="moveEntityToTrash('disco','${album.id}').catch(report)">Mover disco a Papelera</button></div></details>
       </div>
       ${album.notas ? `<p class="muted release-notes">${esc(album.notas)}</p>` : ''}
       <div class="tracklist-tools"><label class="search-box"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>

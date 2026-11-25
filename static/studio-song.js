@@ -179,6 +179,7 @@ function renderWorkflow() {
             <button onclick="productionCopyDialog()">Incorporar producción a AudioTaller…</button>
             <button onclick="feedbackDialog({cancion_id:currentSong.id}).catch(report)">Devoluciones del artista…</button>
             <button onclick="openCatalog(currentSong.id)">Ver audios en el Catálogo</button>
+            <button class="menu-danger" onclick="moveEntityToTrash('cancion',currentSong.id).catch(report)">Mover canción a Papelera</button>
           </div></details>
           <button class="btn-primary" onclick="addMaterialDialog()">+ Agregar audio o sesión</button>
         </div>
@@ -305,10 +306,25 @@ function moveBlock(kind, item) {
         <div class="row-tight"><select id="moveTarget">${stageOptions(item.etapa)}</select>
           <button onclick="transferItem('${kind}','${item.id}',false)">Mover</button>
           <button onclick="transferItem('${kind}','${item.id}',true)">Copiar</button></div>
+        ${kind === 'archivo' ? `<button class="btn-trash" onclick="moveProductionFileToTrash('${item.id}')">Mover a Papelera</button>` : ''}
         <p class="insp-help">${kind === 'sesion'
             ? 'Mover conserva la sesión, su historial y sus archivos asociados. Copiar crea una versión nueva del proyecto (_V00x) junto al original y la registra en la otra etapa.'
             : 'Mover conserva el archivo, su ruta y su historial. Copiar deja el original donde está y suma una copia en la otra etapa.'}</p>
       </div>`;
+}
+async function moveProductionFileToTrash(identity) {
+    const file = fileById(identity);
+    if (!file) return;
+    const origin = file.modo === 'vinculado'
+        ? 'AudioTaller quitará el vínculo; el archivo original seguirá en su ubicación y no se modificará.'
+        : 'La copia guardada por AudioTaller pasará a la Papelera. El archivo original seguirá intacto.';
+    const shared = file.compartido?.length
+        ? `\n\nEste audio aparece en entregas ya publicadas: ${file.compartido.join(', ')}. La Papelera no borrará esos archivos publicados.`
+        : '';
+    if (!await appConfirm({title: 'Mover a la Papelera', message: `¿Querés mover “${file.nombre}” a la Papelera?`, detail: `${origin}${shared}`, confirmLabel: 'Mover a Papelera'})) return;
+    await api('/api/produccion/' + currentSong.id + '/papelera/' + identity, body({}));
+    studioSel = null;
+    await openSong(currentSong.id);
 }
 async function renderInspector() {
     const root = $('inspector');
@@ -614,12 +630,24 @@ function addMaterialDialog(stage = '', files = []) {
         <p class="muted">Audios, sesiones de DAW o documentos. AudioTaller detecta el tipo y sugiere la etapa.</p></div>
         <button type="button" class="btn-ghost" aria-label="Cerrar" onclick="$('addDialog').close()">✕</button></header>
       <div class="add-body">
+        ${linkable ? `<section class="add-audio-choice" aria-labelledby="addAudioChoiceTitle">
+          <div class="add-audio-alert"><span class="add-audio-alert-icon" aria-hidden="true">!</span>
+            <div><strong id="addAudioChoiceTitle">Importante: elegí cómo agregar el audio</strong>
+              <p>El original nunca se modifica. Podés guardar una copia o vincularlo desde su ubicación.</p></div>
+          </div>
+          <div class="add-audio-actions">
+            <button type="button" class="add-audio-option" id="addAudioCopy"><strong>Crear una nueva copia</strong>
+              <small>AudioTaller guarda una copia dentro de la carpeta de la canción. El original queda intacto.</small></button>
+            <button type="button" class="add-audio-option" id="addAudioOriginal"><strong>Usar el audio original</strong>
+              <small>Se registra su ubicación sin copiarlo. Si movés el archivo o desconectás la unidad, el vínculo puede perderse.</small></button>
+          </div>
+        </section>` : ''}
         <label class="add-drop" id="addDrop">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
-          <strong>Soltá archivos acá</strong><span class="muted">o hacé clic para elegirlos · se guarda una copia y el original queda intacto</span>
+          <strong>Soltá archivos acá para crear una copia</strong><span class="muted">También podés elegir archivos desde aquí. El original queda intacto.</span>
           <input type="file" multiple id="addInput"></label>
-        ${linkable ? `<button type="button" class="add-link" id="addLink"><strong>Vincular desde su ubicación</strong>
-          <span class="muted">Para sesiones de DAW y archivos grandes: no se copia nada, se registra dónde están.</span></button>` : ''}
+        ${linkable ? `<button type="button" class="add-link" id="addLink"><strong>Vincular sesión DAW o documento desde su ubicación</strong>
+          <span class="muted">No se copia nada. Para audio, elegí una de las dos opciones destacadas arriba.</span></button>` : ''}
         <div id="addList" class="add-list"></div>
         <p id="addError" role="alert" class="add-error"></p>
       </div>
@@ -631,7 +659,10 @@ function addMaterialDialog(stage = '', files = []) {
     drop.ondragover = event => { event.preventDefault(); drop.classList.add('is-dragging'); };
     drop.ondragleave = () => drop.classList.remove('is-dragging');
     drop.ondrop = event => { event.preventDefault(); drop.classList.remove('is-dragging'); queueFiles([...event.dataTransfer.files]); };
-    if (linkable) $('addLink').onclick = async () => {
+    if (linkable) {
+      $('addAudioCopy').onclick = () => chooseAudioFromLocation('copy-path');
+      $('addAudioOriginal').onclick = () => chooseAudioFromLocation('link');
+      $('addLink').onclick = async () => {
         try {
             const paths = await window.pywebview.api.choose_audio_files();
             for (const path of paths || []) {
@@ -641,10 +672,27 @@ function addMaterialDialog(stage = '', files = []) {
             }
             renderAddList();
         } catch (error) { $('addError').textContent = error.message; }
-    };
+      };
+    }
     $('addSubmit').onclick = submitAdd;
     queueFiles(files);
     dialog.showModal();
+}
+async function chooseAudioFromLocation(mode) {
+    try {
+        const paths = await window.pywebview.api.choose_audio_files(true);
+        for (const path of paths || []) {
+            const name = path.split(/[\\/]/).pop();
+            const stageKey = suggestStage(name);
+            if (kindOf(name) !== 'audio') {
+                $('addError').textContent = name + ': elegí un archivo de audio compatible.';
+                continue;
+            }
+            addItems.push({mode, path, name, kind: 'audio', stage: stageKey,
+                versionOf: previousVersionFor(name, stageKey)});
+        }
+        renderAddList();
+    } catch (error) { $('addError').textContent = error.message; }
 }
 function queueFiles(files) {
     for (const file of files) {
@@ -661,10 +709,10 @@ function renderAddList() {
         const warn = item.kind === 'sesion' && item.mode === 'copy';
         return `<div class="add-item">
           <span class="kind kind-${item.kind}">${item.kind === 'sesion' ? 'SESIÓN' : item.kind === 'audio' ? 'AUDIO' : 'ARCHIVO'}</span>
-          <span class="add-name"><strong>${esc(item.name)}</strong><small class="mono">${item.mode === 'link' ? esc(item.path) : formatBytes(item.size) + ' · se copia'}</small>
+            <span class="add-name"><strong>${esc(item.name)}</strong><small class="mono">${item.mode === 'link' ? esc(item.path) : item.mode === 'copy-path' ? esc(item.path) + ' · se creará una copia' : formatBytes(item.size) + ' · se creará una copia'}</small>
             ${warn ? '<small class="add-warn">Una sesión copiada sola pierde la referencia a sus audios. Usá «Vincular desde su ubicación» para registrarla.</small>' : ''}</span>
           <label class="add-field">Etapa<select data-add-stage="${index}">${STAGE_ORDER.map(key => `<option value="${key}" ${key === item.stage ? 'selected' : ''}>${esc(STAGE_INFO[key].short)}</option>`).join('')}</select></label>
-          ${item.kind === 'audio' && item.mode === 'copy' ? `<label class="add-field">Versión de<select data-add-version="${index}"><option value="">Audio nuevo</option>
+          ${item.kind === 'audio' && item.mode !== 'link' ? `<label class="add-field">Versión de<select data-add-version="${index}"><option value="">Audio nuevo</option>
             ${versions.map(file => `<option value="${file.id}" ${file.id === item.versionOf ? 'selected' : ''}>${esc(fileLabel(file))}</option>`).join('')}</select></label>` : ''}
           <button type="button" class="btn-ghost" data-add-remove="${index}" aria-label="Quitar ${esc(item.name)}">✕</button>
         </div>`;
@@ -701,6 +749,10 @@ async function submitAdd() {
                 const response = await fetch('/api/produccion/' + songId + '/archivos/' + item.stage, {method: 'POST', body: data});
                 const result = await response.json();
                 if (!response.ok) throw Error(result.error || 'No se pudo importar.');
+                last = {kind: 'file', id: result.id};
+            } else if (item.mode === 'copy-path') {
+                const result = await api('/api/produccion/' + songId + '/copias-audio/' + item.stage,
+                    body({ruta: item.path, sesion_id: '', version_de: item.versionOf || ''}));
                 last = {kind: 'file', id: result.id};
             } else if (item.kind === 'sesion') {
                 const ext = item.name.split('.').pop().toLowerCase();

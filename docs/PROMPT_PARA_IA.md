@@ -21,7 +21,7 @@ Vas a colaborar en **AudioTaller**, una aplicación de escritorio gratuita para 
 ## Reglas técnicas
 
 - Stack: Python 3.12+ con Flask, SQLite y pywebview; interfaz en HTML/CSS/JS sin framework ni compilación. Los scripts de `static/` comparten funciones globales y el orden de carga en `audio.html` importa. No migrar a React/Electron ni agregar servidores sin acordarlo.
-- Datos: el esquema está en la versión 9. Cualquier dato nuevo va con una migración compatible en `migrations.py` (con respaldo) o como documento JSON en `rediseno_datos` usando `doc_get`/`doc_put`/`doc_list` de `redesign.py`. Nunca borres, muevas ni sobrescribas archivos originales del usuario: AudioTaller guarda rutas y abre los archivos con su programa.
+- Datos: el esquema está en la versión 11. Cualquier dato nuevo va con una migración compatible en `migrations.py` (con respaldo) o como documento JSON en `rediseno_datos` usando `doc_get`/`doc_put`/`doc_list` de `redesign.py`. Nunca borres, muevas ni sobrescribas archivos originales del usuario: AudioTaller guarda rutas y abre los archivos con su programa. La Papelera permite borrar definitivamente copias administradas, pero los originales vinculados nunca se eliminan.
 - Compatibilidad: todo lo que toque rutas, selectores de archivos o apertura de programas tiene que funcionar en Windows y Mac (`runtime_paths.open_path`, métodos de `desktop.py`).
 - Gotchas: la clave `perfil` en un JSON debe ser un objeto (usá `perfil_id` para ids); no uses `jsonify(dict, clave=...)`; Windows y Mac no distinguen mayúsculas en nombres de carpeta.
 - Seguridad: no subas a Git `.venv`, bases SQLite, audios, `*.dpapi`, JSON de OAuth, claves ni contraseñas. No publiques música, no cambies permisos de Google ni uses cuentas del productor.
@@ -41,7 +41,7 @@ python3 -m venv .venv && .venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python desktop.py
 ```
 
-Estado esperado: 63 pruebas correctas (en Linux falla una conocida que requiere el almacén seguro de Windows/Mac). Agregá tests para lo nuevo en `tests/` con datos temporales. Abrir la app usa la biblioteca real de quien la ejecuta: para probar, preferí los tests o una carpeta de datos aparte. Distinguí siempre lo que probaste de lo que no.
+La suite actual tiene 75 pruebas. En Windows se conoce un fallo de codificación en `test_clasifica_y_crea_sesiones_nuevas_sin_tocar_la_original`; en Linux puede fallar otra prueba que requiere el almacén seguro de Windows/Mac. Agregá tests para lo nuevo en `tests/` con datos temporales. Abrir la app usa la biblioteca real de quien la ejecuta: para probar, preferí los tests o una carpeta de datos aparte. Distinguí siempre lo que probaste de lo que no.
 
 ## Tarea
 

@@ -33,6 +33,8 @@ def migrate(db, database):
             migrate_portal_feedback(db, database)
             migrate_composition(db, database)
             migrate_redesign(db, database)
+            migrate_audio_trash(db, database)
+            migrate_entity_trash(db, database)
             return
         db.execute('BEGIN IMMEDIATE')
         backup = database.with_name(database.stem + '.respaldo-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
@@ -113,6 +115,8 @@ def migrate(db, database):
             migrate_portal_feedback(db, database)
             migrate_composition(db, database)
             migrate_redesign(db, database)
+            migrate_audio_trash(db, database)
+            migrate_entity_trash(db, database)
         except Exception:
             db.rollback()
             raise
@@ -317,6 +321,46 @@ def migrate_redesign(db, database):
         db.execute('''CREATE TABLE IF NOT EXISTS rediseno_datos(tipo TEXT NOT NULL,id TEXT NOT NULL,datos TEXT NOT NULL,
             actualizado TEXT DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(tipo,id))''')
         db.execute('UPDATE schema_audio SET version=9')
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
+def migrate_audio_trash(db, database):
+    """Permite ocultar y restaurar archivos sin alterar sus relaciones ni su origen."""
+    if db.execute('SELECT version FROM schema_audio').fetchone()[0] >= 10:
+        return
+    db.execute('BEGIN IMMEDIATE')
+    backup = database.with_name(database.stem + '.respaldo-papelera-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
+    try:
+        with closing(sqlite3.connect(database)) as source, closing(sqlite3.connect(backup)) as target:
+            source.backup(target)
+        columns = {row[1] for row in db.execute('PRAGMA table_info(archivos)')}
+        if 'eliminado_en' not in columns:
+            db.execute("ALTER TABLE archivos ADD COLUMN eliminado_en TEXT NOT NULL DEFAULT ''")
+        db.execute("CREATE INDEX IF NOT EXISTS archivos_papelera ON archivos(eliminado_en) WHERE eliminado_en <> ''")
+        db.execute('UPDATE schema_audio SET version=10')
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
+def migrate_entity_trash(db, database):
+    """Agrega papelera recuperable para artistas y proyectos sin borrar sus relaciones."""
+    if db.execute('SELECT version FROM schema_audio').fetchone()[0] >= 11:
+        return
+    db.execute('BEGIN IMMEDIATE')
+    backup = database.with_name('respaldo-papelera-entidades-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
+    try:
+        with closing(sqlite3.connect(database)) as source, closing(sqlite3.connect(backup)) as target:
+            source.backup(target)
+        db.execute('''CREATE TABLE IF NOT EXISTS entidades_papelera(
+            tipo TEXT NOT NULL,id TEXT NOT NULL,grupo TEXT NOT NULL,eliminado_en TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY(tipo,id))''')
+        db.execute('CREATE INDEX IF NOT EXISTS entidades_papelera_grupo ON entidades_papelera(grupo)')
+        db.execute('UPDATE schema_audio SET version=11')
         db.commit()
     except Exception:
         db.rollback()

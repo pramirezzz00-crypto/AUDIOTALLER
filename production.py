@@ -1,6 +1,7 @@
 """Sesiones, archivos importados o vinculados y eventos de producción."""
 import json
 import os
+import shutil
 import uuid
 import wave
 from audio_waveform import pcm_waveform
@@ -100,7 +101,7 @@ def register_production(app, connect, safe_name):
                 session['disponible'] = Path(session['ruta']).exists() if session['ruta'] else False
             files = [dict(row) for row in db.execute('''SELECT f.*, ca.favorito,ca.clase,ca.version AS version_audio
                 FROM archivos f LEFT JOIN catalogo_audio ca ON ca.archivo_id=f.id
-                WHERE f.cancion_id=? ORDER BY f.creado DESC''', (sid,))]
+                WHERE f.cancion_id=? AND f.eliminado_en='' ORDER BY f.creado DESC''', (sid,))]
             shared = {}
             # Audios que el artista ya escuchó: están en una playlist publicada en el portal.
             for row in db.execute('''SELECT pi.archivo_id, p.nombre FROM playlist_items pi JOIN playlists p ON p.id=pi.playlist_id
@@ -335,6 +336,114 @@ def register_production(app, connect, safe_name):
                 raise
         return jsonify(id=identity), 201
 
+    @app.post('/api/produccion/<sid>/copias-audio/<stage_key>')
+    def copy_linked_audio(sid, stage_key):
+        data = request.get_json() or {}
+        source = local_path(data.get('ruta', '')).resolve(strict=True)
+        if not source.is_file() or source.suffix.lower() not in (
+                '.wav', '.mp3', '.flac', '.ogg', '.m4a', '.aac', '.opus', '.aif', '.aiff'):
+            raise ValueError('Seleccioná un archivo de audio compatible.')
+        with connect() as db:
+            song = required_row(db, 'canciones', sid)
+            stage = stage_row(db, stage_key)
+            session_id = session_validate(db, sid, stage['clave'], data.get('sesion_id'))
+            previous_id = data.get('version_de', '')
+            if previous_id:
+                previous = required_row(db, 'archivos', previous_id)
+                if previous['cancion_id'] != sid or previous['etapa'] != stage['clave']:
+                    raise ValueError('La versión original debe pertenecer a esta etapa.')
+            folder = managed_folder(song, stage)
+            folder.mkdir(parents=True, exist_ok=True)
+            identity = uuid.uuid4().hex
+            target = folder / (identity + '-' + safe_name(source.name)[:150])
+            try:
+                with source.open('rb') as original, target.open('xb') as copied:
+                    shutil.copyfileobj(original, copied)
+                db.execute('INSERT INTO archivos(id,cancion_id,etapa,sesion_id,nombre,ruta,modo) VALUES(?,?,?,?,?,?,?)',
+                           (identity, sid, stage['clave'], session_id, source.name, str(target), 'importado'))
+                log(db, sid, stage['clave'], 'Archivo incorporado como copia', identity,
+                    json.dumps(dict(nombre=source.name, ruta_origen=str(source), version_de=previous_id), ensure_ascii=False))
+            except Exception:
+                target.unlink(missing_ok=True)
+                raise
+        return jsonify(id=identity), 201
+
+    @app.post('/api/produccion/<sid>/papelera/<identity>')
+    def move_file_to_trash(sid, identity):
+        with connect() as db:
+            file = required_row(db, 'archivos', identity)
+            if file['cancion_id'] != sid:
+                raise ValueError('El archivo no pertenece a esta canción.')
+            if file['eliminado_en']:
+                raise ValueError('Este archivo ya está en la Papelera.')
+            db.execute("UPDATE archivos SET eliminado_en=CURRENT_TIMESTAMP WHERE id=?", (identity,))
+            log(db, sid, file['etapa'], 'Archivo enviado a Papelera', identity, file['nombre'])
+        return jsonify(ok=True)
+
+    @app.get('/api/papelera')
+    def list_trash():
+        with connect() as db:
+            files = [dict(row) for row in db.execute('''SELECT f.id,f.nombre,f.modo,f.etapa,f.eliminado_en,
+                    c.titulo,a.nombre AS artista,
+                    (SELECT COUNT(*) FROM playlist_items pi WHERE pi.archivo_id=f.id) AS playlists,
+                    (SELECT COUNT(DISTINCT pp.id) FROM playlist_items pi JOIN portal_publicaciones pp
+                        ON pp.playlist_id=pi.playlist_id WHERE pi.archivo_id=f.id) AS publicaciones
+                FROM archivos f JOIN canciones c ON c.id=f.cancion_id JOIN artistas a ON a.id=c.artista_id
+                WHERE f.eliminado_en<>'' ORDER BY f.eliminado_en DESC,f.rowid DESC''')]
+        return jsonify(files)
+
+    @app.post('/api/papelera/<identity>/restaurar')
+    def restore_file(identity):
+        with connect() as db:
+            file = required_row(db, 'archivos', identity)
+            if not file['eliminado_en']:
+                raise ValueError('Este archivo no está en la Papelera.')
+            db.execute("UPDATE archivos SET eliminado_en='' WHERE id=?", (identity,))
+            log(db, file['cancion_id'], file['etapa'], 'Archivo restaurado de Papelera', identity, file['nombre'])
+        return jsonify(ok=True)
+
+    @app.delete('/api/papelera/<identity>')
+    def delete_file_permanently(identity):
+        staged_path = None
+        with connect() as db:
+            file = required_row(db, 'archivos', identity)
+            if not file['eliminado_en']:
+                raise ValueError('Primero enviá el archivo a la Papelera.')
+            song = required_row(db, 'canciones', file['cancion_id'])
+            path = Path(file['ruta'])
+            if file['modo'] == 'importado':
+                try:
+                    resolved = path.resolve(strict=True)
+                    project_root = Path(song['carpeta']).resolve()
+                    same_path = db.execute('SELECT 1 FROM archivos WHERE ruta=? AND id<>?',
+                                           (file['ruta'], identity)).fetchone()
+                    if resolved.is_file() and resolved.is_relative_to(project_root) and not same_path:
+                        staged_path = resolved.with_name('.' + resolved.name + '.borrado-' + uuid.uuid4().hex)
+                        os.replace(resolved, staged_path)
+                except FileNotFoundError:
+                    staged_path = None
+            try:
+                playlists = [row['playlist_id'] for row in db.execute(
+                    'SELECT playlist_id FROM playlist_items WHERE archivo_id=?', (identity,))]
+                db.execute('DELETE FROM playlist_items WHERE archivo_id=?', (identity,))
+                for playlist_id in playlists:
+                    db.execute('UPDATE playlists SET revision=revision+1,actualizado=CURRENT_TIMESTAMP WHERE id=?',
+                               (playlist_id,))
+                db.execute('DELETE FROM catalogo_audio WHERE archivo_id=?', (identity,))
+                db.execute('DELETE FROM portal_drive WHERE archivo_id=?', (identity,))
+                log(db, file['cancion_id'], file['etapa'], 'Archivo eliminado definitivamente', identity,
+                    json.dumps(dict(nombre=file['nombre'], modo=file['modo']), ensure_ascii=False))
+                db.execute('DELETE FROM archivos WHERE id=?', (identity,))
+                db.commit()
+            except Exception:
+                db.rollback()
+                if staged_path:
+                    os.replace(staged_path, path)
+                raise
+        if staged_path:
+            staged_path.unlink(missing_ok=True)
+        return jsonify(ok=True, copia_eliminada=bool(staged_path))
+
     # El flujo viejo de adjuntos también crea catálogo e historial.
     app.add_url_rule('/api/canciones/<sid>/adjuntos/<path:stage>', 'attachment',
                      lambda sid, stage: upload(sid, stage), methods=['POST'])
@@ -349,9 +458,11 @@ def register_production(app, connect, safe_name):
             required_row(db, 'canciones', sid)
             stage = stage_row(db, data.get('etapa'))
             session_id = session_validate(db, sid, stage['clave'], data.get('sesion_id'))
-            existing = db.execute('SELECT id FROM archivos WHERE cancion_id=? AND etapa=? AND ruta=?',
+            existing = db.execute('SELECT id,eliminado_en FROM archivos WHERE cancion_id=? AND etapa=? AND ruta=?',
                                   (sid, stage['clave'], str(path))).fetchone()
             if existing:
+                if existing['eliminado_en']:
+                    raise ValueError('Este archivo ya está en la Papelera. Restauralo antes de volver a vincularlo.')
                 return jsonify(id=existing['id'])
             identity = uuid.uuid4().hex
             db.execute('INSERT INTO archivos(id,cancion_id,etapa,sesion_id,nombre,ruta,modo) VALUES(?,?,?,?,?,?,?)',
@@ -363,6 +474,8 @@ def register_production(app, connect, safe_name):
     def download(identity):
         with connect() as db:
             file = required_row(db, 'archivos', identity)
+            if file['eliminado_en']:
+                raise ValueError('El archivo está en la Papelera. Restauralo para volver a usarlo.')
         path = Path(file['ruta'])
         if not path.is_file():
             return jsonify(error='Archivo no disponible. Revisá la unidad o ruta vinculada.'), 404
@@ -374,6 +487,8 @@ def register_production(app, connect, safe_name):
     def waveform(identity):
         with connect() as db:
             file = required_row(db, 'archivos', identity)
+            if file['eliminado_en']:
+                raise ValueError('El audio está en la Papelera. Restauralo para volver a usarlo.')
         path = Path(file['ruta'])
         if not path.is_file():
             return jsonify(error='El audio no está disponible.'), 404

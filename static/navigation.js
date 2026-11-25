@@ -2,7 +2,7 @@ function songRow(s){return `<div class="item"><b>♫ ${esc(s.titulo)}</b><button
 const $ = id => document.getElementById(id);
 let artist, currentAlbum, currentSong, editing, photo, selectedPhoto;
 let previewUrl;
-const pages = ['home', 'manager', 'profile', 'editor', 'artistPane', 'albumPane', 'songPane', 'arrangements', 'globalProjects', 'catalogPane', 'playlistsPane', 'composition', 'beats', 'scores', 'lyrics', 'entidades', 'feedbackPane', 'creditsPane', 'exportPane', 'artistsPane', 'launchesPane', 'avPane', 'configPane'];
+const pages = ['home', 'manager', 'profile', 'editor', 'artistPane', 'albumPane', 'songPane', 'arrangements', 'globalProjects', 'catalogPane', 'playlistsPane', 'trashPane', 'composition', 'beats', 'scores', 'lyrics', 'entidades', 'feedbackPane', 'creditsPane', 'exportPane', 'artistsPane', 'launchesPane', 'avPane', 'configPane'];
 const trail = ['home'];
 function display() {
     const page = trail.at(-1);
@@ -43,6 +43,8 @@ function display() {
     if (page === 'playlistsPane') { $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › Playlist`; loadPlaylists(); }
     $('sideCatalog').setAttribute('aria-current',page === 'catalogPane' ? 'page' : 'false');
     $('sidePlaylists').setAttribute('aria-current',page === 'playlistsPane' ? 'page' : 'false');
+    $('sideTrash').setAttribute('aria-current',page === 'trashPane' ? 'page' : 'false');
+    if (page === 'trashPane') { $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> > Papelera`; loadTrash(); }
     $('error').textContent = '';
     window.scrollTo(0, 0);
     if (page === 'profile' && artist) renderProfile();

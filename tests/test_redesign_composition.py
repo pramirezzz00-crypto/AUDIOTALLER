@@ -165,3 +165,10 @@ class LaunchAndVideoTest(unittest.TestCase):
         response = self.c.post('/api/asistente/mensaje', json={'mensajes': [{'rol': 'user', 'texto': 'hola'}]})
         self.assertEqual(response.status_code, 400, response.data[:200])
         self.assertIn('clave de API', response.get_json(force=True)['error'])
+
+    def test_preferencia_de_tema_persiste_en_datos_locales(self):
+        self.assertEqual(self.c.get('/api/preferencias').json['tema'], 'dark')
+        saved = self.c.post('/api/preferencias', json={'tema': 'light'})
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(self.c.get('/api/preferencias').json['tema'], 'light')
+        self.assertEqual(self.c.post('/api/preferencias', json={'tema': 'azul'}).status_code, 400)

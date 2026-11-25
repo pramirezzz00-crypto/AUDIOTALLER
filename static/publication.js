@@ -14,16 +14,36 @@ function looseSongFields(songs) {
     return `<fieldset><legend>Incorporar canciones sueltas</legend><p class="muted">Conservan archivos, sesiones y créditos. Dejan de aparecer como sueltas.</p>
         ${songs.map(song => `<label class="filter-box"><input type="checkbox" data-loose value="${song.id}">${esc(song.titulo)}</label>`).join('') || '<p>No hay canciones sueltas de este artista.</p>'}</fieldset>`;
 }
+function artistSearchField(people) {
+    const listId = 'artistSearchOptions';
+    return `<label>Artista principal
+      <input name="owner_search" list="${listId}" autocomplete="off" placeholder="Escribí para buscar un artista" required>
+      <datalist id="${listId}">${people.map(person => `<option value="${esc(person.nombre)}"></option>`).join('')}</datalist>
+      <input type="hidden" name="owner"></label>`;
+}
+function bindArtistSearch(form, people) {
+    const input = form.elements.owner_search;
+    const owner = form.elements.owner;
+    const findArtist = () => people.find(person => person.nombre.trim().toLocaleLowerCase() === input.value.trim().toLocaleLowerCase());
+    const validate = () => {
+        const match = findArtist();
+        owner.value = match?.id || '';
+        input.setCustomValidity(input.value.trim() && !match ? 'Elegí un artista de la lista o escribí su nombre completo.' : '');
+    };
+    input.addEventListener('input', validate);
+    input.addEventListener('change', validate);
+    form.addEventListener('submit', validate, {once: true});
+}
 async function newGlobalProject(kind) {
     const people = await api('/api/personas');
     if (!people.length) { editArtist(); return; }
     formDialog(kind === 'album' ? 'Nuevo disco · Artista principal' : 'Nueva canción suelta · Artista principal',
         `<p>Elegí el artista, banda o grupo responsable. Luego podrás agregar músicos y otros créditos.</p>
-        <label>Artista principal<select name="owner" required>${optionPeople(people)}</select></label>`, async data => {
+        ${artistSearchField(people)}`, async data => {
             await openArtist(data.owner, true);
             // El segundo formulario se abre al cerrar el primero, nunca superpuesto.
             $('iterationDialog').addEventListener('close', () => projectForm(kind).catch(report), {once:true});
-        });
+        }, form => bindArtistSearch(form, people));
 }
 async function associateLooseSongs(id) {
     const album = projects.discos.find(row => row.id === id);

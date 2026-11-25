@@ -499,7 +499,7 @@ def register_composition_redesign(app, connect):
         with connect() as db:
             song = dict(required_row(db, 'canciones', sid))
             bundle = export_bundle_for_song(db, sid)
-            ref = db.execute('''SELECT ruta,nombre FROM archivos WHERE cancion_id=? AND (etapa='mastering' OR etapa='mezcla')
+            ref = db.execute('''SELECT ruta,nombre FROM archivos WHERE cancion_id=? AND eliminado_en='' AND (etapa='mastering' OR etapa='mezcla')
                 ORDER BY CASE etapa WHEN 'mastering' THEN 0 ELSE 1 END, creado DESC LIMIT 1''', (sid,)).fetchone()
         title = re.sub(r'[<>:"/\\|?*]', '', song['titulo'])
         folder = Path(song['carpeta']) / 'Trámites' / f'{entity.upper()} · {title}'

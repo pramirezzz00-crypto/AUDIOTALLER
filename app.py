@@ -57,7 +57,7 @@ def home():
 def biblioteca():
     q = '%' + request.args.get('q', '').strip() + '%'
     with db_open() as db:
-        rows = db.execute('''SELECT DISTINCT a.*, (SELECT COUNT(*) FROM discos WHERE artista_id=a.id) AS discos, (SELECT COUNT(*) FROM canciones WHERE artista_id=a.id) AS canciones FROM artistas a LEFT JOIN discos d ON d.artista_id=a.id LEFT JOIN canciones c ON c.artista_id=a.id WHERE a.nombre LIKE ? OR d.nombre LIKE ? OR c.titulo LIKE ? ORDER BY a.nombre''', (q,q,q)).fetchall()
+        rows = db.execute('''SELECT DISTINCT a.*, (SELECT COUNT(*) FROM discos WHERE artista_id=a.id) AS discos, (SELECT COUNT(*) FROM canciones WHERE artista_id=a.id) AS canciones FROM artistas a LEFT JOIN discos d ON d.artista_id=a.id LEFT JOIN canciones c ON c.artista_id=a.id WHERE NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE p.tipo='artista' AND p.id=a.id) AND (a.nombre LIKE ? OR d.nombre LIKE ? OR c.titulo LIKE ?) ORDER BY a.nombre''', (q,q,q)).fetchall()
     return jsonify([dict(x) for x in rows])
 
 @app.post('/api/artistas')
@@ -96,7 +96,7 @@ def artist_get(aid):
         row = db.execute('''SELECT a.*,
             (SELECT COUNT(*) FROM discos WHERE artista_id=a.id) AS discos,
             (SELECT COUNT(*) FROM canciones WHERE artista_id=a.id) AS canciones
-            FROM artistas a WHERE a.id=?''', (aid,)).fetchone()
+            FROM artistas a WHERE a.id=? AND NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE p.tipo='artista' AND p.id=a.id)''', (aid,)).fetchone()
         profile = db.execute('SELECT datos FROM perfiles_artista WHERE id=?', (aid,)).fetchone()
     if not row:
         return jsonify(error='Artista no encontrado.'), 404
@@ -109,11 +109,14 @@ def artist_content(aid):
     with db_open() as db:
         albums = [dict(row) for row in db.execute(
             """SELECT d.*, x.datos, x.creado, x.actualizado FROM discos d
-               LEFT JOIN detalle_disco x ON x.id=d.id WHERE d.artista_id=?""", (aid,))]
+               LEFT JOIN detalle_disco x ON x.id=d.id WHERE d.artista_id=? AND NOT EXISTS
+               (SELECT 1 FROM entidades_papelera p WHERE (p.tipo='artista' AND p.id=d.artista_id) OR (p.tipo='disco' AND p.id=d.id))""", (aid,))]
         songs = [dict(row) for row in db.execute(
             """SELECT c.*, x.datos, e.estado, e.actualizado FROM canciones c LEFT JOIN detalle_cancion x ON x.id=c.id
                LEFT JOIN estado_cancion e ON e.id=c.id
-               WHERE c.artista_id=? ORDER BY c.creado, c.id""", (aid,))]
+               WHERE c.artista_id=? AND NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE
+               (p.tipo='artista' AND p.id=c.artista_id) OR (p.tipo='disco' AND p.id=c.disco_id) OR (p.tipo='cancion' AND p.id=c.id))
+               ORDER BY c.creado, c.id""", (aid,))]
         for row in songs:
             row['busqueda_metadata'] = song_search_text(db,row['id'])
     for row in albums + songs:

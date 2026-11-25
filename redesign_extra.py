@@ -68,6 +68,26 @@ def campaign_view(db, cid, doc):
 
 
 def register_extra(app, connect, data_folder):
+    # Store interface preferences with the local application data so they
+    # survive pywebview restarts and changes to its temporary local origin.
+    @app.get('/api/preferencias')
+    def rx_preferences():
+        with connect() as db:
+            prefs = doc_get(db, 'preferencias', 'interfaz', {})
+        return jsonify(tema=prefs.get('tema', 'dark'))
+
+    @app.post('/api/preferencias')
+    def rx_preferences_save():
+        data = request.get_json() or {}
+        theme = data.get('tema')
+        if theme not in ('dark', 'light'):
+            return jsonify(error='Elegí un tema válido.'), 400
+        with connect() as db:
+            prefs = doc_get(db, 'preferencias', 'interfaz', {})
+            prefs['tema'] = theme
+            doc_put(db, 'preferencias', 'interfaz', prefs)
+        return jsonify(ok=True, tema=theme)
+
     # ── Campañas de lanzamiento ──
     @app.get('/api/campanas')
     def rx_campaigns():
@@ -158,9 +178,13 @@ def register_extra(app, connect, data_folder):
     def rx_av_list():
         with connect() as db:
             items = doc_list(db, 'audiovisual')
+            deleted = {(row['tipo'], row['id']) for row in db.execute('SELECT tipo,id FROM entidades_papelera')}
+            items = {key: value for key, value in items.items()
+                     if ('audiovisual', key) not in deleted and ('artista', value.get('artista_id', '')) not in deleted}
             songs = {r['id']: dict(r) for r in db.execute('''SELECT c.id,c.titulo,c.artista_id,a.nombre AS artista,d.nombre AS disco
-                FROM canciones c JOIN artistas a ON a.id=c.artista_id LEFT JOIN discos d ON d.id=c.disco_id''')}
-            artists = {r['id']: r['nombre'] for r in db.execute('SELECT id,nombre FROM artistas')}
+                FROM canciones c JOIN artistas a ON a.id=c.artista_id LEFT JOIN discos d ON d.id=c.disco_id
+                WHERE NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE (p.tipo='artista' AND p.id=a.id) OR (p.tipo='disco' AND p.id=d.id) OR (p.tipo='cancion' AND p.id=c.id))''')}
+            artists = {r['id']: r['nombre'] for r in db.execute("SELECT a.id,a.nombre FROM artistas a WHERE NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE p.tipo='artista' AND p.id=a.id)")}
         return jsonify([av_view(k, v, songs, artists) for k, v in items.items()])
 
     def av_view(vid, doc, songs, artists):
@@ -257,7 +281,7 @@ def register_extra(app, connect, data_folder):
                     required_row(db, 'canciones', sid)
                 doc['canciones'] = songs
                 if songs and not doc.get('master'):
-                    master = db.execute("SELECT id,nombre FROM archivos WHERE cancion_id=? AND etapa='mastering' ORDER BY creado DESC LIMIT 1", (songs[0],)).fetchone()
+                    master = db.execute("SELECT id,nombre FROM archivos WHERE cancion_id=? AND etapa='mastering' AND eliminado_en='' ORDER BY creado DESC LIMIT 1", (songs[0],)).fetchone()
                     if master:
                         doc['master'] = dict(id=master['id'], nombre=master['nombre'])
             if not doc.get('nombre'):
@@ -276,7 +300,7 @@ def register_extra(app, connect, data_folder):
             doc = doc_get(db, 'audiovisual', vid, {})
             if not doc.get('canciones'):
                 return jsonify(estado='sin-cancion')
-            latest = db.execute("SELECT id,nombre FROM archivos WHERE cancion_id=? AND etapa='mastering' ORDER BY creado DESC LIMIT 1", (doc['canciones'][0],)).fetchone()
+            latest = db.execute("SELECT id,nombre FROM archivos WHERE cancion_id=? AND etapa='mastering' AND eliminado_en='' ORDER BY creado DESC LIMIT 1", (doc['canciones'][0],)).fetchone()
         if not latest:
             return jsonify(estado='sin-master')
         used = doc.get('master', {})

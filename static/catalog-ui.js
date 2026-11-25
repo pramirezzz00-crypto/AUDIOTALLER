@@ -164,7 +164,7 @@ async function updatePlaylistItems(ids){
     }catch(error){report(error);}finally{playlistBusy=false;}
 }
 function movePlaylistItem(from,to){if(playlistBusy || to<0 || to>=playlistCurrent.audios.length || from===to)return;const ids=playlistCurrent.audios.map(audio=>audio.id);ids.splice(to,0,ids.splice(from,1)[0]);updatePlaylistItems(ids);}
-function removePlaylistItem(index){if(confirm('¿Quitar el audio de esta playlist? El archivo original se conserva.'))updatePlaylistItems(playlistCurrent.audios.filter((_,i)=>i!==index).map(audio=>audio.id));}
+async function removePlaylistItem(index){if(await appConfirm({title:'Quitar audio de la playlist',message:'¿Querés quitar este audio de la playlist?',detail:'El archivo original se conserva.',confirmLabel:'Quitar audio',danger:false}))await updatePlaylistItems(playlistCurrent.audios.filter((_,i)=>i!==index).map(audio=>audio.id));}
 async function newPlaylistDialog(){formDialog('Nueva playlist','<label>Nombre<input name="nombre" required maxlength="150"></label><label>Notas internas<textarea name="notas"></textarea></label>',async data=>{playlistCurrent=await api('/api/playlists',body({...data,archivos:[]}));go('playlistsPane');await loadPlaylists();});}
 function editPlaylistDialog(){const old=playlistCurrent;formDialog('Datos de playlist',`<label>Nombre<input name="nombre" required maxlength="150" value="${esc(old.nombre)}"></label><label>Notas internas<textarea name="notas">${esc(old.notas)}</textarea></label>`,async data=>{playlistCurrent=await api('/api/playlists/'+old.id,body({...data,revision:old.revision,archivos:old.audios.map(audio=>audio.id)}));await loadPlaylists();});}
 async function importCatalogAudio(initialFiles=[],pid=''){

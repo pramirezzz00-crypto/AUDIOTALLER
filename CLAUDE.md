@@ -10,14 +10,14 @@ App de escritorio para productores musicales (Windows y Mac). Python 3.12+ · Fl
 
 ## Comandos
 
-- Pruebas: `python -m unittest discover -s tests -q` (63 correctas; en Linux falla una conocida del almacén seguro).
+- Pruebas: `python -m unittest discover -s tests -q` (75 pruebas actuales; este entorno Windows tiene un fallo conocido de codificación en `test_clasifica_y_crea_sesiones_nuevas_sin_tocar_la_original`; Linux puede tener además el fallo conocido del almacén seguro).
 - App de escritorio: `python desktop.py`. Solo interfaz en navegador: `python app.py` → http://127.0.0.1:5000.
 - Sintaxis JS: `node --check static/<archivo>.js`.
 
 ## Reglas
 
 - Cambios chicos; no reescribas `app.py`, `static/audio.html` ni `static/navigation.js` completos. Los JS de `static/` comparten funciones globales y el orden de carga importa.
-- Esquema en versión 9. Datos nuevos: migración compatible en `migrations.py` o documentos en `rediseno_datos` con `doc_get`/`doc_put`/`doc_list` (`redesign.py`).
+- Esquema en versión 11. Datos nuevos: migración compatible en `migrations.py` o documentos en `rediseno_datos` con `doc_get`/`doc_put`/`doc_list` (`redesign.py`).
 - Nunca borrar, mover ni sobrescribir archivos originales del usuario; se guardan rutas y se abren con `runtime_paths.open_path`.
 - `perfil` en un JSON debe ser objeto (usar `perfil_id` para ids). No usar `jsonify(dict, clave=...)`.
 - Probar con datos temporales (tests), no con la biblioteca real. No subir `.venv`, SQLite, audios, `*.dpapi`, credenciales ni contraseñas.

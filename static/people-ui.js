@@ -34,7 +34,7 @@ function paintArtists() {
         <select aria-label="Relación" onchange="ppl.relation=this.value;paintArtists()"><option value="">Toda relación</option>${RELATIONS.map(r => `<option ${ppl.relation === r ? 'selected' : ''}>${r}</option>`).join('')}</select></div>
       <div class="chips">${[['', 'Todos'], ...PROJECT_TYPES.map(t => [t, t])].map(([id, label]) => `<button class="chip-btn ${ppl.type === id ? 'is-on' : ''}" onclick="ppl.type='${id}';paintArtists()">${label} <span class="mono">${id ? ppl.list.filter(a => a.tipo_proyecto === id).length : ppl.list.length}</span></button>`).join('')}</div>
       <div class="ppl-layout">
-        <div class="ppl-grid">${list.map(a => `<button class="ppl-card ${a.id === ppl.sel ? 'is-on' : ''}" onclick="ppl.sel='${a.id}';paintArtists()">
+        <div class="ppl-grid">${list.map(a => `<button class="ppl-card ${a.id === ppl.sel ? 'is-on' : ''}" onclick="if(ppl.sel!=='${a.id}'){ppl.sel='${a.id}';paintArtists()}" ondblclick="openArtist('${a.id}',true).catch(report)" title="Doble clic para ver todas sus producciones">
             ${avatar(a)}${a.alertas.length ? '<i class="ppl-alert" title="Tiene datos pendientes"></i>' : ''}
             <strong>${esc(a.nombre)}</strong><small>${esc(a.tipo_proyecto)} · ${esc(a.relacion)}</small>
             <small class="muted">${countLabel(a.discos.length, 'disco', 'discos')} · ${countLabel(a.canciones, 'canción', 'canciones')}</small></button>`).join('')
@@ -62,7 +62,7 @@ function artistDetail(a) {
       <span class="muted">${esc([a.contacto.email, a.contacto.whatsapp || a.contacto.telefono].filter(Boolean).join(' · ') || 'Sin contacto')}${a.portal ? ' · portal: ' + esc(a.portal) : ''}</span>
       ${Object.keys(a.plataformas).length ? `<div class="row-tight">${Object.entries(a.plataformas).map(([k, url]) => `<a class="chip-btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(PLATFORM_LABELS[k] || k)} ↗</a>`).join('')}</div>` : ''}
       ${a.bio ? `<span class="insp-label">Biografía</span><p class="muted" style="margin:0">${esc(a.bio)}</p>` : ''}
-      <div class="row-tight"><button class="btn-primary" onclick="startWizard('${a.id}')">Editar ficha</button><button class="alt" onclick="startWizard('${a.id}',1)">Integrantes</button></div></aside>`;
+      <div class="row-tight"><button class="btn-primary" onclick="startWizard('${a.id}')">Editar ficha</button><button class="alt" onclick="startWizard('${a.id}',1)">Integrantes</button><button class="trash-permanent" onclick="moveEntityToTrash('artista','${a.id}').catch(report)">Mover a Papelera</button></div></aside>`;
 }
 
 // ── Alta en 4 pasos (también para editar), igual al mockup. Se puede guardar incompleto. ──
