@@ -24,10 +24,23 @@ AV_TEMPLATES = {
     'Entrevista / Documental': ['Desarrollo', 'Rodaje', 'Postproducción', 'Entregas'],
     'Personalizado': ['Desarrollo', 'Preproducción', 'Rodaje', 'Postproducción', 'Entregas', 'Distribución'],
 }
-AV_TASKS = {'Desarrollo': ['Idea y referencias', 'Presupuesto'], 'Preproducción': ['Locaciones', 'Plan de rodaje', 'Pista de playback'],
-            'Rodaje': ['Jornadas', 'Tomas calificadas'], 'Postproducción': ['Armado', 'Corte final', 'Color', 'Sonido'],
-            'Entregas': ['Master de archivo', 'YouTube 16:9', 'Short / Reel 9:16', 'Spotify Canvas'], 'Distribución': ['Estreno', 'Redes']}
+AV_TASKS = {'Desarrollo': ['Idea y concepto', 'Tratamiento audiovisual', 'Referencias y moodboard', 'Guion literario (opcional)', 'Presupuesto preliminar'],
+            'Preproducción': ['Scouting de locaciones', 'Shot list por sección', 'Plan de rodaje', 'Pista de playback con código de tiempo', 'Equipo y permisos'],
+            'Rodaje': ['Jornadas filmadas', 'Tomas calificadas', 'Copia de seguridad del material'],
+            'Postproducción': ['Primer armado', 'Rough cut', 'Fine cut', 'Color', 'Audio del clip', 'Lock'],
+            'Entregas': ['Master de archivo', 'YouTube 16:9', 'Short / Reel 9:16', 'Spotify Canvas'],
+            'Distribución': ['Estreno', 'Recortes para redes', 'Spotify Canvas cargado']}
 DELIVERY_PROFILES = ['Master de archivo', 'YouTube 16:9', 'Short / Reel / TikTok 9:16', 'Spotify Canvas 9:16 (3–8 s, sin audio)', 'Teaser']
+AV_STAGE_COLORS = {'Desarrollo': '#9B8CFF', 'Preproducción': '#5AA7FF', 'Rodaje': '#FFB547', 'Postproducción': '#5ED17E',
+                   'Entregas': '#FF6B8B', 'Distribución': '#FFD166'}
+AV_TEXT_FIELDS = (('nombre', 150), ('cliente', 150), ('responsable', 150), ('direccion', 150), ('edicion', 150),
+                  ('proyecto_editor', 1000), ('sesion_audio', 1000), ('estreno', 10), ('estado', 40), ('notas', 4000),
+                  ('concepto', 4000), ('artista_id', 64), ('plataforma_estreno', 100))
+AV_LIST_FIELDS = ('etapas', 'secciones', 'planos', 'tomas', 'versiones', 'referencias', 'jornadas', 'plataformas')
+# Proyectos de edición que se pueden abrir desde la ficha (se abren con el programa asociado en el sistema).
+EDITOR_PROJECTS = {'.prproj': 'Premiere Pro', '.drp': 'DaVinci Resolve', '.fcpbundle': 'Final Cut Pro', '.fcpxml': 'Final Cut Pro',
+                   '.aep': 'After Effects', '.veg': 'Vegas Pro', '.kdenlive': 'Kdenlive'}
+AV_MEDIA = {'.mp4', '.mov', '.mxf', '.avi', '.mkv', '.m4v', '.wav', '.aif', '.aiff', '.mp3', '.flac', '.jpg', '.jpeg', '.png', '.pdf', '.docx'}
 
 
 def iso(value):
@@ -145,8 +158,66 @@ def register_extra(app, connect, data_folder):
     def rx_av_list():
         with connect() as db:
             items = doc_list(db, 'audiovisual')
-            songs = {r['id']: r['titulo'] for r in db.execute('SELECT id,titulo FROM canciones')}
-        return jsonify([dict(v, id=k, canciones_det=[dict(id=s, titulo=songs.get(s, '¿?')) for s in v.get('canciones', [])]) for k, v in items.items()])
+            songs = {r['id']: dict(r) for r in db.execute('''SELECT c.id,c.titulo,c.artista_id,a.nombre AS artista,d.nombre AS disco
+                FROM canciones c JOIN artistas a ON a.id=c.artista_id LEFT JOIN discos d ON d.id=c.disco_id''')}
+            artists = {r['id']: r['nombre'] for r in db.execute('SELECT id,nombre FROM artistas')}
+        return jsonify([av_view(k, v, songs, artists) for k, v in items.items()])
+
+    def av_view(vid, doc, songs, artists):
+        linked = [songs[s] for s in doc.get('canciones', []) if s in songs]
+        artist_id = doc.get('artista_id') or (linked[0]['artista_id'] if linked else '')
+        stages = []
+        for stage in doc.get('etapas', []):
+            tasks = stage.get('tareas', [])
+            done = sum(1 for t in tasks if t.get('hecha'))
+            stages.append(dict(stage, color=AV_STAGE_COLORS.get(stage.get('nombre'), '#8A8A94'),
+                               progreso=round(100 * done / len(tasks)) if tasks else 0))
+        editor = doc.get('proyecto_editor', '')
+        return dict(doc, id=vid, etapas=stages, artista_id=artist_id, artista=artists.get(artist_id, ''),
+                    disco=linked[0]['disco'] if linked and linked[0]['disco'] else '',
+                    canciones_det=[dict(id=s['id'], titulo=s['titulo']) for s in linked],
+                    editor_programa=EDITOR_PROJECTS.get(Path(editor).suffix.lower(), 'el editor') if editor else '',
+                    editor_disponible=bool(editor) and Path(editor).exists(),
+                    sesion_disponible=bool(doc.get('sesion_audio')) and Path(doc['sesion_audio']).is_file())
+
+    @app.post('/api/audiovisual/<vid>/abrir')
+    def rx_av_open(vid):
+        """Abre un archivo ya vinculado al audiovisual (proyecto de edición, sesión de audio, corte, toma o entrega)."""
+        from production import DAW_PROJECTS
+        from runtime_paths import open_path
+        data = request.get_json() or {}
+        field, index, folder = data.get('campo'), data.get('indice'), bool(data.get('carpeta'))
+        with connect() as db:
+            doc = doc_get(db, 'audiovisual', vid, None)
+        if doc is None:
+            raise ValueError('Audiovisual inexistente.')
+        lists = {'version': 'versiones', 'toma': 'tomas', 'referencia': 'referencias'}
+        if field in ('proyecto_editor', 'sesion_audio'):
+            raw, allowed = doc.get(field, ''), (EDITOR_PROJECTS if field == 'proyecto_editor' else DAW_PROJECTS)
+        elif field in lists:
+            rows = doc.get(lists[field], [])
+            if not isinstance(index, int) or not 0 <= index < len(rows):
+                raise ValueError('Elemento inexistente.')
+            raw, allowed = str(rows[index].get('ruta', '')), AV_MEDIA | set(EDITOR_PROJECTS)
+        elif field == 'entrega':
+            raw, allowed = str(doc.get('entregas_rutas', {}).get(str(index), '')), AV_MEDIA
+        else:
+            raise ValueError('Elegí qué archivo abrir.')
+        if not raw:
+            raise ValueError('Todavía no hay un archivo vinculado.')
+        path = Path(raw)
+        if not path.exists():
+            raise ValueError('No se encuentra el archivo. Revisá si la unidad externa está conectada o si se movió.')
+        if folder:
+            open_path(str(path.resolve().parent))
+            return jsonify(ok=True)
+        if path.suffix.lower() not in allowed:
+            raise ValueError('Ese tipo de archivo no se abre desde AudioTaller. Usá «Carpeta» para verlo.')
+        try:
+            open_path(str(path.resolve()))
+        except OSError as error:
+            raise ValueError('No se pudo abrir. Revisá que el programa esté instalado y asociado a ese tipo de archivo.') from error
+        return jsonify(ok=True)
 
     @app.get('/api/audiovisual/opciones')
     def rx_av_options():
@@ -164,12 +235,16 @@ def register_extra(app, connect, data_folder):
                 if origin not in AV_ORIGINS or template not in AV_TEMPLATES:
                     raise ValueError('Origen o plantilla inválidos.')
                 doc = dict(origen=origin, plantilla=template, estado='En desarrollo', creado=date.today().isoformat(),
-                           etapas=[dict(nombre=s, tareas=[dict(nombre=t, hecha=False) for t in AV_TASKS.get(s, [])]) for s in AV_TEMPLATES[template]],
+                           etapas=[dict(nombre=s, tareas=[dict(nombre=t, hecha=False, responsable='') for t in AV_TASKS.get(s, [])]) for s in AV_TEMPLATES[template]],
                            secciones=[], planos=[], tomas=[], versiones=[], entregas={p: False for p in DELIVERY_PROFILES}, generadas=[])
-            for key, size in (('nombre', 150), ('cliente', 150), ('responsable', 150), ('proyecto_editor', 1000), ('estreno', 10), ('estado', 40), ('notas', 4000), ('artista_id', 64)):
+            for key, size in AV_TEXT_FIELDS:
                 if key in data:
                     doc[key] = iso(data[key]) if key == 'estreno' else short_text(data[key], size)
-            for key in ('etapas', 'secciones', 'planos', 'tomas', 'versiones'):
+            if doc.get('artista_id'):
+                required_row(db, 'artistas', doc['artista_id'])
+            if 'entregas_rutas' in data and isinstance(data['entregas_rutas'], dict):
+                doc['entregas_rutas'] = {k: short_text(v, 1000) for k, v in data['entregas_rutas'].items() if k in DELIVERY_PROFILES}
+            for key in AV_LIST_FIELDS:
                 if key in data:
                     if not isinstance(data[key], list) or len(data[key]) > 500:
                         raise ValueError('Lista demasiado larga.')
@@ -189,7 +264,10 @@ def register_extra(app, connect, data_folder):
                 raise ValueError('Poné un nombre al audiovisual.')
             vid = vid or uuid.uuid4().hex
             doc_put(db, 'audiovisual', vid, doc)
-        return jsonify(dict(doc, id=vid))
+            songs = {r['id']: dict(r) for r in db.execute('''SELECT c.id,c.titulo,c.artista_id,a.nombre AS artista,d.nombre AS disco
+                FROM canciones c JOIN artistas a ON a.id=c.artista_id LEFT JOIN discos d ON d.id=c.disco_id''')}
+            artists = {r['id']: r['nombre'] for r in db.execute('SELECT id,nombre FROM artistas')}
+        return jsonify(av_view(vid, doc, songs, artists))
 
     @app.get('/api/audiovisual/<vid>/master')
     def rx_av_master(vid):
@@ -236,6 +314,9 @@ def register_extra(app, connect, data_folder):
             doc = doc_get(db, 'audiovisual', vid, {})
             doc['canciones'] = list(dict.fromkeys(doc.get('canciones', []) + [c['id'] for c in created]))
             doc['generadas'] = doc.get('generadas', []) + [c['id'] for c in created]
+            doc.setdefault('artista_id', artist_id)
+            if not doc.get('artista_id'):
+                doc['artista_id'] = artist_id
             doc_put(db, 'audiovisual', vid, doc)
         return jsonify(ok=True, canciones=created)
 
