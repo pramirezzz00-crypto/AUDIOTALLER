@@ -352,10 +352,26 @@ async function chatSend(text) {
     const result = await api('/api/asistente/mensaje', body({mensajes: chat.msgs.slice(-20), contexto: context}));
     chat.busy = false; chat.msgs.push({rol: 'assistant', texto: result.texto}); paintChat();
 }
+function setTheme(theme) {
+    const selected = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = selected;
+    try { localStorage.setItem('audiotaller-theme', selected); } catch {}
+}
+
 async function openConfig() {
     go('configPane');
     const c = await api('/api/asistente/config');
-    $('configPane').innerHTML = `<header class="prod-head"><div><div class="eyebrow">Configuración</div><h1>Claude</h1>
+    const currentTheme = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+    $('configPane').innerHTML = `<section class="card appearance-settings" aria-labelledby="appearanceTitle">
+        <div><div class="eyebrow">Interfaz</div><h2 id="appearanceTitle">Apariencia</h2>
+          <p class="muted">Elegí el tema claro u oscuro. La elección se guarda en este dispositivo.</p></div>
+        <label class="fld appearance-control" for="themeMode">Tema
+          <select id="themeMode" onchange="setTheme(this.value)">
+            <option value="dark" ${currentTheme === 'dark' ? 'selected' : ''}>Oscuro</option>
+            <option value="light" ${currentTheme === 'light' ? 'selected' : ''}>Claro</option>
+          </select>
+        </label>
+      </section><header class="prod-head"><div><div class="eyebrow">Configuración</div><h1>Claude</h1>
       <p class="muted">El asistente usa tu propia clave de API de la Claude Console (se factura aparte de la suscripción a claude.ai). La clave se guarda cifrada en esta PC.</p></div></header>
       <form class="card cr-form" onsubmit="event.preventDefault();saveConfig(this).catch(report)">
         <div class="cr-grid">${field('Clave de API', `<input name="api_key" type="password" placeholder="${c.clave ? '•••••• guardada (escribí otra para cambiarla)' : 'sk-ant-…'}">`)}

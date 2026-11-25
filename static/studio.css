@@ -780,3 +780,65 @@ select.avx-in{flex:0 1 auto}
 .ppl-photo-cta{position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);font-size:11px;font-weight:600;padding:1px 8px;border-radius:99px;background:#08080A;border:1px solid var(--at-line3);color:#2FD8BF;white-space:nowrap;opacity:.9}
 .ppl-photo:hover .ppl-photo-cta{opacity:1;border-color:#2FD8BF}
 @media (max-width:1100px){.wz-body{grid-template-columns:minmax(0,1fr)}.wz-side{position:static;flex-direction:row;flex-wrap:wrap}.wz-grid.four{grid-template-columns:repeat(2,minmax(0,1fr))}.wz-proj{grid-template-columns:minmax(0,1fr)}}
+
+/* Tema claro: conserva la jerarquía visual y aclara los paneles heredados del tema oscuro. */
+html[data-theme="light"] input,
+html[data-theme="light"] select,
+html[data-theme="light"] textarea{background-color:var(--at-panel)!important;color:var(--at-text)!important;border-color:var(--at-line2)!important}
+html[data-theme="light"] button.alt,html[data-theme="light"] .btn-ghost,html[data-theme="light"] .appearance-settings{color:var(--at-text)}
+html[data-theme="light"] .artist-tile,
+html[data-theme="light"] .artist-new,
+html[data-theme="light"] .project-tile,
+html[data-theme="light"] #projectDetail,
+html[data-theme="light"] .album-cover,
+html[data-theme="light"] .macro-panel,
+html[data-theme="light"] .session-table th,
+html[data-theme="light"] .session-entry,
+html[data-theme="light"] .wave-track,
+html[data-theme="light"] .wave-seek,
+html[data-theme="light"] .filter-box,
+html[data-theme="light"] .daw-choice,
+html[data-theme="light"] .catalog-filters,
+html[data-theme="light"] .playlist-track,
+html[data-theme="light"] .portal-preview iframe,
+html[data-theme="light"] .composition-card,
+html[data-theme="light"] .score-viewer,
+html[data-theme="light"] .lyric-viewer,
+html[data-theme="light"] .chat-panel,
+html[data-theme="light"] .mk-selbar,
+html[data-theme="light"] .pl-side,
+html[data-theme="light"] .pl-hero,
+html[data-theme="light"] .arr-hero,
+html[data-theme="light"] .arr-row,
+html[data-theme="light"] .lyric-block,
+html[data-theme="light"] .avx-hero{background:var(--at-panel)!important;color:var(--at-text)!important;border-color:var(--at-line)!important}
+html[data-theme="light"] .artist-tile details,html[data-theme="light"] .project-tile details{background:var(--at-deep)!important;color:var(--at-text2)!important}
+html[data-theme="light"] .session-entry.selected-session{background:var(--at-accent-soft)!important}
+html[data-theme="light"] .session-entry.valid-session{background:color-mix(in srgb,var(--at-accent) 9%,var(--at-panel))!important}
+html[data-theme="light"] .cover,html[data-theme="light"] .project-art,html[data-theme="light"] .av-cover{background:linear-gradient(160deg,#F1F3F5,#DDE3E7)!important;color:var(--at-text3)!important}
+html[data-theme="light"] #home .action{background:linear-gradient(145deg,#FFFFFF,#EDF5F4)!important;color:var(--at-text)!important}
+html[data-theme="light"] .sidebar button[aria-current="page"],html[data-theme="light"] .sidebar button:hover:not(:disabled){background:var(--at-accent-soft)!important;color:var(--at-accent)!important}
+html[data-theme="light"] #error:not(:empty){background:#FDECEC!important;color:#8A1C25!important;border-color:#E6B8BC!important}
+html[data-theme="light"] #toast{background:var(--at-raised)!important;color:var(--at-text)!important;border-color:var(--at-line2)!important}
+html[data-theme="light"] .score-select,html[data-theme="light"] .lyric-viewer{color:var(--at-text)!important}
+
+/* Estados seleccionados legibles sobre el fondo claro. */
+html[data-theme="light"] .seg button.is-on,
+html[data-theme="light"] .seg button[aria-checked="true"],
+html[data-theme="light"] .mk-chip.is-on,
+html[data-theme="light"] .mk-play.is-on,
+html[data-theme="light"] .score-v.on,
+html[data-theme="light"] .arr-ver.is-on,
+html[data-theme="light"] .wz-path.on,
+html[data-theme="light"] .wz-chip.on,
+html[data-theme="light"] .wz-step.on i,
+html[data-theme="light"] .module-tabs button[aria-pressed="true"],
+html[data-theme="light"] .module-tabs button[aria-selected="true"],
+html[data-theme="light"] .chips button[aria-pressed="true"],
+html[data-theme="light"] .stage-tabs button[aria-pressed="true"]{
+  background:var(--at-accent-soft)!important;
+  border-color:var(--at-accent)!important;
+  color:var(--at-text)!important;
+  box-shadow:none!important
+}
+html[data-theme="light"] .mk-chip.is-on span{color:var(--at-text2)!important}

@@ -18,6 +18,19 @@
   /* Variables anteriores, para que los módulos existentes adopten el tema. */
   --bg:#08080A;--panel:#111114;--line:#26262C;--mint:#2FD8BF;--muted:#A6A6B0;
 }
+html[data-theme="light"]{
+  color-scheme:light;
+  --at-black:#E9EEF1;--at-bg:#F4F6F8;--at-panel:#FFFFFF;--at-deep:#EDF1F3;--at-raised:#FFFFFF;--at-hover:#E8EEF1;
+  --at-line:#DCE3E7;--at-line2:#C8D2D8;--at-line3:#ADB9C1;
+  --at-text:#182127;--at-text2:#52616B;--at-text3:#6B7880;
+  --at-accent:#087F72;--at-accent-hover:#06685E;--at-accent-ink:#FFFFFF;--at-accent-soft:#DDF3EE;
+  --at-danger:#B42332;--at-star:#8A5A00;
+  --bg:var(--at-bg);--panel:var(--at-panel);--line:var(--at-line);--mint:var(--at-accent);--muted:var(--at-text2);
+}
+.appearance-settings{display:flex;align-items:center;justify-content:space-between;gap:24px;margin:0 0 20px}
+.appearance-settings h2{margin:4px 0}
+.appearance-control{flex:none;width:min(240px,100%)}
+@media(max-width:600px){.appearance-settings{align-items:stretch;flex-direction:column;gap:8px}.appearance-control{width:100%}}
 html{background:var(--at-bg)}
 body{background:var(--at-bg)!important;color:var(--at-text);font:14px/1.45 var(--at-font);-webkit-font-smoothing:antialiased}
 h1{font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1.1}
@@ -123,7 +136,7 @@ details>summary{cursor:pointer}
 }
 
 /* Rediseño 0.3: sin destellos blancos y fundido desde negro al cambiar de pantalla. */
-html,body{background:#000!important}
+html,body{background:var(--at-bg)!important}
 main>section:not([hidden]),.studio-home{animation:atFade .28s ease-out}
 @keyframes atFade{from{opacity:0}to{opacity:1}}
 .sidebar .side-sub{padding-left:42px;min-height:32px;font-size:13px}
