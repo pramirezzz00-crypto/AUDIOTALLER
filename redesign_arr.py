@@ -309,9 +309,9 @@ def register_people_redesign(app, connect):
             alerts = []
             for person in people:
                 roles = person.get('roles', [])
-                if any(r.startswith('Autor') for r in roles) and not person.get('sadaic'):
+                if any(r.startswith('Autor') for r in roles) and not person.get('sadaic') and person.get('sadaic_estado') != 'No':
                     alerts.append(f"{person.get('nombre', 'Integrante')}: sin n.º de SADAIC")
-                if 'Intérprete' in roles and not person.get('aadi'):
+                if 'Intérprete' in roles and not person.get('aadi') and person.get('aadi_estado') != 'No':
                     alerts.append(f"{person.get('nombre', 'Integrante')}: sin n.º de AADI")
             pending = sum(s['pendientes'] for s in mine)
             if pending:
@@ -321,7 +321,8 @@ def register_people_redesign(app, connect):
                             relacion=doc.get('relacion', 'Cliente'), personas=people, plataformas=doc.get('plataformas', {}),
                             contacto=doc.get('contacto') or dict(email=str(legacy.get('correos', '') if not isinstance(legacy.get('correos'), list) else ', '.join(legacy['correos'])),
                                                                  telefono=str(legacy.get('telefonos', ''))),
-                            portal=doc.get('portal', ''), discos=[dict(id=a['id'], nombre=a['nombre']) for a in albums if a['artista_id'] == artist['id']],
+                            portal=doc.get('portal', ''), portal_activo=doc.get('portal_activo', True), genero=doc.get('genero', ''), ciudad=doc.get('ciudad', ''),
+                            sello=doc.get('sello', ''), bio=doc.get('bio', ''), primer_lanzamiento=doc.get('primer_lanzamiento', False), discos=[dict(id=a['id'], nombre=a['nombre']) for a in albums if a['artista_id'] == artist['id']],
                             canciones=len(mine), videos=sum(1 for v in videos.values() if v.get('artista_id') == artist['id']),
                             alertas=alerts, completo=bool(people) and not [a for a in alerts if 'SADAIC' in a or 'AADI' in a]))
         return jsonify(out)
@@ -339,17 +340,32 @@ def register_people_redesign(app, connect):
         clean = []
         for person in people:
             roles = [r for r in person.get('roles', []) if r in PERSON_ROLES]
-            row = {k: short_text(person.get(k, ''), 150) for k in ('nombre', 'nombre_legal', 'sadaic', 'ipi', 'aadi', 'instrumentos', 'email', 'telefono')}
+            row = {k: short_text(person.get(k, ''), 150) for k in ('nombre', 'nombre_legal', 'sadaic', 'ipi', 'aadi', 'instrumentos', 'email', 'telefono', 'cuit', 'nacionalidad')}
+            for key in ('sadaic_estado', 'aadi_estado'):
+                value = short_text(person.get(key, ''), 20)
+                row[key] = value if value in ('', 'Sí', 'No', 'En trámite', 'No sé') else ''
             if row['ipi'] and not re.fullmatch(r'\d{9,11}', row['ipi'].replace(' ', '')):
                 raise ValueError('El IPI tiene 9 a 11 dígitos.')
             if row['nombre']:
                 clean.append(dict(row, roles=roles))
         platforms = {k: short_text(v, 300) for k, v in (data.get('plataformas') or {}).items() if k in PLATFORMS and short_text(v, 300)}
-        contact = {k: short_text((data.get('contacto') or {}).get(k, ''), 200) for k in ('email', 'telefono', 'whatsapp')}
+        contact = {k: short_text((data.get('contacto') or {}).get(k, ''), 200) for k in ('email', 'telefono', 'whatsapp', 'nombre')}
+        image = data.get('imagen')
+        if image is not None and image != '' and (not isinstance(image, str) or len(image) > 2_800_000
+                                                   or not re.fullmatch(r'data:image/(png|jpeg);base64,[A-Za-z0-9+/=]+', image)):
+            raise ValueError('La foto debe ser JPG o PNG de hasta 2 MB.')
+        name = short_text(data.get('nombre', ''), 150).strip()
         with connect() as db:
             required_row(db, 'artistas', aid)
+            if name:
+                db.execute('UPDATE artistas SET nombre=? WHERE id=?', (name, aid))
+            if image is not None:
+                db.execute('UPDATE artistas SET imagen=? WHERE id=?', (image, aid))
             doc_put(db, 'artista', aid, dict(tipo_proyecto=tipo, relacion=relation, personas=clean, plataformas=platforms, contacto=contact,
-                                             portal=short_text(data.get('portal', ''), 200)))
+                                             portal=short_text(data.get('portal', ''), 200), portal_activo=bool(data.get('portal_activo', True)),
+                                             genero=short_text(data.get('genero', ''), 100), ciudad=short_text(data.get('ciudad', ''), 150),
+                                             sello=short_text(data.get('sello', ''), 150), bio=short_text(data.get('bio', ''), 2000),
+                                             primer_lanzamiento=bool(data.get('primer_lanzamiento'))))
         return jsonify(ok=True)
 
     @app.get('/api/catalogo/extra')

@@ -163,7 +163,14 @@ function addMember(member = {}) {
     block.querySelector('button').onclick = () => block.remove();
     $('members').append(block);
 }
+// Alta y edición de artistas: siempre por el flujo nuevo (Artistas › Nuevo artista). La ficha anterior queda como «Datos adicionales».
 async function editArtist(id, addContact = false) {
+    if (addContact && id) return editArtistLegacy(id, true);
+    go('artistsPane');
+    ppl.list = await api('/api/artistas-rediseno');
+    startWizard(id || undefined);
+}
+async function editArtistLegacy(id, addContact = false) {
     const data = id ? await api('/api/artistas/' + id) : {};
     const professional = id ? await api('/api/personas/' + id) : null;
     editing = id;
