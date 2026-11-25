@@ -1,14 +1,15 @@
 # AudioTaller — Handover para colaboradores e IAs
 
-Fecha de corte: **18 de noviembre de 2026**. Versión del producto: **0.2.0 beta**.
-Base de código integrada: **01ba742c89ab5eb68406381a35509aa31207c686**.
+Fecha de corte: **24 de noviembre de 2026**. Versión del producto: **0.3.0 beta** (rediseño «Sala de control»).
+La integración anterior (0.2.0, commit `01ba742`) sigue en `feature/gestion-y-produccion` como historial.
 
 ## 1. Por dónde empezar
 
 - Repositorio principal: https://github.com/pramirezzz00-crypto/AUDIOTALLER
-- **Rama que contiene la integración: `feature/gestion-y-produccion`.** No asumir que `main` contiene estos cambios.
-- Código integrado: https://github.com/pramirezzz00-crypto/AUDIOTALLER/tree/feature/gestion-y-produccion
-- ZIP: https://github.com/pramirezzz00-crypto/AUDIOTALLER/archive/refs/heads/feature/gestion-y-produccion.zip
+- **Rama de trabajo actual: `redisenio-sala-de-control`** (PR #1). No asumir que `main` ni `feature/gestion-y-produccion` contienen el rediseño.
+- Código: https://github.com/pramirezzz00-crypto/AUDIOTALLER/tree/redisenio-sala-de-control
+- Mockup navegable del rediseño (referencia visual): https://claude.ai/artifact/MvHezeGCf1gPjgmKJ4eXSD
+- Detalle del rediseño, módulos y endpoints: [REDISENO_SALA_DE_CONTROL.md](REDISENO_SALA_DE_CONTROL.md).
 - Prompt para iniciar otra IA: [PROMPT_PARA_IA.md](PROMPT_PARA_IA.md).
 
 Este documento describe la **versión de desarrollo**. Un instalador descargado anteriormente puede contener una versión anterior del código aunque muestre el mismo número 0.2.0 beta. Para reproducir un cambio, registrar también su commit.
@@ -65,7 +66,7 @@ Conflicto importante ya resuelto: el fork de Composición usaba una tabla `playl
 Usar **Python 3.12 o posterior**. La base se ha probado en Windows con Python 3.14 y el empaquetado Mac usa Python 3.12. `requirements.txt` contiene las dependencias de ejecución; no obliga a instalar herramientas de empaquetado.
 
 ```sh
-git clone --branch feature/gestion-y-produccion --single-branch https://github.com/pramirezzz00-crypto/AUDIOTALLER.git
+git clone --branch redisenio-sala-de-control https://github.com/pramirezzz00-crypto/AUDIOTALLER.git
 cd AUDIOTALLER
 ```
 
@@ -140,7 +141,7 @@ Al añadir una pantalla: registrar su sección en `audio.html`, incluirla en `pa
 - La instalación del programa y sus datos son independientes.
 - El clon del repositorio no incluye la biblioteca de Pedro ni las rutas/archivos existentes de sus canciones.
 
-### Esquema actual: versión 8
+### Esquema actual: versión 9
 
 `schema_audio` registra la versión. Las migraciones son incrementales y crean respaldos SQLite con fecha antes de ampliar el esquema.
 
@@ -153,6 +154,7 @@ Al añadir una pantalla: registrar su sección en `audio.html`, incluirla en `pa
 | 6 | Configuración/publicaciones del portal y referencias de Drive. |
 | 7 | Devoluciones del artista y seguimiento del productor. |
 | 8 | `composition_playlists`, `composition_beats`, `composition_score_collections`, `composition_scores`, `composition_lyric_collections`, `composition_lyrics`. |
+| 9 | Rediseño 0.3: respuesta, versión que resuelve y bucle en `portal_devoluciones`; tabla `rediseno_datos(tipo,id,datos)` con documentos JSON (créditos, campañas, audiovisuales, arreglos, artistas, sonoridad, asistente). Usar `doc_get`/`doc_put`/`doc_list` de `redesign.py`. |
 
 No reutilizar `playlists` para Beats. No confundir el favorito de un audio con el favorito de todas las versiones de una canción. Mantener identificadores y relaciones al mover una canción de disco.
 
@@ -193,7 +195,7 @@ Desde la raíz del repositorio:
 .venv/bin/python -m unittest discover -s tests -q
 ```
 
-Resultado comprobado para la integración: **40 pruebas correctas en Windows**. Cubren migraciones, sesiones, copia de carpetas, metadata, catálogo, entrega editorial, portal/devoluciones simulados, Composición y soporte por plataforma. En Mac hay pruebas específicas de DPAPI que se omiten por diseño. Los tests no deben publicar canciones ni modificar cuentas reales.
+Resultado actual (0.3.0): **63 pruebas correctas**; 1 fallo conocido en Linux (`test_importa_perfil_sin_aceptar_tokens_de_terceros`, requiere el almacén seguro de Windows/Mac). El diagnóstico de Windows en CI recorre todas las pantallas del ejecutable. Cubren migraciones, sesiones, copia de carpetas, metadata, catálogo, entrega editorial, portal/devoluciones simulados, Composición y soporte por plataforma. En Mac hay pruebas específicas de DPAPI que se omiten por diseño. Los tests no deben publicar canciones ni modificar cuentas reales.
 
 Comprobación opcional de sintaxis, si Node está instalado:
 
@@ -237,14 +239,22 @@ Estas son propuestas de continuidad, no funciones ya terminadas ni autorización
 7. **Audio y arreglos:** LUFS/true peak, formatos adicionales y separación por IA no están implementados; evaluar alcance y dependencias antes de prometerlos.
 8. **Deuda de interfaz:** JS compartido y algunos módulos densos; mejorar gradualmente sin reescribir todo ni romper el puente nativo.
 
+### Cambios 0.3.0 que conviene conocer
+
+- Interfaz oscura «Sala de control» igual al mockup; módulos nuevos `redesign*.py`, `overview.py`, `loudness.py`, `metadata_export.py`, `feedback_markers.py`, `entity_guides.py` y sus `static/*-ui.js`.
+- Validador global de `production.py`: la clave `perfil` debe ser un objeto; para otros usos se usa `perfil_id`.
+- No usar `jsonify(dict, clave=...)` (posicional y con nombre a la vez): armar un solo diccionario.
+- Errores no previstos vuelven como JSON legible (`Error interno (Tipo): …`) y se registran con traza en `inicio.log` de la carpeta de datos.
+- Instaladores: Windows (`.github/workflows/windows.yml`) y Mac (`macos.yml`) se compilan solos en GitHub Actions al subir cambios de código a la rama. Solo Pedro decide qué instalador se comparte.
+
 ## 12. Forma recomendada de colaborar con otra IA
 
-1. Partir de la rama integrada y crear una rama por tarea. Si se trabaja desde un fork, añadir el repositorio principal como remoto y traer esa rama primero.
+1. Partir de `redisenio-sala-de-control` actualizada (`git pull`) y crear una rama por tarea con el nombre `colaborador/tema` (por ejemplo `silvio/entidades-tramites`). Si se trabaja desde un fork, añadir el repositorio principal como remoto y traer esa rama primero.
 2. Pedir a la IA que lea este documento, los archivos afectados y los tests antes de proponer cambios. Darle una tarea concreta y criterios de aceptación.
 3. Respetar el estilo existente y los contratos de API. No hacer un reemplazo completo de `app.py`, `audio.html` o `navigation.js` con las versiones antiguas de los forks.
 4. Probar con bases y archivos temporales. Toda ampliación de datos requiere una migración compatible y un respaldo; no editar a mano la base de otra persona.
 5. Ejecutar los tests correspondientes y un recorrido manual del flujo modificado. Informar qué se verificó y qué quedó sin probar.
-6. Abrir un PR hacia `feature/gestion-y-produccion`, con resumen, pruebas y cualquier migración necesaria. Resolver conflictos conservando funciones de ambos aportes.
+6. Abrir un PR hacia `redisenio-sala-de-control`, con resumen, pruebas y cualquier migración necesaria. Nunca hacer push directo a `redisenio-sala-de-control` ni a `main`: Pedro revisa y aprueba cada PR. Resolver conflictos conservando funciones de ambos aportes.
 7. No adjuntar `.venv`, SQLite, audios, rutas privadas, `*.dpapi`, JSON de clientes OAuth, cuentas de servicio ni contraseñas. Revisar los archivos preparados antes de hacer push.
 8. Los cambios de código locales no autorizan publicar música real, alterar permisos de Google, usar las cuentas del productor ni enviar invitaciones a terceros.
 

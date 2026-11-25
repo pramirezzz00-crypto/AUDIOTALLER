@@ -4,7 +4,7 @@ Aplicación local de escritorio para organizar artistas, discos, canciones y tom
 
 ## Continuar el desarrollo con colaboradores u otras IAs
 
-Empezá por el [handover técnico y funcional](docs/HANDOVER_COLABORADORES.md) y el [prompt listo para otra IA](docs/PROMPT_PARA_IA.md). Incluyen la rama integrada, arquitectura, pruebas, decisiones y pendientes.
+La versión actual (0.3.0 beta, rediseño «Sala de control») está en la rama `redisenio-sala-de-control`. Para colaborar: rama propia y Pull Request hacia esa rama. Empezá por [CLAUDE.md](CLAUDE.md), el [handover técnico y funcional](docs/HANDOVER_COLABORADORES.md) y el [prompt listo para otra IA](docs/PROMPT_PARA_IA.md).
 
 ## Portal del artista e instructivo
 
