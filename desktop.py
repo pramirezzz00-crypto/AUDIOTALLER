@@ -64,9 +64,38 @@ def self_test(output):
             assert (ASSETS/'public'/asset).is_file(),'Falta recurso del portal: '+asset
         assert not any(json.loads((ASSETS/'public/config.json').read_text(encoding='utf-8')).values())
         assert (Path(__file__).parent/'docs/AudioTaller_Instructivo_Portal_del_Artista.pdf').is_file()
+        # Recorre las pantallas con la base recién creada: cualquier error 500 queda en el diagnóstico.
+        import logging, re as _re
+        trazas=[]
+        class Captura(logging.Handler):
+            def emit(self, record):
+                if record.exc_info:
+                    import traceback
+                    trazas.append(''.join(traceback.format_exception(*record.exc_info))[-1500:])
+        backend.app.logger.addHandler(Captura())
+        fallas=[]
+        def probar(metodo, ruta, **datos):
+            respuesta=getattr(client, metodo)(ruta, **datos)
+            if respuesta.status_code>=500 or (respuesta.status_code>=400 and not respuesta.is_json):
+                detalle=(respuesta.get_json(silent=True) or {}).get('error') or respuesta.get_data(as_text=True)[:200]
+                fallas.append(f'{metodo.upper()} {ruta} -> {respuesta.status_code}: {detalle}')
+            return respuesta
+        nueva=probar('post','/api/playlists',json={'nombre':'CANCIONES1','notas':'','archivos':[]}).get_json(silent=True) or {}
+        ids={'pid':nueva.get('id',''),'aid':artist,'sid':song,'did':'','fid':file}
+        for regla in backend.app.url_map.iter_rules():
+            ruta=str(regla)
+            if 'GET' not in regla.methods or not ruta.startswith('/api/') or 'onda' in ruta or 'pdf' in ruta or 'audio' in ruta:
+                continue
+            if any(a not in ids or not ids[a] for a in regla.arguments):
+                continue
+            for a in regla.arguments:
+                ruta=_re.sub(r'<(?:[a-z]+:)?'+a+'>', ids[a], ruta)
+            probar('get', ruta)
+        result_extra={'pantallas_fallidas':fallas,'trazas':trazas[:5]}
         result={'ok':True,'version':DISPLAY_VERSION,'frozen':bool(getattr(sys,'frozen',False)),
                 'datos_aislados':True,'recursos':True,**native,
                 'artista_cancion_audio_playlist':True,'recursos_portal':True,'portal_sin_credenciales':True}
+        result.update(result_extra)
     Path(output).write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
 
 
@@ -124,11 +153,15 @@ def main():
             result = webview.windows[0].create_file_dialog(kind, allow_multiple=False)
             return result[0] if result else ''
 
-        def choose_audio_files(self):
+        def choose_audio_files(self, audio_only=False):
             # El usuario puede seleccionar varios archivos de audio en una sola operación.
-            result = webview.windows[0].create_file_dialog(
-                webview.FileDialog.OPEN, allow_multiple=True
-            )
+            options = {'allow_multiple': True}
+            if audio_only:
+                options['file_types'] = (
+                    'Audio (*.wav;*.mp3;*.flac;*.ogg;*.m4a;*.aac;*.opus;*.aif;*.aiff)',
+                    'Todos los archivos (*.*)',
+                )
+            result = webview.windows[0].create_file_dialog(webview.FileDialog.OPEN, **options)
             return list(result) if result else []
 
         def choose_score_files(self):
@@ -136,7 +169,7 @@ def main():
             result = webview.windows[0].create_file_dialog(
                 webview.FileDialog.OPEN, allow_multiple=True,
                 file_types=(
-                    'Partituras (*.pdf;*.png;*.jpg;*.jpeg)',
+                    'Partituras (*.pdf;*.png;*.jpg;*.jpeg;*.mscz;*.sib;*.dorico;*.musx;*.mus;*.musicxml;*.mxl;*.xml)',
                     'Todos los archivos (*.*)',
                 )
             )
@@ -177,6 +210,77 @@ def main():
             except (OSError, RuntimeError):
                 return False
 
+        def open_folder_for(self, kind, identity):
+            # Carpetas que arma AudioTaller (Entregas, Trámites): se resuelven desde la base, nunca desde una ruta del navegador.
+            from app import db_open
+            table = {'disco': 'discos', 'cancion': 'canciones'}.get(str(kind).split(':')[0])
+            if not table:
+                return False
+            with db_open() as db:
+                row = db.execute(f'SELECT carpeta FROM {table} WHERE id=?', (str(identity),)).fetchone()
+            if not row:
+                return False
+            sub = 'Trámites' if str(kind).endswith(':tramites') else 'Entregas'
+            target = Path(row['carpeta']) / sub
+            if not target.is_dir():
+                return False
+            open_path(str(target))
+            return True
+
+        def copy_text(self, text):
+            try:
+                import subprocess
+                if os.name == 'nt':
+                    subprocess.run(['clip'], input=str(text).encode('utf-16-le'), check=True)
+                elif sys.platform == 'darwin':
+                    subprocess.run(['pbcopy'], input=str(text).encode(), check=True)
+                else:
+                    return False
+                return True
+            except Exception:
+                return False
+
+        def choose_migration_destination(self, suggested='AudioTaller migración.zip'):
+            descargas = Path.home() / 'Downloads'
+            result = webview.windows[0].create_file_dialog(
+                webview.FileDialog.SAVE, directory=str(descargas if descargas.is_dir() else Path.home()),
+                save_filename=suggested, file_types=('Migración de AudioTaller (*.zip)',))
+            destino = result[0] if isinstance(result, (list, tuple)) and result else result
+            return str(destino or '')
+
+        def choose_migration_file(self):
+            result = webview.windows[0].create_file_dialog(
+                webview.FileDialog.OPEN, allow_multiple=False, file_types=('Migración de AudioTaller (*.zip)', 'Todos los archivos (*.*)'))
+            return str(result[0]) if result else ''
+
+        def show_in_folder(self, path):
+            path = Path(path)
+            open_path(str(path.parent if path.is_file() else path))
+            return True
+
+        def save_portal_guide(self):
+            # Copia el instructivo incluido en la app donde el usuario elija y lo abre.
+            import shutil
+            origen = Path(__file__).parent / 'static' / 'docs' / 'Instructivo-Portal-del-artista-AudioTaller.pdf'
+            if not origen.is_file():
+                return ''
+            descargas = Path.home() / 'Downloads'
+            result = webview.windows[0].create_file_dialog(
+                webview.FileDialog.SAVE, directory=str(descargas if descargas.is_dir() else Path.home()),
+                save_filename=origen.name, file_types=('PDF (*.pdf)',))
+            destino = result[0] if isinstance(result, (list, tuple)) and result else result
+            if not destino:
+                return ''
+            destino = Path(destino)
+            if destino.suffix.lower() != '.pdf':
+                destino = destino.with_suffix('.pdf')
+            shutil.copyfile(origen, destino)
+            try:
+                open_path(str(destino))
+            except OSError:
+                pass
+            return str(destino)
+
         def open_location(self, beat_id):
             # El ID se resuelve contra la biblioteca local; nunca se acepta una ruta del navegador.
             from app import db_open
@@ -197,7 +301,7 @@ def main():
     # Identidad propia en la barra de tareas y el icono del acceso directo.
     if os.name == 'nt':
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('AudioTaller.Desktop')
-    webview.create_window('AudioTaller - '+DISPLAY_VERSION, app, width=1280, height=800, js_api=Dialogs())
+    webview.create_window('AudioTaller - '+DISPLAY_VERSION, app, width=1280, height=800, js_api=Dialogs(), background_color='#000000')
     icon=Path(__file__).parent/'static'/'branding'/'AudioTaller.ico'
     webview.start(gui='cocoa' if sys.platform == 'darwin' else 'edgechromium',debug=False,
                   icon=str(icon) if os.name == 'nt' and icon.is_file() else None)

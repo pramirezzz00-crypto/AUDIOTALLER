@@ -1,36 +1,55 @@
-# Prompt para continuar AudioTaller con otra IA
+# Prompt para trabajar en AudioTaller con otra IA
 
-Copiar el siguiente texto en la otra IA y adjuntar `HANDOVER_COLABORADORES.md`, o darle acceso al repositorio y a la rama indicada. Completar la tarea al final.
+Copiá el texto de abajo en tu IA (Claude Code, Cursor, Copilot, ChatGPT con acceso al repositorio, etc.) y completá los tres campos del final. Si usás Claude Code dentro de la carpeta del proyecto, ya lee `CLAUDE.md` solo; igual conviene pegar este prompt con la tarea.
 
 ---
 
-Vas a colaborar en AudioTaller, una aplicación local de escritorio para productores musicales. El responsable del producto es Pedro. Queremos mantener una app sencilla, gratuita y con estética oscura/turquesa.
+Vas a colaborar en **AudioTaller**, una aplicación de escritorio gratuita para productores musicales (Windows y Mac). El responsable del producto es **Pedro**; yo soy un colaborador del equipo. La app es local, oscura con acentos turquesa, y debe seguir siendo sencilla.
 
-Repositorio principal: https://github.com/pramirezzz00-crypto/AUDIOTALLER
-Rama integrada: `feature/gestion-y-produccion`.
-Base de la integración de Composición y Entidades: commit `01ba742`.
+**Repositorio:** https://github.com/pramirezzz00-crypto/AUDIOTALLER
+**Rama base:** `redisenio-sala-de-control` (versión 0.3.0 beta). No partas de `main`.
+**Referencia visual:** mockup navegable https://claude.ai/artifact/MvHezeGCf1gPjgmKJ4eXSD (si no podés abrirlo, guiate por las pantallas actuales).
 
-Antes de modificar:
+## Cómo trabajamos (obligatorio)
 
-1. Leé `docs/HANDOVER_COLABORADORES.md`, `README.md`, los módulos de la tarea y sus tests. Revisá el estado Git y preservá los cambios locales existentes.
-2. Confirmá que partís de la rama integrada y trabajá en una rama propia por tarea. No copies `app.py` o `navigation.js` completos desde un fork antiguo.
-3. La app usa Python/Flask, SQLite, pywebview y HTML/CSS/JS. No la reemplaces por React/Electron ni agregues un backend público sin acordarlo.
-4. Conservá los datos, identificadores, relaciones y archivos originales. El esquema actual es 8; los cambios deben ser compatibles y tener respaldo. No confundas `composition_playlists` con `playlists` del portal.
-5. Trabajá con datos temporales y servicios externos simulados. No uses bases personales, credenciales ni música real del productor para pruebas.
-6. El portal Firebase/Drive es un piloto funcional. La contraseña protege la consulta de la playlist; los audios de Drive son públicos por enlace. El onboarding universal todavía está pendiente. No prometas privacidad de los WAV ni una configuración automática ya resuelta.
-7. No publiques secretos, audios, SQLite, JSON OAuth, tokens ni contraseñas en Git, capturas o respuestas. No actives facturación ni publiques música sin autorización del propietario.
+1. Antes de tocar nada: `git fetch` y `git checkout redisenio-sala-de-control && git pull`. Leé `CLAUDE.md`, `docs/HANDOVER_COLABORADORES.md`, `docs/REDISENO_SALA_DE_CONTROL.md`, los archivos de la tarea y sus tests.
+2. Creá una rama propia para la tarea: `git checkout -b <mi-nombre>/<tema>`. **Nunca hagas push a `redisenio-sala-de-control` ni a `main`.**
+3. Hacé cambios chicos y enfocados en la tarea. No reescribas archivos completos (`app.py`, `static/audio.html`, `static/navigation.js`) ni copies versiones viejas de forks.
+4. Al terminar: ejecutá las pruebas, subí tu rama (`git push -u origin <mi-rama>`) y abrí un **Pull Request hacia `redisenio-sala-de-control`**. Pedro recibe el aviso en GitHub, lo revisa y decide si lo incorpora. Si hay conflictos, resolvelos conservando lo de ambos lados.
+5. En la descripción del PR incluí: qué problema resuelve, qué cambia para el usuario, archivos principales, cambios de datos o API, pruebas ejecutadas con su resultado, capturas si cambia una pantalla, y qué quedó sin probar.
 
-Implementá la tarea completa respetando el flujo y el estilo actuales. Conservá la compatibilidad con Windows y macOS cuando toques rutas, selectores o apertura de DAW. Comprobá que los métodos expuestos por `desktop.py` y el orden de carga de scripts sigan siendo compatibles.
+## Reglas técnicas
 
-Validación mínima: `python -m unittest discover -s tests -q` desde el entorno del proyecto. La base integrada tiene 40 pruebas correctas en Windows. Hacé además una comprobación manual del flujo que cambies y distinguí lo probado de lo pendiente. Si no podés ejecutar una prueba, indicá la causa sin afirmar que pasó.
+- Stack: Python 3.12+ con Flask, SQLite y pywebview; interfaz en HTML/CSS/JS sin framework ni compilación. Los scripts de `static/` comparten funciones globales y el orden de carga en `audio.html` importa. No migrar a React/Electron ni agregar servidores sin acordarlo.
+- Datos: el esquema está en la versión 11. Cualquier dato nuevo va con una migración compatible en `migrations.py` (con respaldo) o como documento JSON en `rediseno_datos` usando `doc_get`/`doc_put`/`doc_list` de `redesign.py`. Nunca borres, muevas ni sobrescribas archivos originales del usuario: AudioTaller guarda rutas y abre los archivos con su programa. La Papelera permite borrar definitivamente copias administradas, pero los originales vinculados nunca se eliminan.
+- Compatibilidad: todo lo que toque rutas, selectores de archivos o apertura de programas tiene que funcionar en Windows y Mac (`runtime_paths.open_path`, métodos de `desktop.py`).
+- Gotchas: la clave `perfil` en un JSON debe ser un objeto (usá `perfil_id` para ids); no uses `jsonify(dict, clave=...)`; Windows y Mac no distinguen mayúsculas en nombres de carpeta.
+- Seguridad: no subas a Git `.venv`, bases SQLite, audios, `*.dpapi`, JSON de OAuth, claves ni contraseñas. No publiques música, no cambies permisos de Google ni uses cuentas del productor.
 
-Al terminar, entregá un resumen del comportamiento final, cambios de datos/API si los hubo, pruebas y límites. Prepará un PR hacia `feature/gestion-y-produccion` cuando se te autorice subir la rama. No publiques instaladores o servicios como parte de una tarea que solo modifica el desarrollo local.
+## Cómo probar
 
-**Tarea concreta:**
-[DESCRIBIR AQUÍ QUÉ SE QUIERE CAMBIAR]
+```sh
+# Windows (PowerShell)
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m unittest discover -s tests -q
+.\.venv\Scripts\python.exe desktop.py      # abre la app
 
-**Criterios de aceptación:**
-[INDICAR QUÉ DEBE PODER HACER EL USUARIO AL TERMINAR]
+# Mac
+python3 -m venv .venv && .venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m unittest discover -s tests -q
+.venv/bin/python desktop.py
+```
 
-**Alcance autorizado para compartir o desplegar:**
-[POR EJEMPLO: SOLO LOCAL / RAMA Y PR / INSTALADOR / ENTORNO DE PRUEBA]
+La suite actual tiene 75 pruebas. En Windows se conoce un fallo de codificación en `test_clasifica_y_crea_sesiones_nuevas_sin_tocar_la_original`; en Linux puede fallar otra prueba que requiere el almacén seguro de Windows/Mac. Agregá tests para lo nuevo en `tests/` con datos temporales. Abrir la app usa la biblioteca real de quien la ejecuta: para probar, preferí los tests o una carpeta de datos aparte. Distinguí siempre lo que probaste de lo que no.
+
+## Tarea
+
+**Qué hay que cambiar:**
+[DESCRIBIR AQUÍ]
+
+**Qué debe poder hacer el usuario al terminar:**
+[CRITERIOS DE ACEPTACIÓN]
+
+**Alcance:**
+[POR EJEMPLO: SOLO MI RAMA Y PR / INCLUYE MIGRACIÓN DE DATOS / SOLO INTERFAZ]

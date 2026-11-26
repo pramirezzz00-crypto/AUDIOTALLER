@@ -35,7 +35,7 @@ function renderAlbumPage() {
     $('albumActions').innerHTML = `<button class="alt" onclick="projectForm('album','${album.id}')">Editar disco</button>
         <button class="alt" onclick="associateLooseSongs('${album.id}').catch(report)">Incorporar canciones sueltas</button>
         <button class="alt" onclick="publicationDialog('lanzamiento','${album.id}').catch(report)">Ficha de lanzamiento</button>
-        <button class="alt" onclick="productionCreditsDialog('disco','${album.id}').catch(report)">Artistas y músicos</button>`;
+        <button class="alt" onclick="productionCreditsDialog('disco','${album.id}').catch(report)">Artistas y músicos</button><button class="trash-permanent" onclick="moveEntityToTrash('disco','${album.id}').catch(report)">Mover a Papelera</button>`;
     $('albumNotes').textContent = album.notas || '';
     renderAlbumSongs();
 }

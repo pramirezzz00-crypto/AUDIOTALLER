@@ -87,9 +87,10 @@ def register_management(app, connect):
     def people():
         with connect() as db:
             rows = [dict(row) for row in db.execute("""SELECT a.*,
-                (SELECT COUNT(*) FROM discos WHERE artista_id=a.id) AS discos,
-                (SELECT COUNT(*) FROM canciones WHERE artista_id=a.id) AS canciones
-                FROM artistas a ORDER BY a.nombre""")]
+                (SELECT COUNT(*) FROM discos d WHERE d.artista_id=a.id AND NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE p.tipo='disco' AND p.id=d.id)) AS discos,
+                (SELECT COUNT(*) FROM canciones c WHERE c.artista_id=a.id AND NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE (p.tipo='disco' AND p.id=c.disco_id) OR (p.tipo='cancion' AND p.id=c.id))) AS canciones
+                FROM artistas a WHERE NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE p.tipo='artista' AND p.id=a.id)
+                ORDER BY a.nombre""")]
             for row in rows:
                 row.update(person_data(db, row['id']))
         return jsonify(rows)
@@ -156,12 +157,14 @@ def register_management(app, connect):
     def productions():
         with connect() as db:
             albums = [dict(row) for row in db.execute("""SELECT d.*, a.nombre AS artista, x.datos,x.creado,x.actualizado,
-                (SELECT COUNT(*) FROM canciones WHERE disco_id=d.id) AS total
-                FROM discos d JOIN artistas a ON d.artista_id=a.id LEFT JOIN detalle_disco x ON x.id=d.id""")]
+                (SELECT COUNT(*) FROM canciones c WHERE c.disco_id=d.id AND NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE p.tipo='cancion' AND p.id=c.id)) AS total
+                FROM discos d JOIN artistas a ON d.artista_id=a.id LEFT JOIN detalle_disco x ON x.id=d.id
+                WHERE NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE (p.tipo='artista' AND p.id=a.id) OR (p.tipo='disco' AND p.id=d.id))""")]
             songs = [dict(row) for row in db.execute("""SELECT c.*, a.nombre AS artista, d.nombre AS disco, x.datos,
                 e.estado, e.actualizado FROM canciones c JOIN artistas a ON c.artista_id=a.id
                 LEFT JOIN discos d ON c.disco_id=d.id LEFT JOIN detalle_cancion x ON c.id=x.id
-                LEFT JOIN estado_cancion e ON c.id=e.id""")]
+                LEFT JOIN estado_cancion e ON c.id=e.id
+                WHERE NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE (p.tipo='artista' AND p.id=a.id) OR (p.tipo='disco' AND p.id=d.id) OR (p.tipo='cancion' AND p.id=c.id))""")]
             for row in songs:
                 row['busqueda_metadata'] = song_search_text(db,row['id'])
         for row in albums + songs:
@@ -178,7 +181,7 @@ def register_management(app, connect):
         if track and (not track.isascii() or not track.isdigit() or not 0 < int(track) < 100000):
             raise ValueError('Número de pista inválido.')
         state = data.get('estado', 'En producción')
-        if state not in ('Idea', 'En preproducción', 'En producción', 'Finalizada', 'En pausa'):
+        if state not in ('Borrador', 'En producción', 'Finalizado', 'Lanzado', 'En pausa', 'Idea', 'En preproducción', 'Finalizada'):
             raise ValueError('Estado de canción inválido.')
         with connect() as db:
             song = required_row(db, 'canciones', sid)

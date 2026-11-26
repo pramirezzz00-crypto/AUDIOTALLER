@@ -11,8 +11,8 @@
 [Setup]
 AppId={{35E28BF4-21A9-4DD2-9137-75E793F85015}
 AppName=AudioTaller
-AppVersion=0.2.0
-AppVerName=AudioTaller 0.2.0 beta
+AppVersion=0.3.0
+AppVerName=AudioTaller 0.3.0 beta
 AppPublisher=AudioTaller
 AppPublisherURL=https://github.com/pramirezzz00-crypto/AUDIOTALLER
 DefaultDirName={localappdata}\Programs\AudioTaller
@@ -22,7 +22,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 OutputDir={#OutputRoot}
-OutputBaseFilename=AudioTaller-0.2.0-beta-Setup-x64
+OutputBaseFilename=AudioTaller-0.3.0-beta-Setup-x64
 SetupIconFile=..\static\branding\AudioTaller.ico
 UninstallDisplayIcon={app}\AudioTaller.exe
 Compression=lzma2
@@ -32,7 +32,7 @@ DisableProgramGroupPage=yes
 CloseApplications=yes
 RestartApplications=no
 InfoBeforeFile=LEEME.txt
-UninstallDisplayName=AudioTaller 0.2.0 beta
+UninstallDisplayName=AudioTaller 0.3.0 beta
 [Languages]
 Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 [Tasks]

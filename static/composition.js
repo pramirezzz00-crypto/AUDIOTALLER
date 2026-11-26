@@ -134,7 +134,7 @@ async function openBeatFolder(id = selectedBeatId) {
     } catch (error) { report(error); }
 }
 async function removeBeat(id) {
-    if (!confirm('¿Quitar este audio de la lista? El archivo original no se borrará.')) return;
+    if (!await appConfirm({title: 'Quitar audio de la lista', message: '¿Querés quitar este audio?', detail: 'El archivo original no se borrará.', confirmLabel: 'Quitar audio', danger: false})) return;
     try { await api('/api/beats/' + encodeURIComponent(id), {method:'DELETE'}); await loadBeats(true); }
     catch (error) { report(error); }
 }
@@ -143,7 +143,7 @@ async function deleteBeatPlaylist() {
     if (!playlist) return;
     const count = Number(playlist.cantidad) || 0;
     const detail = count === 1 ? '1 audio' : `${count} audios`;
-    if (!confirm(`¿Eliminar la lista «${playlist.nombre}»? Contiene ${detail}. Se quitarán de AudioTaller, pero los archivos originales permanecerán en tu PC.`)) return;
+    if (!await appConfirm({title: 'Eliminar playlist', message: `¿Eliminar la lista “${playlist.nombre}”?`, detail: `Contiene ${detail}. Se quitará de AudioTaller, pero los archivos originales permanecerán en tu PC.`, confirmLabel: 'Eliminar playlist'})) return;
     try {
         await api('/api/beats/playlists/' + encodeURIComponent(playlist.id), {method:'DELETE'});
         selectedBeatId = null;
@@ -262,7 +262,8 @@ function selectScore(id, items) {
     selectedScoreId = id; $('scoreNow').textContent = item.nombre; $('openScoreFolder').disabled = false;
     const url = '/api/scores/' + encodeURIComponent(id) + '/file';
     if (item.formato === 'PDF') $('scoreViewer').innerHTML = `<iframe title="Vista previa de ${esc(item.nombre)}" src="${url}"></iframe>`;
-    else $('scoreViewer').innerHTML = `<img alt="Vista previa de ${esc(item.nombre)}" src="${url}">`;
+    else if (['PNG', 'JPG', 'JPEG'].includes(item.formato)) $('scoreViewer').innerHTML = `<img alt="Vista previa de ${esc(item.nombre)}" src="${url}">`;
+    else $('scoreViewer').innerHTML = `<p class="muted">Archivo de ${esc(item.formato)}: se abre con su programa. Usá «Abrir ubicación».</p>`;
     renderScores({partituras:items});
 }
 async function addScores() {
@@ -283,14 +284,14 @@ async function openScoreFolder(id=selectedScoreId) {
     } catch (error) { report(error); }
 }
 async function removeScore(id) {
-    if (!confirm('¿Quitar esta partitura de la colección? El archivo original no se borrará.')) return;
+    if (!await appConfirm({title: 'Quitar partitura', message: '¿Querés quitar esta partitura de la colección?', detail: 'El archivo original se conserva.', confirmLabel: 'Quitar partitura', danger: false})) return;
     try { await api('/api/scores/' + encodeURIComponent(id), {method:'DELETE'}); await loadScores(true); }
     catch (error) { report(error); }
 }
 async function deleteScoreCollection() {
     const collection = scoreCollections.find(x => x.id === selectedScoreCollectionId); if (!collection) return;
     const count = Number(collection.cantidad) || 0;
-    if (!confirm(`¿Eliminar la colección «${collection.nombre}»? Se quitarán ${count} referencia(s) de AudioTaller, pero los archivos originales permanecerán en tu PC.`)) return;
+    if (!await appConfirm({title: 'Eliminar colección', message: `¿Eliminar la colección “${collection.nombre}”?`, detail: `Se quitarán ${count} referencias de AudioTaller, pero los archivos originales permanecerán en tu PC.`, confirmLabel: 'Eliminar colección'})) return;
     try {
         await api('/api/scores/collections/' + encodeURIComponent(collection.id), {method:'DELETE'});
         selectedScoreCollectionId = null; localStorage.removeItem('audiotaller.scores.collection'); clearScoreViewer(); await loadScores(true);
@@ -393,8 +394,8 @@ async function addLyrics(){
     catch(error){report(error);}
 }
 async function openLyricFolder(id=selectedLyricId){if(!id)return;try{if(!window.pywebview?.api?.open_lyric_location)throw Error('La apertura de carpetas requiere la aplicación de escritorio.');if(!await window.pywebview.api.open_lyric_location(id))throw Error('No se pudo abrir la carpeta de la letra.');}catch(error){report(error);}}
-async function removeLyric(id){if(!confirm('¿Quitar esta letra de la colección? El archivo original no se borrará.'))return;try{await api('/api/lyrics/'+encodeURIComponent(id),{method:'DELETE'});await loadLyrics(true);}catch(error){report(error);}}
-async function deleteLyricCollection(){const collection=lyricCollections.find(x=>x.id===selectedLyricCollectionId);if(!collection)return;const count=Number(collection.cantidad)||0;if(!confirm(`¿Eliminar la colección «${collection.nombre}»? Se quitarán ${count} referencia(s) de AudioTaller, pero los archivos originales permanecerán en tu PC.`))return;try{await api('/api/lyrics/collections/'+encodeURIComponent(collection.id),{method:'DELETE'});selectedLyricCollectionId=null;localStorage.removeItem('audiotaller.lyrics.collection');clearLyricViewer();await loadLyrics(true);}catch(error){report(error);}}
+async function removeLyric(id){if(!await appConfirm({title:'Quitar letra',message:'¿Querés quitar esta letra de la colección?',detail:'El archivo original se conserva.',confirmLabel:'Quitar letra',danger:false}))return;try{await api('/api/lyrics/'+encodeURIComponent(id),{method:'DELETE'});await loadLyrics(true);}catch(error){report(error);}}
+async function deleteLyricCollection(){const collection=lyricCollections.find(x=>x.id===selectedLyricCollectionId);if(!collection)return;const count=Number(collection.cantidad)||0;if(!await appConfirm({title:'Eliminar colección',message:`¿Eliminar la colección “${collection.nombre}”?`,detail:`Se quitarán ${count} referencias de AudioTaller, pero los archivos originales permanecerán en tu PC.`,confirmLabel:'Eliminar colección'}))return;try{await api('/api/lyrics/collections/'+encodeURIComponent(collection.id),{method:'DELETE'});selectedLyricCollectionId=null;localStorage.removeItem('audiotaller.lyrics.collection');clearLyricViewer();await loadLyrics(true);}catch(error){report(error);}}
 function openLyricCollectionDialog(mode){lyricDialogMode=mode;const current=lyricCollections.find(x=>x.id===selectedLyricCollectionId);$('lyricCollectionDialogTitle').textContent=mode==='create'?'Crear nueva colección':'Cambiar nombre de la colección';$('lyricCollectionName').value=mode==='rename'?(current?.nombre||''):'';$('lyricCollectionDialog').showModal();$('lyricCollectionName').focus();}
 $('lyricCollectionForm').addEventListener('submit',async event=>{event.preventDefault();const name=$('lyricCollectionName').value.trim();if(!name)return;const submit=$('lyricCollectionForm').querySelector('[type=submit]');submit.disabled=true;try{if(lyricDialogMode==='create'){const created=await api('/api/lyrics/collections',body({nombre:name}));selectedLyricCollectionId=created.id;localStorage.setItem('audiotaller.lyrics.collection',created.id);}else await api('/api/lyrics/collections/'+encodeURIComponent(selectedLyricCollectionId),{method:'PATCH',body:JSON.stringify({nombre:name})});$('lyricCollectionDialog').close();await loadLyrics(true);}catch(error){report(error);}finally{submit.disabled=false;}});
 function bindLyricReordering(){const rows=$('lyricsList').querySelectorAll('[data-lyric-row]');rows.forEach(row=>{row.addEventListener('dragstart',event=>{draggedLyricId=row.dataset.lyricRow;row.classList.add('beat-dragging');event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',draggedLyricId);});row.addEventListener('dragover',event=>{if(!draggedLyricId||draggedLyricId===row.dataset.lyricRow)return;event.preventDefault();event.dataTransfer.dropEffect='move';row.classList.add('beat-drop-target');});row.addEventListener('dragleave',()=>row.classList.remove('beat-drop-target'));row.addEventListener('drop',async event=>{event.preventDefault();row.classList.remove('beat-drop-target');const source=draggedLyricId||event.dataTransfer.getData('text/plain');draggedLyricId=null;if(source&&source!==row.dataset.lyricRow)await moveLyricBefore(source,row.dataset.lyricRow);});row.addEventListener('dragend',()=>{draggedLyricId=null;rows.forEach(x=>x.classList.remove('beat-dragging','beat-drop-target'));});});}

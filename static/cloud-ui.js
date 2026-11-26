@@ -12,11 +12,33 @@ async function cloudOperation(url,data,status){
         await cloudDelay();
     }
 }
+const PORTAL_GUIDE_URL='/static/docs/Instructivo-Portal-del-artista-AudioTaller.pdf';
+async function downloadPortalGuide(){
+    if(window.pywebview?.api?.save_portal_guide){const path=await window.pywebview.api.save_portal_guide();if(path)notify('Instructivo guardado en '+path);return;}
+    const link=document.createElement('a');link.href=PORTAL_GUIDE_URL;link.download='Instructivo-Portal-del-artista-AudioTaller.pdf';document.body.append(link);link.click();link.remove();
+}
+async function copyPortalAiPrompt(button){
+    const text=await (await fetch('/static/docs/prompt-asistencia-ia-portal.txt')).text();
+    if(window.pywebview?.api?.copy_text&&await window.pywebview.api.copy_text(text)){if(button)button.textContent='Prompt copiado';return notify('Prompt copiado: pegalo en tu IA');}
+    try{await navigator.clipboard.writeText(text);if(button)button.textContent='Prompt copiado';notify('Prompt copiado: pegalo en tu IA');}
+    catch{const box=document.createElement('textarea');box.readOnly=true;box.value=text;(button||document.body).after(box);box.select();}
+}
+function portalGuideDialog(){
+    formDialog('Instructivo · Gestionar tu Portal del artista',`<p>Guía paso a paso para crear, conectar y mantener la página web donde tus artistas escuchan las mezclas y te dejan devoluciones. Está pensada para hacerla sin saber programar, aunque sea la primera vez que usás Google Drive, Firebase o una API.</p>
+      <ul><li>Preparar Firebase y Google Cloud gratis (plan Spark).</li><li>Conectar AudioTaller e instalar el portal.</li><li>Publicar playlists y compartirlas por WhatsApp.</li><li>Responder devoluciones y enviar la corrección con antes/después.</li><li>Problemas frecuentes y qué hacer con cada mensaje.</li></ul>
+      <div class="row"><button type="button" id="portalGuideSave">Descargar instructivo (PDF)</button><button type="button" class="alt" id="portalGuidePrompt">Copiar prompt de asistencia con IA</button></div>
+      <p class="muted">El prompt sirve para pegarlo en Claude, ChatGPT, Gemini u otra IA: te guía pantalla por pantalla y te ayuda con los errores. El instructivo viene incluido en AudioTaller; no necesita internet para descargarlo.</p>`,async()=>{},()=>{
+        $('iterationSubmit').textContent='Cerrar';
+        $('portalGuideSave').onclick=()=>downloadPortalGuide().catch(report);
+        $('portalGuidePrompt').onclick=event=>copyPortalAiPrompt(event.currentTarget).catch(report);
+    });
+}
 async function portalSetupDialog(){
     const state=await api('/api/portal/config'),config=state.config;
     formDialog('Conectar portal del artista',`<p>Conectá tu espacio de publicaciones y tu Google usando el plan gratuito Spark. Después podrás publicar, recibir devoluciones y copiar invitaciones desde cada playlist.</p>
       <p role="status">${state.google.conectado?'✓ Google conectado':'○ Conectar Google'} · ${config.projectId?'✓ Espacio configurado':'○ Elegir espacio de publicaciones'}</p>
       <label id="cloudProfileDrop" class="drop-zone">Importar perfil de conexión de AudioTaller<input type="file" accept="application/json,.json"><span role="status"></span></label>
+      <p class="portal-guide-hint">¿Primera vez? <button type="button" class="alt" onclick="portalGuideDialog()">📘 Abrir el instructivo paso a paso</button></p>
       <p class="muted">Si te entregaron un perfil de conexión, importalo y autorizá tu cuenta. No necesitás escribir código. Este piloto todavía requiere que el responsable prepare el espacio Firebase; el alta universal depende de la verificación de Google para la versión distribuible.</p>
       <details><summary>Configuración avanzada · preparar el espacio gratuito</summary><ol>
         <li><a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer">Abrir Firebase</a> y crear un proyecto, sin activar facturación.</li>

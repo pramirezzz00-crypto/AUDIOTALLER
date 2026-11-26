@@ -24,7 +24,8 @@ service cloud.firestore {
           let portal = get(/databases/$(database)/documents/portals/$(portalId)).data;
           let note = request.resource.data;
           return note.keys().hasAll(['artistUid','audioId','songId','driveId','revision','audioLabel','body','positionSeconds','createdAt'])
-            && note.keys().hasOnly(['artistUid','audioId','songId','driveId','revision','audioLabel','body','positionSeconds','createdAt'])
+            && note.keys().hasOnly(['artistUid','audioId','songId','driveId','revision','audioLabel','body','positionSeconds','createdAt','general'])
+            && (!('general' in note) || note.general is bool)
             && note.artistUid == request.auth.uid
             && note.audioId is string && note.audioId in portal.audioKeys
             && note.driveId == portal.audioKeys[note.audioId]

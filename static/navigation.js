@@ -2,13 +2,13 @@ function songRow(s){return `<div class="item"><b>♫ ${esc(s.titulo)}</b><button
 const $ = id => document.getElementById(id);
 let artist, currentAlbum, currentSong, editing, photo, selectedPhoto;
 let previewUrl;
-const pages = ['home', 'manager', 'profile', 'editor', 'artistPane', 'albumPane', 'songPane', 'arrangements', 'globalProjects', 'catalogPane', 'playlistsPane', 'composition', 'beats', 'scores', 'lyrics', 'entidades'];
+const pages = ['home', 'manager', 'profile', 'editor', 'artistPane', 'albumPane', 'songPane', 'arrangements', 'globalProjects', 'catalogPane', 'playlistsPane', 'trashPane', 'composition', 'beats', 'scores', 'lyrics', 'entidades', 'feedbackPane', 'creditsPane', 'exportPane', 'artistsPane', 'launchesPane', 'avPane', 'configPane'];
 const trail = ['home'];
 function display() {
     const page = trail.at(-1);
     const visible = page === 'projectManager' ? 'globalProjects' : page;
     pages.forEach(id => { $(id).hidden = id !== visible; });
-    $('moduleTabs').hidden = !['manager', 'projectManager'].includes(page);
+    $('moduleTabs').hidden = page !== 'manager';
     $('peopleTab').setAttribute('aria-pressed', page === 'manager');
     $('productionsTab').setAttribute('aria-pressed', page === 'projectManager');
     if (page === 'projectManager') loadGlobalProjects();
@@ -16,17 +16,20 @@ function display() {
     document.querySelectorAll('main audio').forEach(audio => audio.pause());
     $('nav').hidden = page === 'home';
     $('sideHome').setAttribute('aria-current', page === 'home' ? 'page' : 'false');
-    $('sideArtists').setAttribute('aria-current', ['home', 'arrangements', 'catalogPane', 'playlistsPane', 'composition', 'beats', 'scores', 'lyrics', 'entidades'].includes(page) ? 'false' : 'page');
+    const peoplePage = ['manager', 'profile', 'editor', 'artistsPane'].includes(page) && !trail.includes('projectManager');
+    const productionPage = ['projectManager', 'artistPane', 'albumPane', 'songPane', 'creditsPane', 'exportPane'].includes(page) || (['profile', 'editor'].includes(page) && trail.includes('projectManager'));
+    $('sideArtists').setAttribute('aria-current', peoplePage ? 'page' : 'false');
+    $('sideProductions').setAttribute('aria-current', productionPage ? 'page' : 'false');
     $('sideArrangements').setAttribute('aria-current', page === 'arrangements' ? 'page' : 'false');
     const compositionLabels = {composition:'Composición',beats:'Beats',scores:'Partituras',lyrics:'Letras'};
     $('sideComposition').setAttribute('aria-current', compositionLabels[page] ? 'page' : 'false');
     $('sideEntities').setAttribute('aria-current', page === 'entidades' ? 'page' : 'false');
-    if (page !== 'arrangements') $('takePlayer').pause();
+    if (page !== 'arrangements') $('takePlayer')?.pause();
     const projectPath = trail.includes('projectManager');
     const manager = projectPath ? 'Gestión de producciones' : 'Gestión de artistas';
     const artistLabel = ['profile', 'artistPane', 'editor', 'songPane'].includes(page) && artist ? ' › ' + esc(artist.nombre) : '';
     $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="openArtistManager(${projectPath})">${manager}</button>${artistLabel}`;
-    if (page === 'arrangements') $('crumbPath').innerHTML = '<button onclick="go(\'home\')">Inicio</button> › Arreglos';
+    if (page === 'arrangements' && $('crumbPath')) $('crumbPath').innerHTML = '<button onclick="go(\'home\')">Inicio</button> › Arreglos';
     if (compositionLabels[page]) {
         $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="go('composition')">Composición</button>${page==='composition'?'':' › '+compositionLabels[page]}`;
         if(page==='beats') loadBeats();
@@ -40,6 +43,8 @@ function display() {
     if (page === 'playlistsPane') { $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › Playlist`; loadPlaylists(); }
     $('sideCatalog').setAttribute('aria-current',page === 'catalogPane' ? 'page' : 'false');
     $('sidePlaylists').setAttribute('aria-current',page === 'playlistsPane' ? 'page' : 'false');
+    $('sideTrash').setAttribute('aria-current',page === 'trashPane' ? 'page' : 'false');
+    if (page === 'trashPane') { $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> > Papelera`; loadTrash(); }
     $('error').textContent = '';
     window.scrollTo(0, 0);
     if (page === 'profile' && artist) renderProfile();
@@ -49,6 +54,7 @@ function display() {
         $('managerDescription').textContent = projects ? 'Elegí un artista para gestionar sus discos y canciones.' : 'Buscá un artista para consultar o modificar su ficha.';
         loadLibrary();
     }
+    if (typeof studioDisplayHook === 'function') studioDisplayHook(page);
 }
 function go(page) {
     if (trail.at(-1) === 'songPane' && page !== 'songPane' && hasUnsavedSongNotes() &&
@@ -159,7 +165,14 @@ function addMember(member = {}) {
     block.querySelector('button').onclick = () => block.remove();
     $('members').append(block);
 }
+// Alta y edición de artistas: siempre por el flujo nuevo (Artistas › Nuevo artista). La ficha anterior queda como «Datos adicionales».
 async function editArtist(id, addContact = false) {
+    if (addContact && id) return editArtistLegacy(id, true);
+    go('artistsPane');
+    ppl.list = await api('/api/artistas-rediseno');
+    startWizard(id || undefined);
+}
+async function editArtistLegacy(id, addContact = false) {
     const data = id ? await api('/api/artistas/' + id) : {};
     const professional = id ? await api('/api/personas/' + id) : null;
     editing = id;

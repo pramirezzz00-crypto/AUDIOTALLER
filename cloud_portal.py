@@ -24,6 +24,27 @@ from management import required_row
 ASSETS=Path(__file__).parent/'artist_web'
 
 
+SITE_FILES=('index.html','portal.js','portal.css')
+
+
+def site_hash():
+    """Huella de la web del artista y sus reglas: si cambia, la próxima publicación la actualiza sola."""
+    h=hashlib.sha256((ASSETS/'firestore.rules').read_bytes())
+    for name in SITE_FILES:h.update((ASSETS/'public'/name).read_bytes())
+    return h.hexdigest()
+
+
+def audio_peaks(path,bins=160):
+    """Forma de onda liviana para el portal (solo WAV PCM); sin ella el portal muestra una barra simple."""
+    try:
+        from audio_waveform import pcm_waveform
+        peaks=pcm_waveform(path,bins)['peaks']
+        top=max(peaks) or 1
+        return [round(value/top,2) for value in peaks]
+    except Exception:
+        return []
+
+
 def digest(path):
     result=hashlib.sha256()
     with Path(path).open('rb') as source:
@@ -94,6 +115,15 @@ class Publisher:
         if not releases.get('releases'):
             raise ValueError('Primero instalá la web con Conectar portal web → Instalar portal.')
     def install(self,progress):
+        result=self.deploy_site(progress,check_services=True)
+        return dict(url=result,mensaje='Portal instalado. Publicá una playlist para generar su enlace.')
+    def ensure_site_current(self,progress):
+        """Si la web o las reglas cambiaron en esta versión de AudioTaller, las vuelve a subir antes de publicar."""
+        if self.config.get('siteHash')==site_hash():return False
+        progress('Actualizando la web del portal a la versión nueva…')
+        self.deploy_site(progress,check_services=False)
+        return True
+    def deploy_site(self,progress,check_services=True):
         project=self.config['projectId'];site=self.config['siteId']
         progress('Comprobando Firestore (base default)…')
         self.google('https://firestore.googleapis.com/v1/projects/'+project+'/databases/(default)')
@@ -121,7 +151,7 @@ class Publisher:
                        # y mantiene compatible la restricción por sitio web.
                        'headers':[{'glob':'**','headers':{'Referrer-Policy':'strict-origin-when-cross-origin','X-Content-Type-Options':'nosniff','Cache-Control':'no-cache, max-age=0, must-revalidate'}},
                                   {'glob':'/config.json','headers':{'Cache-Control':'no-store'}}]}})[2]['name']
-        content={('/'+name):(ASSETS/'public'/name).read_bytes() for name in ('index.html','portal.js','portal.css')}
+        content={('/'+name):(ASSETS/'public'/name).read_bytes() for name in SITE_FILES}
         # Cada interfaz referencia sus propios recursos. Una pestaña abierta
         # antes de actualizar no debe mezclar HTML nuevo con JavaScript viejo.
         html=content['/index.html'].decode('utf-8')
@@ -138,7 +168,52 @@ class Publisher:
                 self.google(populated['uploadUrl']+'/'+hashes[path],'POST',value,{'Content-Type':'application/octet-stream'},raw=True)
         self.google('https://firebasehosting.googleapis.com/v1beta1/'+version+'?updateMask=status','PATCH',{'status':'FINALIZED'})
         self.google('https://firebasehosting.googleapis.com/v1beta1/sites/'+site+'/releases?'+urlencode({'versionName':version}),'POST',{})
-        return dict(url='https://'+site+'.web.app',mensaje='Portal instalado. Publicá una playlist para generar su enlace.')
+        self.config['siteHash']=site_hash()
+        with self.connect() as db:
+            row=db.execute('SELECT datos FROM portal_config WHERE id=1').fetchone()
+            if row:
+                saved=json.loads(row['datos']);saved['siteHash']=self.config['siteHash']
+                db.execute('UPDATE portal_config SET datos=? WHERE id=1',(json.dumps(saved),))
+        return 'https://'+site+'.web.app'
+    def build_replies(self,identity,items,progress):
+        """Respuestas del productor por devolución, con la versión que resuelve (se sube a Drive si hace falta)."""
+        from catalog import catalog_rows
+        by_item={item['id']:item for item in items}
+        with self.connect() as db:
+            notes=[dict(row) for row in db.execute('''SELECT f.*,rv.nombre AS resuelve_nombre FROM portal_devoluciones f
+                LEFT JOIN archivos rv ON rv.id=f.resuelve_archivo WHERE f.publicacion_id=?''',(identity,))]
+            pending=[n['resuelve_archivo'] for n in notes if n['resuelve_archivo'] and n['resuelve_archivo'] not in by_item]
+            audios={row['id']:row for row in catalog_rows(db) if row['id'] in pending} if pending else {}
+        uploaded={}
+        replies={}
+        for note in notes:
+            if not (note.get('respuesta') or note['estado']!='Pendiente' or note.get('resuelve_archivo')):continue
+            resolved=note.get('resuelve_archivo') or ''
+            drive='';label=''
+            if resolved:
+                if resolved in by_item:
+                    drive=by_item[resolved]['driveId'];label=' · '.join(filter(None,[by_item[resolved]['clase'],by_item[resolved]['version']])) or by_item[resolved]['nombre']
+                elif resolved in audios and audios[resolved].get('disponible'):
+                    if resolved not in uploaded:
+                        progress('Subiendo la versión corregida: '+audios[resolved]['nombre'])
+                        uploaded[resolved]=self.upload_audio(audios[resolved],self.config['projectId'],progress)['id']
+                    drive=uploaded[resolved];label=' · '.join(filter(None,[audios[resolved]['clase'],audios[resolved]['version']])) or audios[resolved]['nombre']
+            replies[note['id'].split(':',1)[-1]]=dict(status=note['estado'],reply=note.get('respuesta') or '',resolvedAudioId=resolved,
+                resolvedDriveId=drive,resolvedLabel=label or (note.get('resuelve_nombre') or ''),repliedAt=str(note.get('actualizado') or ''))
+        return replies
+    def send_replies(self,identity,progress):
+        """Actualiza solo las respuestas del portal, sin volver a subir la playlist completa."""
+        progress('Comprobando el portal…')
+        self.check_ready();self.ensure_site_current(progress)
+        previous=self.get_document(identity)
+        if not previous:raise ValueError('Esta playlist todavía no está publicada en el portal.')
+        items=json.loads(decode(previous).get('items','[]'))
+        replies=self.build_replies(identity,items,progress)
+        progress('Enviando respuestas al artista…')
+        payload=dict(replies=json.dumps(replies,ensure_ascii=False),repliesUpdatedAt=datetime.now(timezone.utc))
+        mask='&'.join('updateMask.fieldPaths='+key for key in payload)
+        self.google(self.document_url(identity)+'?'+mask+'&'+urlencode({'currentDocument.updateTime':previous['updateTime']}),'PATCH',{'fields':fields(payload)})
+        return dict(respuestas=len(replies),mensaje=f'{len(replies)} respuestas enviadas. El artista las ve al abrir o actualizar el portal.')
     def upload_audio(self,audio,project,progress):
         path=Path(audio['ruta']);before=path.stat();checksum=digest(path)
         with self.connect() as db:
@@ -205,6 +280,7 @@ class Publisher:
             raise ValueError('Hay audios vacíos o no disponibles. Revisalos antes de publicar.')
         progress('Comprobando que el portal esté instalado…')
         self.check_ready()
+        self.ensure_site_current(progress)
         identity=old['id'] if old else uuid.uuid4().hex
         url='https://'+self.config['siteId']+'.web.app/p/'+identity
         if not old:
@@ -221,8 +297,13 @@ class Publisher:
             if password:
                 # Ingresar otra contraseña aquí no debe reemplazar la guardada
                 # sin verificarla, ni simular un cambio de clave en Firebase.
-                verified=http_request('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+self.config['apiKey'],
-                    'POST',{'email':email,'password':password,'returnSecureToken':True})[2]
+                try:
+                    verified=http_request('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+self.config['apiKey'],
+                        'POST',{'email':email,'password':password,'returnSecureToken':True})[2]
+                except CloudError as error:
+                    if error.code in ('INVALID_PASSWORD','INVALID_LOGIN_CREDENTIALS'):
+                        raise ValueError('Esa contraseña no es la que ya tiene el artista. Para actualizar la playlist dejá el campo de contraseña vacío: se conserva la actual (la ves con «Copiar datos de acceso»).') from None
+                    raise
                 if verified['localId']!=artist_uid:raise ValueError('El acceso no corresponde al artista de esta entrega.')
                 created_password=password
         else:
@@ -248,7 +329,8 @@ class Publisher:
             items.append(dict(id=audio['id'],driveId=remote['id'],resourceKey=remote.get('resourceKey',''),
                 driveView=remote.get('webViewLink') or 'https://drive.google.com/file/d/'+remote['id']+'/view',
                 titulo=audio['titulo'],artista=audio['artista'],disco=audio['disco'] or '',nombre=audio['nombre'],
-                clase=audio['clase'],version=audio['version'],cancionId=audio['cancion_id'],duracion=audio['tecnica'].get('duracion',0)))
+                clase=audio['clase'],version=audio['version'],cancionId=audio['cancion_id'],duracion=audio['tecnica'].get('duracion',0),
+                peaks=audio_peaks(audio['ruta'])))
         payload=dict(title=playlist['nombre'],producerName=self.config['producerName'],color=self.config['color'],
             artistEmail=email,artistUid=artist_uid,expiresAt=datetime.fromtimestamp(time.time()+days*86400,timezone.utc),
             revoked=False,allowDownload=bool(data.get('descarga',False)),items=json.dumps(items,ensure_ascii=False),
@@ -257,6 +339,8 @@ class Publisher:
             audioKeys={item['id']:item['driveId'] for item in items},
             audioSongs={item['id']:item['cancionId'] for item in items},
             audioLabels={item['id']:' · '.join(filter(None,[item['titulo'],item['clase'],item['version'],item['nombre']])) for item in items})
+        payload['replies']=json.dumps(self.build_replies(identity,items,progress),ensure_ascii=False)
+        payload['repliesUpdatedAt']=datetime.now(timezone.utc)
         progress('Publicando la selección del artista…')
         self.save_document(identity,payload,previous)
         url='https://'+self.config['siteId']+'.web.app/p/'+identity
@@ -284,11 +368,17 @@ def register_cloud_portal(app,connect,data_folder):
         identity=uuid.uuid4().hex
         jobs[identity]=dict(estado='trabajando',mensaje='Preparando…',tipo=kind)
         def worker():
+            step={'paso':''}
+            def progress(message):
+                step['paso']=message;jobs[identity].update(mensaje=message)
             try:
-                result=callback(lambda message:jobs[identity].update(mensaje=message))
+                result=callback(progress)
                 jobs[identity].update(estado='completado',resultado=result)
             except Exception as error:
-                jobs[identity].update(estado='error',mensaje=str(error) if isinstance(error,ValueError) else 'La operación no terminó. Podés reintentar; los originales se conservan.')
+                text=str(error) if isinstance(error,ValueError) else 'La operación no terminó. Podés reintentar; los originales se conservan.'
+                if step['paso'] and isinstance(error,CloudError):text+=' — Paso: '+step['paso'].rstrip('…')
+                app.logger.warning('Portal (%s) falló en «%s»: %s',kind,step['paso'],text)
+                jobs[identity].update(estado='error',mensaje=text)
             finally:active.release()
         threading.Thread(target=worker,daemon=True).start()
         return jsonify(id=identity),202
@@ -375,6 +465,11 @@ def register_cloud_portal(app,connect,data_folder):
         with connect() as db:
             required_row(db,'playlists',pid)
             return jsonify([dict(row) for row in db.execute('SELECT * FROM portal_publicaciones WHERE playlist_id=?',(pid,))])
+    @app.post('/api/portal/publicaciones/<identity>/respuestas')
+    def cloud_send_replies(identity):
+        with connect() as db:required_row(db,'portal_publicaciones',identity)
+        publisher=Publisher(connect,session(),config())
+        return run('respuestas',lambda progress:publisher.send_replies(identity,progress))
     @app.post('/api/portal/publicaciones/<identity>/revocar')
     def cloud_revoke(identity):
         if active.locked():raise ValueError('Esperá a que termine la publicación.')

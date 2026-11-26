@@ -78,7 +78,7 @@ class CloudPortalTest(unittest.TestCase):
             remote[identity]={'fields':fields(payload),'updateTime':'2026-11-07T01:00:00Z'}
             return remote[identity]
         def account(*args,**kwargs):accounts.append(args);return 200,{},dict(localId='artist-uid')
-        with patch.object(self.publisher,'check_ready'),patch.object(self.publisher,'get_document',side_effect=get),patch.object(self.publisher,'save_document',side_effect=save),\
+        with patch.object(self.publisher,'check_ready'),patch.object(self.publisher,'ensure_site_current'),patch.object(self.publisher,'get_document',side_effect=get),patch.object(self.publisher,'save_document',side_effect=save),\
              patch.object(self.publisher,'upload_audio',return_value=dict(id='drive-file')),patch('cloud_portal.http_request',side_effect=account):
             first=self.publisher.publish(self.pid,dict(email='artista@example.com',password='Prueba123',dias=7),lambda msg:None)
             self.c.post('/api/playlists/'+self.pid,json={'nombre':'Otra selección','revision':1,'archivos':[self.file]})
@@ -112,7 +112,7 @@ class CloudPortalTest(unittest.TestCase):
         self.assertNotIn(b'TOKEN_SIMULADO',config)
 
     def test_error_de_subida_no_reemplaza_documento_publicado(self):
-        with patch.object(self.publisher,'check_ready'),patch.object(self.publisher,'get_document',return_value={'fields':{'artistEmail':{'stringValue':'artista@example.com'},'artistUid':{'stringValue':'uid'}}}),\
+        with patch.object(self.publisher,'check_ready'),patch.object(self.publisher,'ensure_site_current'),patch.object(self.publisher,'get_document',return_value={'fields':{'artistEmail':{'stringValue':'artista@example.com'},'artistUid':{'stringValue':'uid'}}}),\
              patch.object(self.publisher,'upload_audio',side_effect=ValueError('Sin espacio')),patch.object(self.publisher,'save_document') as save:
             with self.assertRaises(ValueError):self.publisher.publish(self.pid,dict(email='artista@example.com'),lambda msg:None)
             save.assert_not_called()
@@ -156,7 +156,7 @@ class CloudPortalTest(unittest.TestCase):
 
     def test_snapshots_remotos_tienen_revision_y_audio_para_validar_devolucion(self):
         from cloud_portal import fields
-        with patch.object(self.publisher,'check_ready'),patch.object(self.publisher,'get_document',return_value={'updateTime':'before','fields':fields(dict(artistEmail='artista@example.com',artistUid='uid',revision=4))}),\
+        with patch.object(self.publisher,'check_ready'),patch.object(self.publisher,'ensure_site_current'),patch.object(self.publisher,'get_document',return_value={'updateTime':'before','fields':fields(dict(artistEmail='artista@example.com',artistUid='uid',revision=4))}),\
              patch.object(self.publisher,'upload_audio',return_value={'id':'drive-new'}),patch.object(self.publisher,'save_document') as save:
             self.publisher.publish(self.pid,dict(email='artista@example.com'),lambda msg:None)
             payload=save.call_args.args[1]

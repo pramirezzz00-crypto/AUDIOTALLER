@@ -9,6 +9,7 @@ from publication import register_publication, validate_collaborators, add_collab
 from song_hub import register_song_hub
 from catalog import register_catalog
 from composition import register_composition
+from overview import register_overview
 from listening_portal import register_listening_portal
 from cloud_portal import register_cloud_portal
 from flask import Flask, jsonify, request, send_file
@@ -56,7 +57,7 @@ def home():
 def biblioteca():
     q = '%' + request.args.get('q', '').strip() + '%'
     with db_open() as db:
-        rows = db.execute('''SELECT DISTINCT a.*, (SELECT COUNT(*) FROM discos WHERE artista_id=a.id) AS discos, (SELECT COUNT(*) FROM canciones WHERE artista_id=a.id) AS canciones FROM artistas a LEFT JOIN discos d ON d.artista_id=a.id LEFT JOIN canciones c ON c.artista_id=a.id WHERE a.nombre LIKE ? OR d.nombre LIKE ? OR c.titulo LIKE ? ORDER BY a.nombre''', (q,q,q)).fetchall()
+        rows = db.execute('''SELECT DISTINCT a.*, (SELECT COUNT(*) FROM discos WHERE artista_id=a.id) AS discos, (SELECT COUNT(*) FROM canciones WHERE artista_id=a.id) AS canciones FROM artistas a LEFT JOIN discos d ON d.artista_id=a.id LEFT JOIN canciones c ON c.artista_id=a.id WHERE NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE p.tipo='artista' AND p.id=a.id) AND (a.nombre LIKE ? OR d.nombre LIKE ? OR c.titulo LIKE ?) ORDER BY a.nombre''', (q,q,q)).fetchall()
     return jsonify([dict(x) for x in rows])
 
 @app.post('/api/artistas')
@@ -95,7 +96,7 @@ def artist_get(aid):
         row = db.execute('''SELECT a.*,
             (SELECT COUNT(*) FROM discos WHERE artista_id=a.id) AS discos,
             (SELECT COUNT(*) FROM canciones WHERE artista_id=a.id) AS canciones
-            FROM artistas a WHERE a.id=?''', (aid,)).fetchone()
+            FROM artistas a WHERE a.id=? AND NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE p.tipo='artista' AND p.id=a.id)''', (aid,)).fetchone()
         profile = db.execute('SELECT datos FROM perfiles_artista WHERE id=?', (aid,)).fetchone()
     if not row:
         return jsonify(error='Artista no encontrado.'), 404
@@ -108,11 +109,14 @@ def artist_content(aid):
     with db_open() as db:
         albums = [dict(row) for row in db.execute(
             """SELECT d.*, x.datos, x.creado, x.actualizado FROM discos d
-               LEFT JOIN detalle_disco x ON x.id=d.id WHERE d.artista_id=?""", (aid,))]
+               LEFT JOIN detalle_disco x ON x.id=d.id WHERE d.artista_id=? AND NOT EXISTS
+               (SELECT 1 FROM entidades_papelera p WHERE (p.tipo='artista' AND p.id=d.artista_id) OR (p.tipo='disco' AND p.id=d.id))""", (aid,))]
         songs = [dict(row) for row in db.execute(
             """SELECT c.*, x.datos, e.estado, e.actualizado FROM canciones c LEFT JOIN detalle_cancion x ON x.id=c.id
                LEFT JOIN estado_cancion e ON e.id=c.id
-               WHERE c.artista_id=? ORDER BY c.creado, c.id""", (aid,))]
+               WHERE c.artista_id=? AND NOT EXISTS (SELECT 1 FROM entidades_papelera p WHERE
+               (p.tipo='artista' AND p.id=c.artista_id) OR (p.tipo='disco' AND p.id=c.disco_id) OR (p.tipo='cancion' AND p.id=c.id))
+               ORDER BY c.creado, c.id""", (aid,))]
         for row in songs:
             row['busqueda_metadata'] = song_search_text(db,row['id'])
     for row in albums + songs:
@@ -331,6 +335,36 @@ register_cloud_portal(app, db_open, lambda: DB.parent)
 register_production(app, db_open, safe_name)
 register_daw_operations(app, db_open, safe_name)
 register_folder_migration(app, db_open, lambda: DB)
+register_overview(app, db_open)
+from redesign import register_redesign
+register_redesign(app, db_open)
+from redesign_comp import register_composition_redesign
+register_composition_redesign(app, db_open)
+from redesign_arr import register_arrangements_redesign
+register_arrangements_redesign(app, db_open)
+from redesign_arr import register_people_redesign
+register_people_redesign(app, db_open)
+from redesign_arr import register_playlist_options
+register_playlist_options(app, db_open)
+from redesign_arr import register_arrangement_waves
+register_arrangement_waves(app)
+from redesign_extra import register_extra
+register_extra(app, db_open, lambda: DB.parent)
+from migration import register_migration
+from version import DISPLAY_VERSION as _MIGRATION_VERSION
+register_migration(app, db_open, lambda: DB, _MIGRATION_VERSION)
+
+from werkzeug.exceptions import HTTPException
+
+
+@app.errorhandler(Exception)
+def unexpected_error(error):
+    """Cualquier error no previsto vuelve como JSON legible y queda en inicio.log con su traza."""
+    if isinstance(error, HTTPException):
+        return jsonify(error=error.description or error.name), error.code
+    app.logger.exception('Error inesperado en %s %s', request.method, request.path)
+    return jsonify(error=('Error interno (' + type(error).__name__ + '): ' + str(error))[:300]), 500
+
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1',port=5000,debug=False)

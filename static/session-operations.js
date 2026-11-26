@@ -124,7 +124,7 @@ async function productionCopyDialog() {
                     productionCopyId=plan.id;
                     $('iterationError').textContent='';
                     preview.innerHTML=`<h3>Contenido a copiar</h3><ul>${plan.carpetas.map(folder=>`<li>${esc(folder)}</li>`).join('')}</ul>
-                      <p>${plan.archivos} archivos · ${(plan.bytes/1024/1024).toFixed(1)} MB · ${plan.extras} archivos externos adicionales</p>
+                      <p>${plan.archivos} archivos · ${formatBytes(plan.bytes)} · ${plan.extras} archivos externos adicionales</p>
                       <p>Destino: ${esc(plan.destino)}</p>`;
                 } catch(error) {
                     if(!preview.isConnected || !$('iterationDialog').open)return;
@@ -151,7 +151,7 @@ function showCopyProgress(songId,identity) {
         try {
             const job=await api('/api/produccion/'+songId+'/copiar-produccion/'+identity);
             $('copyProgress').value=job.total?Math.min(100,job.copiados/job.total*100):0;
-            $('copyState').textContent=job.estado+' · '+(job.copiados/1024/1024).toFixed(1)+' / '+(job.total/1024/1024).toFixed(1)+' MB';
+            $('copyState').textContent=job.estado+' · '+formatBytes(job.copiados)+' / '+formatBytes(job.total);
             if(job.estado==='completada') {
                 $('copyResult').textContent='Copia verificada. Los vínculos apuntan a '+JSON.parse(job.resultado).destino;
                 if(currentSong.id===songId)await openSong(songId);
