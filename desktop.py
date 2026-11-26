@@ -240,6 +240,29 @@ def main():
             except Exception:
                 return False
 
+        def save_portal_guide(self):
+            # Copia el instructivo incluido en la app donde el usuario elija y lo abre.
+            import shutil
+            origen = Path(__file__).parent / 'static' / 'docs' / 'Instructivo-Portal-del-artista-AudioTaller.pdf'
+            if not origen.is_file():
+                return ''
+            descargas = Path.home() / 'Downloads'
+            result = webview.windows[0].create_file_dialog(
+                webview.FileDialog.SAVE, directory=str(descargas if descargas.is_dir() else Path.home()),
+                save_filename=origen.name, file_types=('PDF (*.pdf)',))
+            destino = result[0] if isinstance(result, (list, tuple)) and result else result
+            if not destino:
+                return ''
+            destino = Path(destino)
+            if destino.suffix.lower() != '.pdf':
+                destino = destino.with_suffix('.pdf')
+            shutil.copyfile(origen, destino)
+            try:
+                open_path(str(destino))
+            except OSError:
+                pass
+            return str(destino)
+
         def open_location(self, beat_id):
             # El ID se resuelve contra la biblioteca local; nunca se acepta una ruta del navegador.
             from app import db_open

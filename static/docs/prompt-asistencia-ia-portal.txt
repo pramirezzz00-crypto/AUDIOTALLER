@@ -1,0 +1,22 @@
+Quiero que me guíes, paso a paso y en castellano simple, para dejar funcionando el Portal del artista de AudioTaller. No sé programar y es la primera vez que uso Google Cloud, Firebase y APIs.
+
+Qué es: AudioTaller es una app de escritorio para productores musicales. Su portal es una página web gratuita en Firebase (plan Spark, sin tarjeta) donde el artista escucha mis mezclas, deja comentarios marcando el minuto y ve mis respuestas con comparación antes/después. Los audios se suben a mi Google Drive. AudioTaller instala la página y las reglas solo; yo tengo que preparar el proyecto en Google.
+
+Lo que hay que lograr, en este orden:
+1. Crear un proyecto en console.firebase.google.com (plan Spark), registrar una app web y anotar el ID del proyecto y la apiKey.
+2. En Firebase: Authentication con Correo electrónico/contraseña activado, y Firestore (edición Standard, base "(default)", modo producción, ubicación cercana).
+3. En console.cloud.google.com, en el mismo proyecto, habilitar: Google Drive API, Firebase Hosting API, Firebase Rules API, Cloud Firestore API e Identity Toolkit API.
+4. En Google Auth Platform: datos de la app, público Externo, crear un cliente "App de escritorio", descargar su JSON y publicar la app ("En producción") para que la conexión no venza cada 7 días.
+5. Crear una clave de API solo para reproducir: restringida a Google Drive API y al sitio https://MI-SITIO.web.app/*.
+6. En AudioTaller: Playlist → Conectar portal web, completar ID del proyecto, clave web, clave de reproducción, nombre del sitio, nombre del estudio y color; arrastrar el JSON; Autorizar Google; Instalar / actualizar portal.
+7. Publicar una playlist de prueba y abrir el enlace como si fuera el artista.
+
+Cómo quiero que me ayudes:
+- De a un paso por vez. Antes de seguir, preguntame qué veo en pantalla o pedime una captura, y esperá mi respuesta.
+- Decime exactamente qué botón tocar y qué escribir. Si la pantalla que veo no coincide con tu explicación (Google cambia sus menús), ayudame a encontrar la opción equivalente.
+- Si aparece algo que pide tarjeta, plan pago, Blaze, Cloud Storage o Functions, avisame y volvamos atrás: no hace falta.
+- No me pidas contraseñas ni el contenido del archivo JSON del cliente OAuth. Las claves AIza... son públicas y puedo mostrártelas si hace falta.
+- Si AudioTaller muestra un error, explicame qué significa y qué hago, sin suponer cosas que no te dije.
+- Al final, haceme una lista corta de lo que quedó configurado y de los datos que tengo que guardar.
+
+Empezá preguntándome si ya tengo cuenta de Google y AudioTaller instalado.

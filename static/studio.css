@@ -561,6 +561,9 @@ body[data-page=albumPane] #chatFab{bottom:110px}
 /* Playlist */
 .pl-layout{display:flex;margin:-24px -22px 0;min-height:calc(100vh - 80px)}
 .pl-side{flex:0 0 268px;border-right:1px solid var(--at-line);padding:20px 12px;display:flex;flex-direction:column;gap:4px;background:#0A0A0C}
+.pl-guide{margin-top:auto;display:flex;flex-direction:column;gap:6px;padding:14px;border:1px solid var(--at-line);border-radius:10px;background:color-mix(in srgb,var(--at-accent) 7%,transparent)}
+.pl-guide small{color:var(--at-text2);line-height:1.4}
+.pl-guide .mk-btn{align-self:flex-start;margin-top:4px}
 .pl-side-head{display:flex;justify-content:space-between;align-items:center;padding:0 6px 8px}
 .pl-item{display:flex!important;gap:12px;align-items:center;text-align:left;margin:0!important;background:transparent!important;border:0!important;padding:8px!important;color:var(--at-text)!important;font-weight:400}
 .pl-item.is-on{background:var(--at-raised)!important}.pl-item small{display:block;font-size:12px}.pl-item small.muted{color:var(--at-text2)}

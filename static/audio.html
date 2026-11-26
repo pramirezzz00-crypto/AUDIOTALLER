@@ -22,6 +22,7 @@
   <button id="sidePlaylists" aria-label="Playlist" onclick="openPlaylists()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h11M4 11h11M4 16h7"/><path d="M18 8v9.5"/><circle cx="16" cy="18" r="2"/></svg><span>Playlist</span></button>
   <button class="side-sub" id="sideMyPlaylists" aria-label="Mis playlists" onclick="openPlaylists()"><span>Mis playlists</span></button>
   <button class="side-sub" id="sideFeedback" aria-label="Devoluciones" onclick="openFeedbackPane()"><span>Devoluciones</span><b id="sideFeedbackCount" class="side-count" hidden></b></button>
+  <button class="side-sub" id="sidePortalGuide" aria-label="Instructivo del portal" onclick="portalGuideDialog()"><span>Instructivo del portal</span></button>
   <button id="sideArrangements" aria-label="Arreglos" onclick="openArrangements()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h2l2-6 3 12 3-9 2 5 2-2h4"/></svg><span>Arreglos</span></button>
   <button id="sideComposition" aria-label="Composición" onclick="compGo(comp.tab)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4-1 11-11-3-3L5 16z"/></svg><span>Composición</span></button>
   <button class="side-sub comp-sub" id="sideBeats" onclick="compGo('beats')"><span>Beats</span></button>
@@ -192,7 +193,7 @@
   <div id="catalogAudios"></div><div class="row"><button class="alt" id="catalogPrev" onclick="catalogPage(-1)">Anterior</button><button class="alt" id="catalogNext" onclick="catalogPage(1)">Siguiente</button></div>
 </section>
 <section id="playlistsPane" hidden>
-  <div class="heading"><div><h1>Playlist</h1><p class="muted">Selecciones de audios para revisar y preparar entregas al artista.</p></div><div class="row"><button class="alt" onclick="portalSetupDialog().catch(report)">Conectar portal web</button><button onclick="newPlaylistDialog().catch(report)">＋ Nueva playlist</button></div></div>
+  <div class="heading"><div><h1>Playlist</h1><p class="muted">Selecciones de audios para revisar y preparar entregas al artista.</p></div><div class="row"><button class="alt" onclick="portalGuideDialog()" title="Guía paso a paso para crear y mantener la página de tus artistas">📘 Instructivo del portal</button><button class="alt" onclick="portalSetupDialog().catch(report)">Conectar portal web</button><button onclick="newPlaylistDialog().catch(report)">＋ Nueva playlist</button></div></div>
   <div class="playlist-layout"><aside id="playlistLibrary" class="list"></aside><article id="playlistDetail" class="card"><p>Elegí una playlist o creá una desde los favoritos del Catálogo.</p></article></div>
 </section>
 <section id="trashPane" hidden>

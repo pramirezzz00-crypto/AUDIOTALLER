@@ -123,7 +123,8 @@ function paintPlaylists() {
     root.innerHTML = `<div class="pl-layout">
       <aside class="pl-side"><div class="pl-side-head"><span class="eyebrow">Mis playlists</span><button class="link" onclick="newPlaylistDialog().catch(report)">+ Nueva</button></div>
         ${plx.lists.map(l => { const [st, cls] = plStatus(l); return `<button class="pl-item ${cur?.id === l.id ? 'is-on' : ''}" onclick="selectPlaylist('${l.id}').catch(report)">
-          <span class="pl-art" style="${placeholderArt(l.id, 'mezcla')}"></span><span><strong>${esc(l.nombre)}</strong><small>${countLabel(l.total, 'audio', 'audios')}</small><small class="${cls}">${st}</small></span></button>`; }).join('') || '<p class="muted">Todavía no hay playlists. Creá una desde el Catálogo.</p>'}</aside>
+          <span class="pl-art" style="${placeholderArt(l.id, 'mezcla')}"></span><span><strong>${esc(l.nombre)}</strong><small>${countLabel(l.total, 'audio', 'audios')}</small><small class="${cls}">${st}</small></span></button>`; }).join('') || '<p class="muted">Todavía no hay playlists. Creá una desde el Catálogo.</p>'}
+        <div class="pl-guide"><span class="eyebrow">Tu Portal del artista</span><strong>Instructivo paso a paso</strong><small>Crear, conectar y mantener la página donde tus artistas escuchan y comentan.</small><button class="mk-btn" onclick="portalGuideDialog()">📘 Abrir instructivo</button></div></aside>
       ${cur ? `<section class="pl-main">
         <div class="pl-hero"><span class="pl-cover" style="${placeholderArt(cur.id, 'mezcla')}"></span>
           <div><span class="eyebrow">Playlist de escucha</span><h1>${esc(cur.nombre)}</h1>
@@ -135,7 +136,7 @@ function paintPlaylists() {
           <button class="mk-btn" onclick="publishWebDialog().catch(report)">Publicar cambios en el portal</button>
           <details class="menu"><summary class="menu-button">Más</summary><div class="menu-list">
             <button onclick="editPlaylistDialog()">Nombre y notas</button><button onclick="deliveryDialog().catch(report)">Vista local / entrega</button>
-            <button onclick="portalSetupDialog().catch(report)">Conectar portal web</button><button onclick="importCatalogAudio([], '${cur.id}').catch(report)">Incorporar audios desde la PC</button></div></details></div>
+            <button onclick="portalSetupDialog().catch(report)">Conectar portal web</button><button onclick="portalGuideDialog()">Instructivo del portal (PDF)</button><button onclick="importCatalogAudio([], '${cur.id}').catch(report)">Incorporar audios desde la PC</button></div></details></div>
         <div class="pl-body"><div class="pl-tracks"><table class="mk-table"><thead><tr><th></th><th>#</th><th>Audio</th><th>Canción · disco</th><th>Devoluciones</th><th>Dur.</th><th></th></tr></thead><tbody>
           ${cur.audios.map((a, i) => `<tr draggable="true" data-pl="${i}"><td class="grip" title="Arrastrá para ordenar">⋮⋮</td><td class="mono">${i + 1}</td>
             <td><strong>${esc(a.titulo)} · ${esc(KIND[a.etapa]?.[1] || 'Audio')} ${esc(catVersionOf(a))}</strong><small class="mono">${esc(a.nombre)}</small></td>
