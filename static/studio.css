@@ -957,3 +957,8 @@ html[data-theme="light"] .avx input[type=checkbox],html[data-theme="light"] .wz-
 .mig-wait .spin{width:16px;height:16px;border-radius:50%;border:2px solid var(--at-line3);border-top-color:var(--at-accent);animation:migspin 1s linear infinite}
 @keyframes migspin{to{transform:rotate(360deg)}}
 @media (max-width:900px){.mig-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Composición: enlace entre la página de listas y la vista de trabajo (Zharelly) */
+.composition-detail .comp-old{margin:2px 0 14px}
+.comp-old .link,.comp-back .link{color:var(--at-accent);font-weight:600}
+.comp-back{margin:0 0 10px}
