@@ -350,6 +350,9 @@ from redesign_arr import register_arrangement_waves
 register_arrangement_waves(app)
 from redesign_extra import register_extra
 register_extra(app, db_open, lambda: DB.parent)
+from migration import register_migration
+from version import DISPLAY_VERSION as _MIGRATION_VERSION
+register_migration(app, db_open, lambda: DB, _MIGRATION_VERSION)
 
 from werkzeug.exceptions import HTTPException
 

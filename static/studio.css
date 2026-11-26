@@ -916,3 +916,44 @@ html[data-theme="light"] .wz-photo>span{color:var(--at-accent)}
 html[data-theme="light"] .wz-person.open{border-color:var(--at-accent)}
 html[data-theme="light"] .ppl-photo-cta{background:var(--at-panel)}
 html[data-theme="light"] .avx input[type=checkbox],html[data-theme="light"] .wz-check input{accent-color:var(--at-accent)}
+
+/* Migrar a otra computadora */
+.mig-card{display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap;margin-bottom:16px}
+.mig-card>div:first-child{flex:1 1 380px}.mig-card h2{margin:2px 0 6px}
+.mig-card-actions{display:flex;gap:8px;flex-wrap:wrap}
+.mig-tabs{display:flex;gap:4px;border-bottom:1px solid var(--at-line);margin-bottom:16px;flex-wrap:wrap}
+.mig-tabs button{background:none!important;border:0!important;border-bottom:2px solid transparent!important;border-radius:0!important;padding:10px 14px!important;color:var(--at-text2)!important;font:600 13px var(--at-font);margin:0!important}
+.mig-tabs button.is-on{color:var(--at-text)!important;border-bottom-color:var(--at-accent)!important}
+.mig-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.mig-summary>div{border:1px solid var(--at-line);border-radius:10px;padding:12px 14px;background:var(--at-panel)}
+.mig-summary small{display:block;color:var(--at-text2);font-size:12px}.mig-summary b{font-size:18px}
+.mig-summary .is-total{border-color:var(--at-accent)}
+.mig-section{margin-bottom:16px}.mig-section h2{margin:0 0 6px;font-size:17px}.mig-section h3{margin:16px 0 6px;font-size:14px}
+.mig-section td small{display:block;color:var(--at-text3);font-size:11.5px;word-break:break-all}
+.mig-section .right,.mig-run .right{text-align:right}
+.mig-disk{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11.5px;border:1px solid var(--at-line3);white-space:nowrap}
+.mig-disk.ok{color:var(--at-accent);border-color:color-mix(in srgb,var(--at-accent) 45%,transparent)}
+.mig-disk.warn{color:#E0A84A;border-color:color-mix(in srgb,#E0A84A 45%,transparent)}
+.mig-group{border:1px solid var(--at-line);border-radius:10px;margin:8px 0;padding:0 12px}
+.mig-group summary{display:flex;align-items:center;gap:10px;padding:10px 0;cursor:pointer;flex-wrap:wrap}
+.mig-group summary small{color:var(--at-text2)}.mig-group>p{margin:0 0 8px;font-size:12.5px}
+.mig-group table{margin-bottom:10px}
+.mig-badge{font:600 11px var(--at-font);padding:2px 8px;border-radius:6px;background:var(--at-line2);text-transform:uppercase;letter-spacing:.04em}
+.mig-badge.copia{background:color-mix(in srgb,var(--at-accent) 20%,transparent);color:var(--at-accent)}
+.mig-badge.ilok,.mig-badge.clave{background:color-mix(in srgb,#E0A84A 18%,transparent);color:#E0A84A}
+.mig-count{margin-left:auto;font-size:12px;color:#E0A84A}.mig-count.ok{color:var(--at-accent)}
+.mig-ok{color:var(--at-accent);font-weight:700}.mig-miss{color:var(--at-text3)}
+.mig-note{font-size:12.5px;color:var(--at-text2);margin-top:12px}
+.mig-missing{margin-top:10px;font-size:12.5px;color:var(--at-text2)}
+.mig-warn{border-color:color-mix(in srgb,#E0A84A 45%,transparent)}.mig-warn li{margin:4px 0}
+.mig-warnline{padding:10px 12px;border-radius:8px;background:color-mix(in srgb,#E0A84A 12%,transparent);border:1px solid color-mix(in srgb,#E0A84A 35%,transparent)}
+.mig-actions{display:flex;justify-content:flex-end;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0}
+.mig-actions>.muted{margin-right:auto}
+.mig-run{max-width:760px}.mig-run h2{margin-top:0}
+.mig-bar{height:8px;border-radius:99px;background:var(--at-line2);overflow:hidden;margin:12px 0 6px}
+.mig-bar i{display:block;height:100%;background:var(--at-accent);transition:width .4s}
+.mig-done h2{color:var(--at-accent)}
+.mig-wait{display:flex;align-items:center;gap:12px}
+.mig-wait .spin{width:16px;height:16px;border-radius:50%;border:2px solid var(--at-line3);border-top-color:var(--at-accent);animation:migspin 1s linear infinite}
+@keyframes migspin{to{transform:rotate(360deg)}}
+@media (max-width:900px){.mig-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}

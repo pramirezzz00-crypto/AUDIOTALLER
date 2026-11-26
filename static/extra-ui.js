@@ -372,6 +372,12 @@ async function openConfig() {
             <option value="light" ${currentTheme === 'light' ? 'selected' : ''}>Claro</option>
           </select>
         </label>
+      </section><section class="card mig-card" aria-labelledby="migTitle">
+        <div><div class="eyebrow">Computadora nueva</div><h2 id="migTitle">Migrar a otra computadora</h2>
+          <p class="muted">Exportá en un solo archivo la biblioteca de AudioTaller, los proyectos del disco interno y los plugins gratuitos. En la computadora nueva lo importás y AudioTaller te dice qué plugins con licencia reinstalar y con qué central.</p></div>
+        <div class="mig-card-actions"><button class="btn-primary" onclick="openMigration('exportar').catch(report)">Exportar todo</button>
+          <button class="mk-btn" onclick="openMigration('importar').catch(report)">Importar migración</button>
+          <button class="mk-btn" onclick="openMigration('plugins').catch(report)">Plugins para reinstalar</button></div>
       </section><header class="prod-head"><div><div class="eyebrow">Configuración</div><h1>Claude</h1>
       <p class="muted">El asistente usa tu propia clave de API de la Claude Console (se factura aparte de la suscripción a claude.ai). La clave se guarda cifrada en esta PC.</p></div></header>
       <form class="card cr-form" onsubmit="event.preventDefault();saveConfig(this).catch(report)">

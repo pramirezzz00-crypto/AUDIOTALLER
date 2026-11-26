@@ -240,6 +240,24 @@ def main():
             except Exception:
                 return False
 
+        def choose_migration_destination(self, suggested='AudioTaller migración.zip'):
+            descargas = Path.home() / 'Downloads'
+            result = webview.windows[0].create_file_dialog(
+                webview.FileDialog.SAVE, directory=str(descargas if descargas.is_dir() else Path.home()),
+                save_filename=suggested, file_types=('Migración de AudioTaller (*.zip)',))
+            destino = result[0] if isinstance(result, (list, tuple)) and result else result
+            return str(destino or '')
+
+        def choose_migration_file(self):
+            result = webview.windows[0].create_file_dialog(
+                webview.FileDialog.OPEN, allow_multiple=False, file_types=('Migración de AudioTaller (*.zip)', 'Todos los archivos (*.*)'))
+            return str(result[0]) if result else ''
+
+        def show_in_folder(self, path):
+            path = Path(path)
+            open_path(str(path.parent if path.is_file() else path))
+            return True
+
         def save_portal_guide(self):
             # Copia el instructivo incluido en la app donde el usuario elija y lo abre.
             import shutil
