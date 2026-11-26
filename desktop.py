@@ -240,6 +240,56 @@ def main():
             except Exception:
                 return False
 
+        def save_download(self, url, suggested=''):
+            # En Mac la ventana no sabe descargar: un enlace «download» reemplazaba la app por el archivo
+            # y al cerrarlo se cerraba AudioTaller. Acá se pide el archivo a la propia app y se guarda.
+            import re
+            from urllib.parse import urlsplit, unquote
+            parts = urlsplit(str(url))
+            path = parts.path + ('?' + parts.query if parts.query else '')
+            if not parts.path.startswith('/'):
+                return ''
+            response = app.test_client().get(path)
+            if response.status_code != 200:
+                return ''
+            header = response.headers.get('Content-Disposition', '')
+            match = re.search(r"filename\*=UTF-8''([^;]+)", header) or re.search(r'filename="?([^";]+)"?', header)
+            name = suggested or (unquote(match.group(1)) if match else unquote(parts.path.rsplit('/', 1)[-1])) or 'archivo'
+            name = re.sub(r'[\\/:*?"<>|]+', '-', name).strip() or 'archivo'
+            descargas = Path.home() / 'Downloads'
+            result = webview.windows[0].create_file_dialog(
+                webview.FileDialog.SAVE, directory=str(descargas if descargas.is_dir() else Path.home()), save_filename=name)
+            destino = result[0] if isinstance(result, (list, tuple)) and result else result
+            if not destino:
+                return ''
+            destino = Path(destino)
+            destino.write_bytes(response.get_data())
+            try:
+                open_path(str(destino if destino.suffix.lower() == '.pdf' else destino.parent))
+            except OSError:
+                pass
+            return str(destino)
+
+        def open_download(self, url):
+            # «Abrir» un archivo servido por la app: se abre con el programa del sistema, sin salir de AudioTaller.
+            import re, tempfile
+            from urllib.parse import urlsplit, unquote
+            parts = urlsplit(str(url))
+            if not parts.path.startswith('/'):
+                return ''
+            response = app.test_client().get(parts.path + ('?' + parts.query if parts.query else ''))
+            if response.status_code != 200:
+                return ''
+            header = response.headers.get('Content-Disposition', '')
+            match = re.search(r"filename\*=UTF-8''([^;]+)", header) or re.search(r'filename="?([^";]+)"?', header)
+            name = unquote(match.group(1)) if match else unquote(parts.path.rsplit('/', 1)[-1]) or 'archivo'
+            name = re.sub(r'[\\/:*?"<>|]+', '-', name).strip() or 'archivo'
+            folder = Path(tempfile.mkdtemp(prefix='audiotaller-'))
+            destino = folder / name
+            destino.write_bytes(response.get_data())
+            open_path(str(destino))
+            return str(destino)
+
         def choose_migration_destination(self, suggested='AudioTaller migración.zip'):
             descargas = Path.home() / 'Downloads'
             result = webview.windows[0].create_file_dialog(

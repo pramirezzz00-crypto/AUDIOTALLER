@@ -487,3 +487,24 @@ function renderProfile() {
     ).join('') || '<p class="muted">Sin integrantes registrados.</p>';
     renderSocials($('profileSocials'), profile.redesSociales || []);
 }
+// En la app de escritorio (sobre todo en Mac) la ventana no descarga archivos: un enlace «download»
+// reemplazaba AudioTaller por el archivo y al cerrarlo se cerraba la app. Se guarda con el diálogo del sistema.
+document.addEventListener('click', event => {
+    const link = event.target.closest?.('a[download]');
+    if (!link || !window.pywebview?.api?.save_download) return;
+    const url = new URL(link.href, location.href);
+    if (url.origin !== location.origin) return;
+    event.preventDefault();
+    window.pywebview.api.save_download(url.pathname + url.search, link.getAttribute('download') || '')
+        .then(path => { if (path) notify('Guardado en ' + path); })
+        .catch(error => report(error));
+}, true);
+// Igual para «Abrir» archivos de la app en otra ventana: se abren con el programa del sistema.
+document.addEventListener('click', event => {
+    const link = event.target.closest?.('a[target="_blank"]:not([download])');
+    if (!link || !window.pywebview?.api?.open_download) return;
+    const url = new URL(link.href, location.href);
+    if (url.origin !== location.origin) return;
+    event.preventDefault();
+    window.pywebview.api.open_download(url.pathname + url.search).catch(error => report(error));
+}, true);
