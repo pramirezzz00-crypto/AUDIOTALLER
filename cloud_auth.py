@@ -21,8 +21,47 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
 class CloudError(ValueError):
-    def __init__(self,message,status):
-        super().__init__(message);self.status=status
+    def __init__(self,message,status,code=''):
+        super().__init__(message);self.status=status;self.code=str(code or '').split(':')[0].strip()
+
+
+SERVICES={'www.googleapis.com':'Google Drive','firestore.googleapis.com':'Firestore','firebasehosting.googleapis.com':'Firebase Hosting',
+          'firebaserules.googleapis.com':'las reglas de Firestore','identitytoolkit.googleapis.com':'Firebase Authentication',
+          'securetoken.googleapis.com':'Firebase Authentication','oauth2.googleapis.com':'el inicio de sesión de Google'}
+AUTH_CODES={'EMAIL_EXISTS':'Ese correo ya tiene una cuenta en el portal. Escribí su contraseña actual para vincularlo.',
+            'OPERATION_NOT_ALLOWED':'Activá «Correo electrónico/contraseña» en Firebase → Authentication → Método de acceso.',
+            'INVALID_LOGIN_CREDENTIALS':'La contraseña no coincide con la que ya tiene el artista. Dejá el campo vacío para conservarla.',
+            'INVALID_PASSWORD':'La contraseña no coincide con la que ya tiene el artista. Dejá el campo vacío para conservarla.',
+            'EMAIL_NOT_FOUND':'Ese correo todavía no tiene acceso al portal.',
+            'WEAK_PASSWORD':'La contraseña es muy corta: usá al menos 8 caracteres.',
+            'INVALID_EMAIL':'El correo del artista no es válido.',
+            'USER_DISABLED':'La cuenta del artista está deshabilitada en Firebase Authentication.',
+            'TOO_MANY_ATTEMPTS_TRY_LATER':'Hubo demasiados intentos con ese correo. Esperá unos minutos y volvé a probar.',
+            'API_KEY_INVALID':'La clave web de Firebase no es válida. Revisala en Conectar portal web.',
+            'CONFIGURATION_NOT_FOUND':'Inicializá Firebase Authentication en el proyecto (Authentication → Comenzar).'}
+
+
+def google_message(url,status,raw):
+    """Explica en castellano qué servicio falló y por qué, sin exponer tokens ni direcciones de subida."""
+    host=urllib.parse.urlparse(url).hostname or ''
+    service=SERVICES.get(host,'Google')
+    code=str(raw or '').split(':')[0].strip()
+    text=str(raw or '')
+    if code in AUTH_CODES:return AUTH_CODES[code]
+    if 'has not been used in project' in text or 'is disabled' in text or 'SERVICE_DISABLED' in text:
+        return f'La API de {service} no está habilitada en tu proyecto de Google Cloud. Habilitala en Google Cloud → APIs y servicios → Biblioteca y reintentá en unos minutos.'
+    if 'storageQuotaExceeded' in text or 'quota' in text.lower() and 'storage' in text.lower():
+        return 'Tu Google Drive no tiene espacio suficiente para subir los audios.'
+    if status==401:
+        return 'La conexión con Google venció. Volvé a conectar Google en «Conectar portal web».'
+    if status==403:
+        return f'{service[:1].upper()+service[1:]} no dio permiso. Volvé a conectar Google en «Conectar portal web» aceptando todos los permisos, y revisá que tu cuenta sea propietaria del proyecto.'
+    if status==404:
+        return f'{service[:1].upper()+service[1:]} no encontró el recurso. Revisá el ID del proyecto y que Firestore y Hosting estén creados.'
+    if status==409 or 'FAILED_PRECONDITION' in text:
+        return f'{service[:1].upper()+service[1:]} cambió mientras se publicaba (otra publicación en curso). Reintentá.'
+    detail=' '.join(text.split())[:220]
+    return f'{service[:1].upper()+service[1:]} rechazó la operación' + (f': {detail}' if detail else '. Revisá los permisos, las APIs habilitadas y el espacio disponible.')
 
 
 def http_request(url, method='GET', data=None, headers=None, raw=False):
@@ -47,18 +86,7 @@ def http_request(url, method='GET', data=None, headers=None, raw=False):
             message=detail.get('message','') if isinstance(detail,dict) else str(detail)
         except (ValueError,AttributeError):
             message=''
-        names={'EMAIL_EXISTS':'Ese correo ya tiene una cuenta. Indicá su contraseña actual para vincularlo.',
-               'OPERATION_NOT_ALLOWED':'Habilitá Correo/contraseña en Firebase Authentication.',
-               'INVALID_LOGIN_CREDENTIALS':'Correo o contraseña incorrectos.',
-               'API_KEY_INVALID':'Revisá la clave web de Firebase.',
-               'CONFIGURATION_NOT_FOUND':'Inicializá Firebase Authentication en el proyecto.'}
-        if error.code==404:
-            message='Recurso no encontrado. Revisá el proyecto, Firestore y los servicios habilitados.'
-        elif message in names:
-            message=names[message]
-        else:
-            message='Google rechazó la operación. Revisá los permisos, APIs habilitadas y espacio disponible.'
-        raise CloudError(f'{message} (HTTP {error.code})',error.code) from None
+        raise CloudError(f'{google_message(url,error.code,message)} (HTTP {error.code})',error.code,message) from None
     except urllib.error.URLError:
         raise ValueError('No se pudo conectar con Google. Revisá Internet y volvé a intentar.') from None
 

@@ -1,5 +1,46 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AudioTaller · Portal del artista</title><link rel="stylesheet" href="/portal.css"></head><body><main>
-<header><div class="heading"><strong class="brand" id="producerBrand">♫ AudioTaller</strong><div><button id="reloadPlaylist" hidden>Actualizar playlist</button> <button id="logout" hidden>Cerrar sesión</button></div></div><p>Portal del artista</p><h1 id="title">Tu espacio de escucha</h1><p id="policy"></p></header>
-<p id="error" role="alert"></p><form id="access"><h2>Ingresar a la playlist</h2><label>Correo<input id="email" type="email" autocomplete="username" required></label><label>Contraseña<input id="password" type="password" autocomplete="current-password" required></label><button id="login">Ingresar</button><p id="accessInfo">Usá el acceso que te compartió tu productor.</p></form>
-<div id="tracks"></div><footer>La playlist puede actualizarse, vencer o ser revocada por el productor. Los audios están compartidos por enlace en Google Drive; quien tenga su enlace directo podrá acceder a ellos. La reproducción y el acceso dependen también de los límites y permisos de Google.</footer>
-</main><script src="/portal.js"></script></body></html>
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>Portal de escucha · AudioTaller</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="/portal.css"></head><body>
+<header class="top"><div class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4M7 7v10M11 4v16M15 8v8M19 11v2"/></svg><b>Portal de escucha</b><span id="sharedBy"></span></div>
+  <div class="who"><span id="who"></span><button id="logout" class="link" hidden>Salir</button></div></header>
+<div id="notice" class="notice" role="status" hidden></div>
+<p id="error" class="error" role="alert"></p>
+
+<section id="access" class="access"><div class="access-card">
+  <p class="eyebrow">Playlist para escuchar y comentar</p><h1>Tu espacio de escucha</h1>
+  <p class="muted">Entrá con el correo y la contraseña que te pasó tu productor. Vas a poder escuchar, marcar el minuto exacto de cada comentario y ver sus respuestas.</p>
+  <form id="accessForm"><label>Correo<input id="email" type="email" autocomplete="username" required></label>
+    <label>Contraseña<input id="password" type="password" autocomplete="current-password" required></label>
+    <button id="login" class="primary">Ingresar</button></form></div></section>
+
+<main id="app" hidden>
+  <section class="hero"><div class="cover" aria-hidden="true"><i></i><i></i></div>
+    <div class="hero-info"><p class="eyebrow">Playlist para escuchar y comentar</p><h1 id="title"></h1><p id="meta" class="muted"></p></div>
+    <button id="heroPlay" class="hero-play" aria-label="Reproducir la playlist">▶</button></section>
+  <div class="layout">
+    <div class="main-col">
+      <div class="tracks" role="table" aria-label="Audios de la playlist">
+        <div class="tr th" role="row"><span>#</span><span>Audio</span><span>Tus devoluciones</span><span class="r">Dur.</span></div>
+        <div id="tracks"></div></div>
+      <section id="player" class="player" aria-label="Reproductor">
+        <div class="player-head"><div><b id="nowTitle"></b> <span id="nowTag" class="tag" hidden>versión nueva</span></div><span class="time mono"><b id="tNow">0:00</b> / <span id="tDur">0:00</span></span></div>
+        <div id="wave" class="wave" role="slider" tabindex="0" aria-label="Posición del audio" aria-valuemin="0" aria-valuenow="0"></div>
+        <div class="controls"><button id="play" class="round" aria-label="Reproducir">▶</button><button id="back5" class="ghost">⟲ 5 s</button>
+          <div id="ab" class="ab" hidden><span class="muted">A/B con la versión que comentaste:</span><div class="seg"><button id="abA"></button><button id="abB" class="on"></button></div></div></div>
+        <form id="composer" class="composer">
+          <div class="stamp"><span id="stamp" class="mono chip-time">0:00</span><div class="nudge"><button type="button" id="minus" aria-label="Un segundo antes">−1 s</button><button type="button" id="plus" aria-label="Un segundo después">+1 s</button></div></div>
+          <div class="compose-main"><textarea id="text" maxlength="4000" rows="3" placeholder="Escribí tu devolución sobre este momento…" required></textarea>
+            <div class="compose-foot"><small id="hint" class="muted">Se marca el minuto donde pausaste. Podés moverlo ±1 s o dejarla como comentario general.</small>
+              <div class="row"><button type="button" id="general" class="ghost" aria-pressed="false">General</button><button id="send" class="primary">Enviar devolución</button></div></div>
+            <p id="sendStatus" class="muted" role="status"></p></div></form>
+      </section>
+    </div>
+    <aside class="side"><p class="eyebrow" id="sideTitle">Tus devoluciones</p><p id="counts" class="counts"></p><div id="notes"></div>
+      <p class="fine">Tu productor ve tus devoluciones con el minuto exacto, te responde y marca qué versión resuelve cada una. <span id="expires"></span></p></aside>
+  </div>
+  <footer class="fine">Los audios se comparten por enlace de Google Drive: quien tenga ese enlace directo puede escucharlos. La playlist puede actualizarse, vencer o ser revocada por el productor.</footer>
+</main>
+<audio id="audio" preload="none"></audio>
+<script src="/portal.js"></script></body></html>

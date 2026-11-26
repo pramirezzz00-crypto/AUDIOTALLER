@@ -58,7 +58,7 @@ function renderFeedbackPane() {
       <header class="fb-head">
         <div><div class="eyebrow">Playlist › Devoluciones</div><h1>Devoluciones</h1>
           <p class="muted">Lo que marcó el artista en el portal, con el estado de cada cambio.</p></div>
-        <div class="row"><span id="fbSyncStatus" class="muted" role="status"></span><button class="alt" onclick="syncFeedback().catch(report)">Buscar devoluciones nuevas</button></div>
+        <div class="row"><span id="fbSyncStatus" class="muted" role="status"></span><button class="alt" onclick="syncFeedback().catch(report)">Buscar devoluciones nuevas</button><button onclick="sendFeedbackReplies().catch(report)" title="Envía tus respuestas, estados y versiones corregidas al portal del artista">Enviar respuestas al artista</button></div>
       </header>
       <div class="fb-layout">
         <aside class="fb-lists" aria-label="Playlists">
@@ -315,6 +315,16 @@ async function fbSaveMarkers() {
     const result = await api('/api/portal/devoluciones/marcadores', body({archivo_id: note.archivo_id, desfase: Number($('fbOffset').value) || 0,
         sesion_id: $('fbSession')?.value || '', reaper: !!$('fbReaper')?.checked}));
     $('fbStatus').textContent = '✓ ' + result.mensaje + ' ' + result.archivos.map(path => path.split(/[\\/]/).pop()).join(', ');
+}
+// Manda respuestas, estados y la versión que resuelve cada pedido al portal (sin volver a publicar la playlist).
+async function sendFeedbackReplies() {
+    const notes = fb.notes.filter(n => (!fb.playlist || n.playlist_id === fb.playlist) && (n.respuesta || n.estado !== 'Pendiente' || n.resuelve_archivo));
+    const pubs = [...new Set(notes.map(n => n.publicacion_id).filter(Boolean))];
+    if (!pubs.length) throw Error('Todavía no hay respuestas para enviar: respondé o cambiá el estado de alguna devolución.');
+    const status = $('fbSyncStatus');
+    let total = 0;
+    for (const id of pubs) total += (await cloudOperation('/api/portal/publicaciones/' + encodeURIComponent(id) + '/respuestas', {}, status)).respuestas;
+    if (status) status.textContent = `✓ ${countLabel(total, 'respuesta enviada', 'respuestas enviadas')} al portal. El artista verá el aviso al entrar.`;
 }
 async function syncFeedback() {
     const result = await api('/api/portal/devoluciones/sincronizar', body(fb.playlist ? {playlist_id: fb.playlist} : {}));
