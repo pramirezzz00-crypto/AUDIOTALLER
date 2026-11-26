@@ -31,7 +31,7 @@ function display() {
     $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="openArtistManager(${projectPath})">${manager}</button>${artistLabel}`;
     if (page === 'arrangements' && $('crumbPath')) $('crumbPath').innerHTML = '<button onclick="go(\'home\')">Inicio</button> › Arreglos';
     if (compositionLabels[page]) {
-        $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="go('composition')">Composición</button>${page==='composition'?'':' › '+compositionLabels[page]}`;
+        $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="compGo('${page==='composition'?comp.tab:page}')">Composición</button>${page==='composition'?'':' › '+compositionLabels[page]}`;
         if(page==='beats') loadBeats();
         if(page==='scores') loadScores();
         if(page==='lyrics') loadLyrics();

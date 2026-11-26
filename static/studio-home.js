@@ -138,10 +138,14 @@ function studioDisplayHook(page) {
     else if (typeof fb !== 'undefined') fb.audio.pause();
     if (page === 'creditsPane') renderCredits();
     if (page === 'composition') renderCompositionPane();
-    document.querySelectorAll('.comp-sub').forEach(b => { b.hidden = page !== 'composition'; });
-    if (typeof comp !== 'undefined') { $('sideBeats')?.setAttribute('aria-current', page === 'composition' && comp.tab === 'beats' ? 'page' : 'false');
-        $('sideLyrics')?.setAttribute('aria-current', page === 'composition' && comp.tab === 'lyrics' ? 'page' : 'false');
-        $('sideScores')?.setAttribute('aria-current', page === 'composition' && comp.tab === 'scores' ? 'page' : 'false'); }
+    const compLists = ['beats', 'lyrics', 'scores'].includes(page);
+    document.querySelectorAll('.comp-sub').forEach(b => { b.hidden = page !== 'composition' && !compLists; });
+    if (typeof comp !== 'undefined') {
+        if (compLists) comp.tab = page;
+        const compNow = page === 'composition' || compLists ? comp.tab : '';
+        $('sideBeats')?.setAttribute('aria-current', compNow === 'beats' ? 'page' : 'false');
+        $('sideLyrics')?.setAttribute('aria-current', compNow === 'lyrics' ? 'page' : 'false');
+        $('sideScores')?.setAttribute('aria-current', compNow === 'scores' ? 'page' : 'false'); }
     if (page === 'entidades') renderEntitiesPane();
     if (page === 'arrangements') renderArrangementsPane();
     const crumbs = {launchesPane: 'Lanzamientos', avPane: 'Audiovisual', configPane: 'Configuración'};
