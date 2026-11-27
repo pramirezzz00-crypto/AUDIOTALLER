@@ -495,10 +495,20 @@ document.addEventListener('click', event => {
     const url = new URL(link.href, location.href);
     if (url.origin !== location.origin) return;
     event.preventDefault();
+    if (/\.pdf$|\/pdf$/i.test(url.pathname)) { openPdf(url.pathname + url.search, link.getAttribute('download') || '').catch(error => report(error)); return; }
     window.pywebview.api.save_download(url.pathname + url.search, link.getAttribute('download') || '')
         .then(path => { if (path) notify('Guardado en ' + path); })
         .catch(error => report(error));
 }, true);
+// Los PDF se abren directo en el lector predeterminado o el navegador; solo si no hay ninguno se ofrece guardarlo.
+async function openPdf(url, name = '') {
+    if (!window.pywebview?.api?.open_pdf) { window.open(url, '_blank', 'noopener'); return; }
+    const result = await window.pywebview.api.open_pdf(url);
+    if (result?.ok) return notify('Abriendo el PDF…');
+    if (!await appConfirm({title: 'No hay un lector de PDF', message: 'No encontré un programa para abrir PDF en esta computadora.', detail: 'Podés guardarlo y verlo después, o instalar un lector (por ejemplo Adobe Acrobat Reader) o abrirlo con tu navegador.', confirmLabel: 'Guardar PDF', danger: false})) return;
+    const path = await window.pywebview.api.save_download(url, name);
+    if (path) notify('Guardado en ' + path);
+}
 // Igual para «Abrir» archivos de la app en otra ventana: se abren con el programa del sistema.
 document.addEventListener('click', event => {
     const link = event.target.closest?.('a[target="_blank"]:not([download])');

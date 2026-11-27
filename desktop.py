@@ -270,6 +270,36 @@ def main():
                 pass
             return str(destino)
 
+        def open_pdf(self, url):
+            # Abre el PDF con el lector predeterminado (o el navegador). Si no hay ninguno, avisa para guardarlo.
+            import re, tempfile, subprocess
+            from urllib.parse import urlsplit, unquote
+            parts = urlsplit(str(url))
+            if not parts.path.startswith('/'):
+                return dict(ok=False, motivo='ruta')
+            response = app.test_client().get(parts.path + ('?' + parts.query if parts.query else ''))
+            if response.status_code != 200:
+                return dict(ok=False, motivo='archivo')
+            header = response.headers.get('Content-Disposition', '')
+            match = re.search(r"filename\*=UTF-8''([^;]+)", header) or re.search(r'filename="?([^";]+)"?', header)
+            name = unquote(match.group(1)) if match else unquote(parts.path.rsplit('/', 1)[-1]) or 'documento.pdf'
+            name = re.sub(r'[\\/:*?"<>|]+', '-', name).strip() or 'documento.pdf'
+            if not name.lower().endswith('.pdf'):
+                name += '.pdf'
+            destino = Path(tempfile.mkdtemp(prefix='audiotaller-')) / name
+            destino.write_bytes(response.get_data())
+            try:
+                if sys.platform == 'darwin':
+                    ok = subprocess.run(['/usr/bin/open', str(destino)], capture_output=True).returncode == 0
+                elif os.name == 'nt':
+                    os.startfile(str(destino))
+                    ok = True
+                else:
+                    ok = subprocess.run(['xdg-open', str(destino)], capture_output=True).returncode == 0
+            except OSError:
+                ok = False
+            return dict(ok=ok, ruta=str(destino), motivo='' if ok else 'sin-visor')
+
         def open_download(self, url):
             # «Abrir» un archivo servido por la app: se abre con el programa del sistema, sin salir de AudioTaller.
             import re, tempfile

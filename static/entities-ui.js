@@ -41,14 +41,13 @@ function paintEntities() {
           <p>${esc(cur.what)}</p>
           <div class="ent-guide">${PDF_ICON}<div><strong>Guía de inscripción y gestión · ${esc(cur.abbr)}</strong>
             <small>Ficha técnica completa: qué protege y qué liquida, documentación a presentar, pasos de alta y recomendaciones.</small></div>
-            <a class="btn-link btn-primary" href="/static/docs/entidades/Guia-${esc(cur.abbr)}-AudioTaller.pdf" download="Guia-${esc(cur.abbr)}-AudioTaller.pdf">Descargar PDF</a></div>
+            <a class="btn-link btn-primary" href="/static/docs/entidades/Guia-${esc(cur.abbr)}-AudioTaller.pdf" download="Guia-${esc(cur.abbr)}-AudioTaller.pdf">Abrir guía (PDF)</a></div>
           <div class="ent-cols"><div><span class="insp-label">Qué te da</span><ul>${cur.gives.map(g => `<li>${esc(g)}</li>`).join('')}</ul></div>
             <div><span class="insp-label">Qué guarda AudioTaller</span><p class="muted">${esc(cur.stores)}</p></div></div>
           <span class="insp-label">Procedimientos</span>
           <label class="row-tight">Preparar para<select id="entSong" onchange="ent.song=this.value">${ent.rows.map(r => `<option value="${r.id}" ${r.id === ent.song ? 'selected' : ''}>${esc(r.titulo)} · ${esc(r.disco || 'suelta')}</option>`).join('')}</select></label>
           ${cur.procs.map(p => `<div class="ent-proc"><div><strong>${esc(p.titulo)}</strong><span class="tag">${esc(p.cuando)}</span><p class="muted">${esc(p.resumen)}</p></div>
-            <div class="row-tight"><a class="btn-link" href="/api/entidades/guia/${p.id}.pdf" download>Guía paso a paso (PDF)</a>
-              <button onclick="prepareProcedure('${cur.id}').catch(report)" ${ent.rows.length ? '' : 'disabled'}>Preparar con mis datos</button></div></div>`).join('')}
+            <div class="row-tight"><button onclick="prepareProcedure('${cur.id}').catch(report)" ${ent.rows.length ? '' : 'disabled'}>Preparar con mis datos</button></div></div>`).join('')}
           <span class="insp-help">«Preparar con mis datos» arma la carpeta del trámite dentro de la canción: ficha en PDF con obra, autores y porcentajes, la letra y, si corresponde, una copia del audio. Requisitos y aranceles pueden cambiar: confirmalos en el sitio oficial.</span>
         </aside>` : ''}
       </div>
