@@ -131,7 +131,7 @@ function renderSideRecents(recent) {
 // Se llama al final de display(): agrega el comportamiento de las pantallas nuevas.
 function studioDisplayHook(page) {
     document.body.dataset.page = page;
-    document.body.classList.toggle('no-crumbs', ['catalogPane', 'playlistsPane', 'arrangements', 'beats', 'lyrics', 'scores', 'entidades', 'launchesPane', 'artistsPane', 'feedbackPane', 'projectManager', 'configPane', 'pluginsPane', 'budgetsPane'].includes(page));
+    document.body.classList.toggle('no-crumbs', ['catalogPane', 'playlistsPane', 'arrangements', 'composition', 'entidades', 'launchesPane', 'artistsPane', 'feedbackPane', 'projectManager', 'configPane', 'pluginsPane', 'budgetsPane'].includes(page));
     $('sideFeedback')?.setAttribute('aria-current', page === 'feedbackPane' ? 'page' : 'false');
     $('sideMyPlaylists')?.setAttribute('aria-current', page === 'playlistsPane' ? 'page' : 'false');
     if (page === 'feedbackPane') { $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="openPlaylists()">Playlist</button> › Devoluciones`; renderFeedbackPane(); }

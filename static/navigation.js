@@ -14,7 +14,7 @@ function display() {
     if (page === 'projectManager') loadGlobalProjects();
     if (page !== 'songPane' && page !== 'catalogPane') disposeWavePlayers();
     document.querySelectorAll('main audio').forEach(audio => audio.pause());
-    if (page !== 'composition' || comp.tab !== 'beats') comp.audio.pause();
+    if (typeof comp !== 'undefined' && (page !== 'composition' || comp.tab !== 'beats')) comp.audio.pause();
     $('nav').hidden = page === 'home';
     $('sideHome').setAttribute('aria-current', page === 'home' ? 'page' : 'false');
     const peoplePage = ['manager', 'profile', 'editor', 'artistsPane'].includes(page) && !trail.includes('projectManager');
@@ -32,7 +32,7 @@ function display() {
     $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="openArtistManager(${projectPath})">${manager}</button>${artistLabel}`;
     if (page === 'arrangements' && $('crumbPath')) $('crumbPath').innerHTML = '<button onclick="go(\'home\')">Inicio</button> › Arreglos';
     if (compositionLabels[page]) {
-        $('crumbPath').innerHTML = page === 'composition' ? `<button onclick="compLists('${comp.tab}')">${compositionLabels[comp.tab]}</button> › ${{beats:'Banco de beats',lyrics:'Editor de letras',scores:'Vista de trabajo'}[comp.tab]}` : `<button onclick="go('home')">Inicio</button> › Composición › ${compositionLabels[page]}`;
+        $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="compGo('${page==='composition'?comp.tab:page}')">Composición</button>${page==='composition'?'':' › '+compositionLabels[page]}`;
         if(page==='beats') loadBeats();
         if(page==='scores') loadScores();
         if(page==='lyrics') loadLyrics();
@@ -60,21 +60,11 @@ function display() {
 function go(page) {
     if (trail.at(-1) === 'songPane' && page !== 'songPane' && hasUnsavedSongNotes() &&
         !confirm('Hay notas sin guardar. Se conservarán como borrador mientras esta ventana siga abierta. ¿Querés continuar?')) return;
-    if (trail.at(-1) === 'composition' && ['beats', 'lyrics', 'scores'].includes(page)) {
-        if (trail.at(-2) === page) trail.pop();
-        else trail[trail.length - 1] = page;
-        display();
-        return;
-    }
     if (page === 'home') trail.splice(1);
     else if (trail.at(-1) !== page) trail.push(page);
     display();
 }
 function back() {
-    if (trail.at(-1) === 'composition') {
-        compLists(comp.tab);
-        return;
-    }
     if (trail.at(-1) === 'songPane' && hasUnsavedSongNotes() &&
         !confirm('Hay notas sin guardar. Se conservarán como borrador mientras esta ventana siga abierta. ¿Querés volver?')) return;
     if (trail.length > 1) trail.pop();
