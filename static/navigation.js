@@ -2,7 +2,7 @@ function songRow(s){return `<div class="item"><b>♫ ${esc(s.titulo)}</b><button
 const $ = id => document.getElementById(id);
 let artist, currentAlbum, currentSong, editing, photo, selectedPhoto;
 let previewUrl;
-const pages = ['home', 'manager', 'profile', 'editor', 'artistPane', 'albumPane', 'songPane', 'arrangements', 'globalProjects', 'catalogPane', 'playlistsPane', 'trashPane', 'composition', 'beats', 'scores', 'lyrics', 'entidades', 'feedbackPane', 'creditsPane', 'exportPane', 'artistsPane', 'launchesPane', 'avPane', 'configPane', 'pluginsPane'];
+const pages = ['home', 'manager', 'profile', 'editor', 'artistPane', 'albumPane', 'songPane', 'arrangements', 'globalProjects', 'catalogPane', 'playlistsPane', 'trashPane', 'composition', 'beats', 'scores', 'lyrics', 'entidades', 'feedbackPane', 'creditsPane', 'exportPane', 'artistsPane', 'launchesPane', 'avPane', 'configPane', 'pluginsPane', 'budgetsPane'];
 const trail = ['home'];
 function display() {
     const page = trail.at(-1);
@@ -520,3 +520,11 @@ document.addEventListener('click', event => {
 }, true);
 // Ícono de PDF para los botones de manuales y guías.
 const PDF_ICON = '<svg class="pdf-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h8l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="#E5484D"/><path d="M14 2v5h5" fill="#FF9EA1"/><text x="12" y="17.5" text-anchor="middle" font-size="6.4" font-weight="800" fill="#fff" font-family="Inter,Arial">PDF</text></svg>';
+// Playlist plegable en el menú lateral (se recuerda la elección).
+function togglePlaylistFold(force) {
+    const folded = force ?? !document.body.classList.contains('pl-folded');
+    document.body.classList.toggle('pl-folded', folded);
+    document.getElementById('foldPlaylists')?.setAttribute('aria-expanded', String(!folded));
+    try { localStorage.setItem('audiotaller-playlist-plegada', folded ? '1' : '0'); } catch {}
+}
+try { if (localStorage.getItem('audiotaller-playlist-plegada') === '1') document.addEventListener('DOMContentLoaded', () => togglePlaylistFold(true)); } catch {}

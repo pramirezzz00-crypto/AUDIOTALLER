@@ -21,14 +21,14 @@ function avatar(a, cls = 'av') {
 function paintArtists() {
     const root = $('artistsPane');
     if (ppl.wizard) return paintWizard(root);
+    if (ppl.view === 'radar') return paintRadar(root);
     const q = ppl.q.trim().toLowerCase();
     const list = ppl.list.filter(a => (!q || [a.nombre, ...a.personas.map(p => p.nombre)].join(' ').toLowerCase().includes(q))
         && (!ppl.type || a.tipo_proyecto === ppl.type) && (!ppl.relation || a.relacion === ppl.relation));
     const cur = ppl.list.find(a => a.id === ppl.sel);
     const keepFocus = document.activeElement?.id === 'pplQ';
     root.innerHTML = `
-      <header class="prod-head"><div><div class="eyebrow">Proyectos artísticos y sus integrantes</div><h1>Artistas</h1></div>
-        <div class="row"><button class="btn-primary" onclick="startWizard()">+ Nuevo artista</button></div></header>
+      ${artistsTabsHeader()}
       <div class="prod-tools"><label class="search-box"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
           <input id="pplQ" type="search" placeholder="Buscar artista o integrante…" value="${esc(ppl.q)}"></label>
         <select aria-label="Relación" onchange="ppl.relation=this.value;paintArtists()"><option value="">Toda relación</option>${RELATIONS.map(r => `<option ${ppl.relation === r ? 'selected' : ''}>${r}</option>`).join('')}</select></div>

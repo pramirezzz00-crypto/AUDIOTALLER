@@ -351,6 +351,9 @@ register_arrangement_waves(app)
 from redesign_extra import register_extra
 register_extra(app, db_open, lambda: DB.parent)
 from session_tools import register_session_tools
+from studio_profile import register_studio_profile
+from budgets import register_budgets
+register_budgets(app, db_open, register_studio_profile(app, db_open, lambda: DB.parent))
 from plugin_manager import register_plugin_manager
 register_plugin_manager(app, lambda: DB.parent)
 register_session_tools(app, db_open)

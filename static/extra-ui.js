@@ -363,7 +363,8 @@ async function openConfig() {
     go('configPane');
     const c = await api('/api/asistente/config');
     const currentTheme = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
-    $('configPane').innerHTML = `<section class="card appearance-settings" aria-labelledby="appearanceTitle">
+    const profileCard = typeof profileCardHtml === 'function' ? await profileCardHtml().catch(() => '') : '';
+    $('configPane').innerHTML = profileCard + `<section class="card appearance-settings" aria-labelledby="appearanceTitle">
         <div><div class="eyebrow">Interfaz</div><h2 id="appearanceTitle">Apariencia</h2>
           <p class="muted">Elegí el tema claro u oscuro. La elección se guarda en este dispositivo.</p></div>
         <label class="fld appearance-control" for="themeMode">Tema

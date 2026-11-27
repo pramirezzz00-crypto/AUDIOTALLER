@@ -125,7 +125,10 @@ def register_overview(app, connect):
             connect_counts = [dict(r) for r in db.execute('SELECT estado,COUNT(*) AS n FROM portal_devoluciones GROUP BY estado')]
         import getpass
         counts = {row['estado']: row['n'] for row in connect_counts}
-        return jsonify(usuario=getpass.getuser().split('.')[0].capitalize(), estados=counts, recientes=recent, etapas=pipeline, devoluciones=feedback, devoluciones_total=pending_total,
+        from studio_profile import display_name, load_profile
+        with connect() as db:
+            greeting = display_name(load_profile(db))
+        return jsonify(usuario=greeting or getpass.getuser().split('.')[0].capitalize(), estados=counts, recientes=recent, etapas=pipeline, devoluciones=feedback, devoluciones_total=pending_total,
                        discos=albums, sueltas=loose, canciones_activas=sum(1 for s in songs if s['etapa_indice'] >= 0))
 
     @app.get('/api/discos/<did>/resumen')
