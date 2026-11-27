@@ -356,6 +356,8 @@ from budgets import register_budgets
 register_budgets(app, db_open, register_studio_profile(app, db_open, lambda: DB.parent))
 from plugin_manager import register_plugin_manager
 register_plugin_manager(app, lambda: DB.parent)
+from loudness_store import register_loudness_store
+register_loudness_store(app, lambda: DB.parent)
 register_session_tools(app, db_open)
 from migration import register_migration
 from version import DISPLAY_VERSION as _MIGRATION_VERSION

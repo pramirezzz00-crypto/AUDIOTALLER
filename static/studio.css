@@ -1213,3 +1213,9 @@ body.pl-folded .sidebar .pl-sub{display:none!important}
 @media (max-width:1100px){.lp-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .plg-dup table{table-layout:fixed;width:100%}
 .plg-dup th:nth-child(1){width:190px}.plg-dup th:nth-child(3){width:90px}.plg-dup th:nth-child(4){width:110px}.plg-dup th:nth-child(5){width:90px}.plg-dup th:nth-child(6){width:56px}
+#loudnessPane{position:relative}
+.lp-overlay{display:none;position:absolute;inset:-8px;z-index:20;border:2px dashed var(--at-accent);border-radius:16px;background:color-mix(in srgb,var(--at-bg) 82%,transparent);backdrop-filter:blur(2px);pointer-events:none}
+.lp-overlay>div{position:sticky;top:40%;display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:22vh;text-align:center}
+.lp-overlay b{font-size:22px;color:var(--at-text)}.lp-overlay span{color:var(--at-text2)}
+#loudnessPane.lp-dragging .lp-overlay{display:block}
+.lp-drop-hint{font-size:12.5px!important}

@@ -123,6 +123,34 @@ function lpPenalties(r) {
 function renderLoudnessPane() {
     if (lp.playing) lpPause();
     paintLoudness();
+    if (!lp.result && !lp.busy && !lp.restored) { lp.restored = true; lpRestore().catch(() => {}); }
+}
+
+// ---------- Memoria local: el último análisis queda guardado en la carpeta de datos de AudioTaller ----------
+// Sobrevive a cerrar la app. Un análisis nuevo lo reemplaza y «Reiniciar» lo borra.
+async function lpRestore() {
+    const saved = await api('/api/loudness/ultimo');
+    if (!saved.hay || lp.result || lp.busy) return;
+    const res = await fetch('/api/loudness/ultimo/audio');
+    if (!res.ok) return;
+    const bytes = await res.arrayBuffer();
+    lp.ctx = lp.ctx || new (window.AudioContext || window.webkitAudioContext)();
+    const buffer = await lp.ctx.decodeAudioData(bytes);
+    if (lp.result || lp.busy) return;
+    lp.buffer = buffer; lp.name = saved.nombre; lp.result = saved.resultado; lp.offset = 0; lp.sel = 'original';
+    if (!$('loudnessPane').hidden) paintLoudness();
+}
+function lpSave(name, bytes, result) {
+    const safe = JSON.stringify(result, (k, v) => typeof v === 'number' && !Number.isFinite(v) ? null : v);
+    return fetch('/api/loudness/ultimo?nombre=' + encodeURIComponent(name), {method: 'POST', body: bytes,
+        headers: {'Content-Type': 'application/octet-stream', 'X-Resultado': encodeURIComponent(safe)}});
+}
+async function lpReset() {
+    lpStop();
+    lp.buffer = null; lp.result = null; lp.name = ''; lp.sel = 'original';
+    await api('/api/loudness/ultimo/borrar', body({})).catch(() => {});
+    paintLoudness();
+    notify('Listo: se borró el análisis. Soltá otro audio para empezar.');
 }
 const lpFmt = v => Number.isFinite(v) ? v.toFixed(1).replace('-', '−') : '—';
 const lpSigned = v => v === 0 ? '0.0' : (v > 0 ? '+' : '−') + Math.abs(v).toFixed(1);
@@ -131,22 +159,32 @@ function paintLoudness() {
     const pens = r ? lpPenalties(r) : [];
     root.innerHTML = `<header class="prod-head"><div><div class="eyebrow">Herramientas</div><h1>Loudness Penalty</h1>
         <p class="muted">Subí un master y mirá cuánto lo baja (o sube) cada plataforma al normalizar. Tocá una plataforma para escucharlo como va a sonar ahí. El análisis se hace en esta computadora: el audio no se sube a ningún lado.</p></div>
-        ${r ? `<div class="row-tight"><button class="mk-btn" onclick="lpPickLibrary().catch(report)">De tus producciones…</button><button class="btn-primary" onclick="$('lpFile').click()">Analizar otro audio…</button></div>` : ''}</header>
+        ${r ? `<div class="row-tight"><button class="mk-btn" onclick="lpReset().catch(report)" title="Borra este análisis y vuelve a la pantalla inicial">↺ Reiniciar</button><button class="mk-btn" onclick="lpPickLibrary().catch(report)">De tus producciones…</button><button class="btn-primary" onclick="$('lpFile').click()">Analizar otro audio…</button></div>` : ''}</header>
+      <div class="lp-overlay" aria-hidden="true"><div><b>Soltá el audio para analizarlo</b><span>${r ? 'Reemplaza el análisis actual' : 'WAV, AIFF, FLAC, MP3 o M4A'}</span></div></div>
       <input type="file" id="lpFile" accept="audio/*,.wav,.aif,.aiff,.flac,.mp3,.m4a,.ogg" hidden>
       ${lp.busy ? `<div class="card mig-wait"><span class="spin"></span> Midiendo «${esc(lp.name)}»…</div>` : r ? lpResults(r, pens) : lpDrop()}`;
     const file = $('lpFile');
     file.onchange = () => { if (file.files[0]) lpLoadFile(file.files[0]).catch(lpFail); };
-    const drop = $('lpDrop');
-    if (drop) {
-        drop.ondragover = e => { e.preventDefault(); drop.classList.add('is-over'); };
-        drop.ondragleave = () => drop.classList.remove('is-over');
-        drop.ondrop = e => { e.preventDefault(); drop.classList.remove('is-over'); const f = e.dataTransfer.files[0]; if (f) lpLoadFile(f).catch(lpFail); };
+    // Arrastrar y soltar funciona en toda la sección, haya un análisis o no.
+    if (!root.dataset.dnd) {
+        root.dataset.dnd = '1';
+        let depth = 0;
+        const hasFiles = e => [...(e.dataTransfer?.types || [])].includes('Files');
+        root.addEventListener('dragenter', e => { if (!hasFiles(e)) return; e.preventDefault(); depth++; root.classList.add('lp-dragging'); $('lpDrop')?.classList.add('is-over'); });
+        root.addEventListener('dragover', e => { if (!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+        root.addEventListener('dragleave', () => { if (--depth <= 0) { depth = 0; root.classList.remove('lp-dragging'); $('lpDrop')?.classList.remove('is-over'); } });
+        root.addEventListener('drop', e => {
+            if (!hasFiles(e)) return;
+            e.preventDefault(); depth = 0; root.classList.remove('lp-dragging');
+            const f = e.dataTransfer.files[0];
+            if (f && !lp.busy) lpLoadFile(f).catch(lpFail);
+        });
     }
     lpPaintProgress();
 }
 function lpDrop() {
     return `<div class="lp-drop" id="lpDrop"><div class="lp-drop-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h2l2-6 3 12 3-9 2 5 2-2h4"/></svg></div>
-        <h2>Soltá acá tu master</h2><p class="muted">WAV, AIFF, FLAC, MP3 o M4A. Mejor si es el archivo final, sin limitador de monitoreo.</p>
+        <h2>Soltá acá tu master</h2><p class="muted lp-drop-hint">Podés soltar un audio en cualquier parte de esta sección, también cuando ya hay un análisis.</p><p class="muted">WAV, AIFF, FLAC, MP3 o M4A. Mejor si es el archivo final, sin limitador de monitoreo.</p>
         <div class="row-tight"><button class="btn-primary" onclick="$('lpFile').click()">Elegir archivo…</button><button class="mk-btn" onclick="lpPickLibrary().catch(report)">De tus producciones…</button></div></div>
       <p class="insp-help">Valores de referencia que publican las plataformas o que se miden en la práctica (YouTube, Spotify, TIDAL, Amazon −14 LUFS · Deezer −15 · Apple Music −16). Pueden cambiar y dependen de la configuración de cada oyente.</p>`;
 }
@@ -190,10 +228,12 @@ async function lpAnalyze(name, bytes) {
     lpStop();
     lp.name = name; lp.busy = true; lp.result = null; paintLoudness();
     lp.ctx = lp.ctx || new (window.AudioContext || window.webkitAudioContext)();
+    lp.bytes = bytes.slice(0);  // decodeAudioData consume el original; esta copia se guarda como último análisis
     const buffer = await lp.ctx.decodeAudioData(bytes);
     await new Promise(r => setTimeout(r, 30));
-    lp.buffer = buffer; lp.result = lpMeasure(buffer); lp.busy = false; lp.offset = 0; lp.sel = 'original';
+    lp.buffer = buffer; lp.result = lpMeasure(buffer); lp.busy = false; lp.offset = 0; lp.sel = 'original'; lp.restored = true;
     paintLoudness();
+    lpSave(name, lp.bytes, lp.result).catch(() => {}); lp.bytes = null;
 }
 async function lpPickLibrary() {
     if (!lp.lib) lp.lib = (await api('/api/catalogo?limit=500')).audios || [];
