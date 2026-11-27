@@ -309,9 +309,13 @@ def find_duplicates(items):
     for (fmt, _), group in groups.items():
         if len(group) < 2:
             continue
-        ranked = sorted(group, key=lambda i: (version_tuple(i.get('version')), i.get('modificado') or 0, -len(i['relativo'])), reverse=True)
+        # Versión declarada; si empatan, la fecha (por día: copiar un archivo conserva su fecha);
+        # después, el que no tiene marca de copia («(1)», «copy») y la ruta más corta.
+        ranked = sorted(group, key=lambda i: (version_tuple(i.get('version')), int((i.get('modificado') or 0) // 86400),
+                                              not COPY_MARK.search(i['nombre']), -len(i['relativo'])), reverse=True)
         keep = ranked[0]
-        out.append(dict(formato=fmt, nombre=keep['nombre'], conservar=keep['id'],
+        clean = min((COPY_MARK.sub('', i['nombre']).strip() or i['nombre'] for i in ranked), key=len)
+        out.append(dict(formato=fmt, nombre=clean, conservar=keep['id'],
                         copias=[dict(i, sugerido=i['id'] == keep['id']) for i in ranked],
                         espacio=sum(i['tamano'] for i in ranked[1:]),
                         central=next((i['central'] for i in ranked if i['licencia'] in ('central', 'ilok')), '')))

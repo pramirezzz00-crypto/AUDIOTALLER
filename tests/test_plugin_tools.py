@@ -42,7 +42,12 @@ class DuplicatesTest(unittest.TestCase):
         self.assertEqual(plugin_inventory.find_duplicates([item('a', 'SPAN'), item('b', 'SPAN', fmt='VST2')]), [])
 
     def test_date_breaks_ties(self):
-        groups = plugin_inventory.find_duplicates([item('a', 'DC1A', mtime=5), item('b', 'DC1A copy', mtime=9)])
+        groups = plugin_inventory.find_duplicates([item('a', 'DC1A', mtime=5), item('b', 'DC1A copy', mtime=9 * 86400)])
+        self.assertEqual(groups[0]['conservar'], 'b')
+        self.assertEqual(groups[0]['nombre'], 'DC1A')
+
+    def test_same_day_prefers_name_without_copy_mark(self):
+        groups = plugin_inventory.find_duplicates([item('a', 'SPAN copy', mtime=100), item('b', 'SPAN', mtime=50)])
         self.assertEqual(groups[0]['conservar'], 'b')
 
 
