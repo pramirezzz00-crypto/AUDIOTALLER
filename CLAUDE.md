@@ -10,7 +10,7 @@ App de escritorio para productores musicales (Windows y Mac). Python 3.12+ · Fl
 
 ## Comandos
 
-- Pruebas: `python -m unittest discover -s tests -q` (75 pruebas actuales; este entorno Windows tiene un fallo conocido de codificación en `test_clasifica_y_crea_sesiones_nuevas_sin_tocar_la_original`; Linux puede tener además el fallo conocido del almacén seguro).
+- Pruebas: `python -m unittest discover -s tests -q` (98 pruebas actuales; este entorno Windows tiene un fallo conocido de codificación en `test_clasifica_y_crea_sesiones_nuevas_sin_tocar_la_original`; Linux puede tener además el fallo conocido del almacén seguro).
 - App de escritorio: `python desktop.py`. Solo interfaz en navegador: `python app.py` → http://127.0.0.1:5000.
 - Sintaxis JS: `node --check static/<archivo>.js`.
 
@@ -22,3 +22,5 @@ App de escritorio para productores musicales (Windows y Mac). Python 3.12+ · Fl
 - `perfil` en un JSON debe ser objeto (usar `perfil_id` para ids). No usar `jsonify(dict, clave=...)`.
 - Probar con datos temporales (tests), no con la biblioteca real. No subir `.venv`, SQLite, audios, `*.dpapi`, credenciales ni contraseñas.
 - Pantalla nueva: sección en `audio.html`, entrada en `pages` de `navigation.js`, breadcrumbs y carga de datos.
+- Estética: variables de `static/theme.css`, componentes existentes (`card`, `btn-primary`, `mk-btn`, `seg`, `mig-tabs`), tema oscuro y claro, textos con voseo. Estilos nuevos al final de `static/studio.css`.
+- Al terminar, el PR lleva el «Informe de integración» de `docs/PROMPT_PARA_IA.md` con las alertas de funcionalidad, estética y trabajo deshecho.
