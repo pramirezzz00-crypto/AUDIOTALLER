@@ -350,6 +350,10 @@ from redesign_arr import register_arrangement_waves
 register_arrangement_waves(app)
 from redesign_extra import register_extra
 register_extra(app, db_open, lambda: DB.parent)
+from session_tools import register_session_tools
+from plugin_manager import register_plugin_manager
+register_plugin_manager(app, lambda: DB.parent)
+register_session_tools(app, db_open)
 from migration import register_migration
 from version import DISPLAY_VERSION as _MIGRATION_VERSION
 register_migration(app, db_open, lambda: DB, _MIGRATION_VERSION)

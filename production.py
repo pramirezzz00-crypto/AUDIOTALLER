@@ -11,6 +11,7 @@ from management import required_row
 from migrations import LEGACY_STAGE
 from daw_operations import ensure_revisions
 from runtime_paths import open_path
+from redesign import doc_list
 
 
 # Extensiones de proyecto. El lanzador solo abre archivos de estos tipos mediante Windows.
@@ -99,6 +100,11 @@ def register_production(app, connect, safe_name):
                     session['criterio'] = 'Sesión de trabajo sin archivo DAW disponible'
                 session['abrible'] = Path(session['ruta']).suffix.lower() in DAW_PROJECTS and Path(session['ruta']).is_file()
                 session['disponible'] = Path(session['ruta']).exists() if session['ruta'] else False
+            meta = doc_list(db, 'sesion_meta')
+            for session in sessions:
+                info = meta.get(session['id'], {})
+                session['validada'] = bool(info.get('validada'))
+                session['notas_total'] = len(info.get('notas', [])) + (1 if (session.get('comentario') or '').strip() and not info.get('legado_migrado') else 0)
             files = [dict(row) for row in db.execute('''SELECT f.*, ca.favorito,ca.clase,ca.version AS version_audio
                 FROM archivos f LEFT JOIN catalogo_audio ca ON ca.archivo_id=f.id
                 WHERE f.cancion_id=? AND f.eliminado_en='' ORDER BY f.creado DESC''', (sid,))]

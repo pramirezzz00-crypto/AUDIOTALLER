@@ -164,7 +164,7 @@ def classify(name, vendor_text, folder_hint=''):
     """Devuelve el fabricante conocido y cómo se reinstala."""
     sample = ' '.join(filter(None, (vendor_text, folder_hint, name)))
     if FREE.search(sample):
-        return dict(fabricante=vendor_text or folder_hint or 'Gratuito', licencia='gratis', central='', enlace='')
+        return dict(fabricante=clean_vendor(vendor_text) or folder_hint or '—', licencia='gratis', central='', enlace='')
     for key, label, pattern, kind, manager, url in VENDORS:
         if re.search(pattern, vendor_text or '', re.I) or re.search(pattern, folder_hint or '', re.I):
             return dict(fabricante=label, licencia=kind, central=manager, enlace=url, clave=key)

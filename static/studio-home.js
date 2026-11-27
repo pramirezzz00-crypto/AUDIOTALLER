@@ -131,7 +131,7 @@ function renderSideRecents(recent) {
 // Se llama al final de display(): agrega el comportamiento de las pantallas nuevas.
 function studioDisplayHook(page) {
     document.body.dataset.page = page;
-    document.body.classList.toggle('no-crumbs', ['catalogPane', 'playlistsPane', 'arrangements', 'composition', 'entidades', 'launchesPane', 'artistsPane', 'feedbackPane', 'projectManager', 'configPane'].includes(page));
+    document.body.classList.toggle('no-crumbs', ['catalogPane', 'playlistsPane', 'arrangements', 'composition', 'entidades', 'launchesPane', 'artistsPane', 'feedbackPane', 'projectManager', 'configPane', 'pluginsPane'].includes(page));
     $('sideFeedback')?.setAttribute('aria-current', page === 'feedbackPane' ? 'page' : 'false');
     $('sideMyPlaylists')?.setAttribute('aria-current', page === 'playlistsPane' ? 'page' : 'false');
     if (page === 'feedbackPane') { $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="openPlaylists()">Playlist</button> › Devoluciones`; renderFeedbackPane(); }
@@ -147,8 +147,10 @@ function studioDisplayHook(page) {
         $('sideLyrics')?.setAttribute('aria-current', compNow === 'lyrics' ? 'page' : 'false');
         $('sideScores')?.setAttribute('aria-current', compNow === 'scores' ? 'page' : 'false'); }
     if (page === 'entidades') renderEntitiesPane();
+    if (page === 'pluginsPane') renderPluginsPane();
+    $('sidePlugins')?.setAttribute('aria-current', page === 'pluginsPane' ? 'page' : 'false');
     if (page === 'arrangements') renderArrangementsPane();
-    const crumbs = {launchesPane: 'Lanzamientos', avPane: 'Audiovisual', configPane: 'Configuración'};
+    const crumbs = {launchesPane: 'Lanzamientos', avPane: 'Audiovisual', configPane: 'Configuración', pluginsPane: 'Plugins'};
     if (crumbs[page]) $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › ${crumbs[page]}`;
     $('sideLaunches')?.setAttribute('aria-current', page === 'launchesPane' ? 'page' : 'false');
     $('sideConfig')?.setAttribute('aria-current', page === 'configPane' ? 'page' : 'false');

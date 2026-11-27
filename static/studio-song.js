@@ -68,7 +68,7 @@ function validSelection(sel) {
 function timelineItems() {
     const items = [
         ...workflow.archivos.map(file => ({kind: 'file', id: file.id, stage: file.etapa, date: parseDate(file.creado), ref: file})),
-        ...workflow.sesiones.map(session => ({kind: 'session', id: session.id, stage: session.etapa,
+        ...visibleSessions().map(session => ({kind: 'session', id: session.id, stage: session.etapa,
             date: session.fecha_archivo ? new Date(session.fecha_archivo * 1000) : parseDate(session.creado), ref: session})),
     ];
     const dates = items.map(item => item.date?.getTime()).filter(Boolean);
@@ -100,18 +100,18 @@ function clipMarkup(item) {
     const selected = studioSel && studioSel.kind === item.kind && studioSel.id === item.id;
     if (item.kind === 'session') {
         const s = item.ref;
-        return `<button class="clip clip-session ${selected ? 'is-selected' : ''} ${s.disponible ? '' : 'is-missing'}" data-clip="session:${s.id}"
+        return `<button class="clip clip-session ${selected ? 'is-selected' : ''} ${s.disponible ? '' : 'is-missing'} ${s.vigente ? 'is-vigente' : ''} ${s.validada ? 'is-validada' : ''}" draggable="true" data-clip="session:${s.id}"
             style="left:min(${item.left}%, calc(100% - 96px));width:max(${item.width}%, 92px);top:${8 + item.row * 66}px" title="${esc(s.nombre)} · ${esc(s.ruta || '')}"
             aria-pressed="${selected}" aria-label="Sesión ${esc(s.nombre)}">
             <span class="clip-head"><span class="clip-daw">${esc(DAW_SIGLAS[s.daw] || (s.daw || 'DAW').slice(0, 4).toUpperCase())}</span>
-              <span class="clip-name">${esc(s.nombre)}</span>${s.vigente ? '<span class="clip-flag" title="Sesión vigente">✓</span>' : ''}</span>
+              <span class="clip-name">${esc(s.nombre)}</span>${s.vigente ? '<span class="clip-badge vig" title="Última vigente de la etapa">VIGENTE</span>' : s.validada ? '<span class="clip-badge val" title="Sesión validada">✓</span>' : ''}${s.notas_total ? `<span class="clip-notes-n" title="${s.notas_total} nota(s)">✎${s.notas_total}</span>` : ''}</span>
             <span class="clip-foot mono">${s.version ? 'V' + String(s.version).padStart(3, '0') : 'sesión'} · ${esc(shortDate(item.date))}</span></button>`;
     }
     const f = item.ref;
     const notes = notesFor(f.id).filter(openNote).length;
     const shared = (f.compartido || [])[0];
     const audio = isAudio(f);
-    return `<button class="clip ${audio ? 'clip-audio' : 'clip-doc'} ${selected ? 'is-selected' : ''} ${f.disponible ? '' : 'is-missing'}" data-clip="file:${f.id}"
+    return `<button class="clip ${audio ? 'clip-audio' : 'clip-doc'} ${selected ? 'is-selected' : ''} ${f.disponible ? '' : 'is-missing'}" draggable="true" data-clip="file:${f.id}"
         style="left:min(${item.left}%, calc(100% - 96px));width:max(${item.width}%, 92px);top:${8 + item.row * 66}px" title="${esc(f.nombre)}"
         aria-pressed="${selected}" aria-label="${audio ? 'Audio' : 'Archivo'} ${esc(f.nombre)}">
         <span class="clip-head">${audio ? '' : `<span class="clip-daw">${esc(f.nombre.split('.').pop().toUpperCase().slice(0, 4))}</span>`}
@@ -187,6 +187,7 @@ function renderWorkflow() {
       <div id="transport" class="transport" role="region" aria-label="Transporte"></div>
       <div class="studio">
         <section class="arrange" aria-label="Línea de producción">
+          ${prodToolbar()}
           <div class="ruler"><span class="ruler-label">Etapas</span><div class="ruler-ticks mono">${ticks.map(tick => `<span>${esc(shortDate(tick))}</span>`).join('')}</div></div>
           <div class="lanes">${lanes}</div>
           <details class="history"><summary>Historial de producción · ${countLabel(workflow.eventos.length, 'evento', 'eventos')}</summary>
@@ -227,13 +228,16 @@ function bindLanes() {
     });
     document.querySelectorAll('[data-stage-select]').forEach(button => button.onclick = () => selectStudio({kind: 'stage', id: button.dataset.stageSelect}));
     document.querySelectorAll('[data-stage-add]').forEach(button => button.onclick = () => addMaterialDialog(button.dataset.stageAdd));
+    bindClipDrag();
     document.querySelectorAll('[data-drop-stage]').forEach(zone => {
         const stage = zone.dataset.dropStage;
-        zone.ondragover = event => { if ([...event.dataTransfer.types].includes('Files')) { event.preventDefault(); zone.classList.add('is-dragging'); } };
+        zone.ondragover = event => { const types = [...event.dataTransfer.types]; if (types.includes('Files') || types.includes(CLIP_MIME)) { event.preventDefault(); zone.classList.add('is-dragging'); } };
         zone.ondragleave = () => zone.classList.remove('is-dragging');
         zone.ondrop = event => {
             event.preventDefault();
             zone.classList.remove('is-dragging');
+            const clip = event.dataTransfer.getData(CLIP_MIME);
+            if (clip) return dropClip(clip, stage).catch(report);
             if (event.dataTransfer.files.length) addMaterialDialog(stage, [...event.dataTransfer.files]);
         };
     });
@@ -345,14 +349,19 @@ async function renderInspector() {
           </dl>
           <div class="insp-actions">
             <button class="btn-primary" ${s.abrible ? '' : 'disabled title="Para abrirla, vinculá el archivo de proyecto del DAW"'} onclick="openDawSession('${s.id}')">Abrir en ${esc(s.daw || 'el DAW')}</button>
-            <div class="row-tight"><button onclick="setValidSession('${s.id}','${s.etapa}',${!s.vigente})">${s.vigente ? 'Quitar vigente' : 'Marcar como vigente'}</button>
-              <button onclick="duplicateSessionDialog('${s.id}')">Nueva versión</button></div>
+            <div class="mark-set">
+              <button class="mark-btn vig ${s.vigente ? 'is-on' : ''}" aria-pressed="${!!s.vigente}" onclick="setValidSession('${s.id}','${s.etapa}',${!s.vigente})">
+                <b>${s.vigente ? '★ Vigente de la etapa' : '☆ Marcar como vigente'}</b><small>${s.vigente ? 'La última versión de esta etapa · tocá para quitar' : 'La última versión de esta etapa (una por etapa)'}</small></button>
+              <button class="mark-btn val ${s.validada ? 'is-on' : ''}" aria-pressed="${!!s.validada}" onclick="setSessionValidated('${s.id}',${!s.validada}).catch(report)">
+                <b>${s.validada ? '✓ Validada' : '○ Marcar como validada'}</b><small>${s.validada ? 'Aparece en el filtro de validadas · tocá para quitar' : 'Versiones aprobadas o finales (podés marcar varias)'}</small></button>
+            </div>
+            <div class="row-tight"><button onclick="duplicateSessionDialog('${s.id}')">Nueva versión</button><button onclick="renameSessionsDialog('${s.id}').catch(report)">Renombrar…</button></div>
           </div>
-          <div class="insp-block"><label class="insp-label" for="sessionNote">Notas de la sesión</label>
-            <textarea id="sessionNote" rows="4">${esc(sessionDrafts.get(s.id) ?? s.comentario ?? '')}</textarea>
-            <div class="row-tight"><button onclick="saveSessionNote('${s.id}')">Guardar notas</button><span id="sessionNoteStatus" class="insp-help" role="status"></span></div></div>
+          <div class="insp-block"><div class="insp-label-row"><span class="insp-label">Notas de la sesión</span><span class="insp-help">${s.notas_total ? countLabel(s.notas_total, 'nota', 'notas') : 'Sin notas'}</span></div>
+            <div id="sessionNotesPeek" class="notes-peek"><p class="insp-help">Cargando…</p></div>
+            <button class="notes-open" onclick="openSessionNotes('${s.id}').catch(report)">✎ Abrir notas de la sesión</button></div>
           ${moveBlock('sesion', s)}`;
-        $('sessionNote').oninput = event => { sessionDrafts.set(s.id, event.target.value); $('sessionNoteStatus').textContent = 'Sin guardar'; };
+        peekSessionNotes(s.id).catch(() => {});
         return;
     }
     const f = fileById(sel.id);
