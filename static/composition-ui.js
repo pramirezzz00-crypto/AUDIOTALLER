@@ -1,6 +1,6 @@
 // Composición · Beats, Letras y Partituras en una sola pantalla.
-// La primera pantalla de cada sección son sus listas / colecciones (páginas 'beats', 'lyrics', 'scores').
-// Esta vista de trabajo se abre desde el enlace «Ver banco de beats» / «Ver letras…» / «Ver partituras…» (compOpen).
+// La pantalla principal de cada sección es esta vista de trabajo (como el mockup).
+// Las listas y colecciones (páginas 'beats', 'lyrics', 'scores') se abren con compLists().
 const comp = {tab: 'beats', beats: [], lists: [], q: '', bpmMin: '', bpmMax: '', beatState: '', beat: '', panel: false, scan: null,
     songs: [], song: '', lyric: null, collapsed: new Set(), lyricDirty: false, sync: null, scores: [], audio: new Audio(), playing: ''};
 const SECTION_LABELS = {intro: 'Intro', verse: 'Verso', pre: 'Pre-estribillo', chorus: 'Estribillo', bridge: 'Puente', inter: 'Interludio', outro: 'Final'};
@@ -21,14 +21,14 @@ function paintComposition() {
     const root = $('composition');
     const cta = {beats: '+ Importar carpeta de beats', lyrics: '+ Nueva letra', scores: '+ Cargar partitura'}[comp.tab];
     root.innerHTML = `
-      <p class="insp-help comp-back"><button class="link" onclick="compGo('${comp.tab}')">← ${comp.tab === 'beats' ? 'Volver a mis listas de beats' : comp.tab === 'lyrics' ? 'Volver a mis colecciones de letras' : 'Volver a mis colecciones de partituras'}</button></p>
       <header class="prod-head mk-comp-head"><div><div class="eyebrow">Composición</div><h1>${{beats: 'Beats', lyrics: 'Letras', scores: 'Partituras'}[comp.tab]}</h1>
         <p class="muted">${{beats: 'Tu banco de beats: organizados, segmentados y listos para llevar al DAW',
           lyrics: 'Las letras de tus canciones, con versiones y listas para publicar',
           scores: 'Partituras y particellas con versiones, asociadas a canciones y arreglos'}[comp.tab]}</p></div>
         <button class="btn-primary" onclick="compNew()">${cta}</button></header>
       <div id="compPanel"></div>
-      <div id="compBody">${comp.tab === 'beats' ? beatsView() : comp.tab === 'lyrics' ? lyricsView() : scoresView()}</div>`;
+      <div id="compBody">${comp.tab === 'beats' ? beatsView() : comp.tab === 'lyrics' ? lyricsView() : scoresView()}</div>
+      <p class="insp-help comp-old">¿Buscás tus listas y colecciones? <button class="link" onclick="compLists('${comp.tab}')">${comp.tab === 'beats' ? 'Ver mis listas de beats' : comp.tab === 'lyrics' ? 'Ver mis colecciones de letras' : 'Ver mis colecciones de partituras'}</button></p>`;
     if (comp.panel) paintCompPanel();
     if (comp.tab === 'lyrics') bindLyricEditor();
     if (comp.tab === 'beats') drawBeatWaves();
@@ -238,8 +238,8 @@ function lyricEditor(doc) {
           <button class="mk-btn" onclick="notify((comp.lyric.letra.historial||[]).map(h=>'V'+h.version+' · '+h.estado).join('  ·  ')||'Todavía no hay versiones anteriores.')">Historial</button></div></div>
       <div class="lyr-bar"><span class="muted">Forma de la canción</span><div class="seg">${schemes.map(([id, label]) => `<button class="${doc.esquema === id ? 'is-on' : ''}" onclick="setScheme('${id}')">${label}</button>`).join('')}</div>
         <label class="check"><input type="checkbox" id="lyricInstrumental" ${doc.instrumental ? 'checked' : ''}> Instrumental</label><span class="spacer"></span>
-        <button class="mk-btn" onclick="comp.collapsed.clear();paintComposition()">Desplegar todo</button><button class="mk-btn" onclick="comp.lyric.letra.secciones.forEach((_,i)=>comp.collapsed.add(i));paintComposition()">Achicar todo</button>
-        <label class="mk-btn">⤓ Importar Word o PDF<input type="file" accept=".docx,.pdf,.txt,.lrc" hidden onchange="importIntoLyric(this.files[0]).catch(report)"></label></div>
+        ${comp.collapsed.size ? `<button class="mk-btn" onclick="comp.collapsed.clear();paintComposition()">Desplegar todo</button>` : `<button class="mk-btn" onclick="comp.lyric.letra.secciones.forEach((_,i)=>comp.collapsed.add(i));paintComposition()">Achicar todo</button>`}
+        <label class="mk-btn" title="Importar la letra desde Word, PDF, TXT o LRC">⤓ Importar<input type="file" accept=".docx,.pdf,.txt,.lrc" hidden onchange="importIntoLyric(this.files[0]).catch(report)"></label></div>
       <div class="form-bar">${doc.secciones.map((b, i) => `<button style="flex:${Math.max(1, b.lineas.length)};background:${SECTION_COLORS[b.tipo]}" title="${esc(names[i])}" onclick="document.getElementById('sec${i}').scrollIntoView({block:'center'})">${esc(names[i])}</button>`).join('')}</div>
       ${comp.sync ? syncBar() : ''}
       <div id="lyricBlocks">${doc.secciones.map((b, i) => { const t = firstTime(b); return `<section class="lyric-block" id="sec${i}" style="--c:${SECTION_COLORS[b.tipo]}">
@@ -404,12 +404,16 @@ async function uploadScores() {
     notify(countLabel(paths.length, 'partitura cargada', 'partituras cargadas') + ': asociala a su canción y arreglo.');
 }
 
-// Pantalla principal de cada sección: sus listas / colecciones.
+// Pantalla principal de cada sección: la vista de trabajo (banco de beats, letras y partituras con versiones).
 function compGo(tab) {
-    const fromWorkspace = trail.at(-1) === 'composition';
-    if (fromWorkspace && comp.lyricDirty && !confirm('Hay cambios sin guardar en la letra. ¿Salir igual?')) return;
-    comp.tab = tab; comp.panel = false; comp.lyricDirty = false;
-    if (fromWorkspace && trail.at(-2) === tab) back(); else go(tab);
+    if (trail.at(-1) === 'composition' && comp.tab === 'lyrics' && tab !== 'lyrics' && comp.lyricDirty && !confirm('Hay cambios sin guardar en la letra. ¿Salir igual?')) return;
+    if (comp.tab !== tab) comp.lyricDirty = false;
+    comp.tab = tab; comp.panel = false;
+    if (trail.at(-1) === 'composition') renderCompositionPane(); else go('composition');
 }
-// Vista de trabajo (banco de beats, letras o partituras con versiones), enlazada desde la página de listas.
-function compOpen(tab) { comp.tab = tab; comp.panel = false; go('composition'); }
+function compOpen(tab) { compGo(tab); }
+// Listas y colecciones de cada sección (pantallas anteriores, aporte de Zharelly).
+function compLists(tab) {
+    if (comp.lyricDirty && !confirm('Hay cambios sin guardar en la letra. ¿Salir igual?')) return;
+    comp.lyricDirty = false; comp.tab = tab; go(tab);
+}

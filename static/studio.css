@@ -962,3 +962,9 @@ html[data-theme="light"] .avx input[type=checkbox],html[data-theme="light"] .wz-
 .composition-detail .comp-old{margin:2px 0 14px}
 .comp-old .link,.comp-back .link{color:var(--at-accent);font-weight:600}
 .comp-back{margin:0 0 10px}
+/* Composición · Letras: barra de forma en una sola línea, como el mockup */
+.lyr-bar{gap:8px;padding:8px 10px}
+.lyr-bar>.muted{font-size:13px;white-space:nowrap}
+.lyr-bar .mk-btn{padding:6px 10px!important;font-size:12.5px!important;white-space:nowrap}
+.lyr-bar .seg button{padding:5px 10px!important;font-size:12.5px!important}
+.lyr-bar .check{font-size:12.5px;white-space:nowrap}

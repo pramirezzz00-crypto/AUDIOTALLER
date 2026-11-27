@@ -248,7 +248,7 @@
 <section id="beats" class="composition-detail" hidden>
   <div class="heading"><div><h1>Beats</h1><p class="muted">Organizá tus bases instrumentales en listas independientes. Los archivos permanecen en sus carpetas originales.</p></div><button id="addBeats">＋ Agregar audios</button></div>
   <p id="beatsStatus" class="muted" role="status">Cargando tus listas…</p>
-  <p class="insp-help comp-old">¿Querés filtrar por BPM o estado, segmentar y arrastrar al DAW? <button class="link" onclick="compOpen('beats')">Ver banco de beats →</button></p>
+  <p class="insp-help comp-old"><button class="link" onclick="compGo('beats')">← Volver al banco de beats</button></p>
   <div class="grid beats-layout">
     <article class="card"><div class="heading"><div><h2>Mis listas</h2><div class="beat-playlist-tools"><select id="beatsPlaylistSelect" aria-label="Seleccionar lista de Beats"></select><button id="newBeatPlaylist" class="alt">＋ Nueva lista</button><button id="renameBeatPlaylist" class="alt">Renombrar</button><button id="deleteBeatPlaylist" class="alt" disabled>Eliminar lista</button></div></div><span id="beatsCount" class="muted">0 audios</span></div><h3 id="beatsListTitle">Mi lista de audios</h3><small class="muted">Arrastrá los audios para cambiar el orden.</small><div id="beatsList" class="list"></div></article>
     <article class="card"><h2>Reproductor</h2><p id="beatNow" class="muted">Seleccioná un audio de la lista para escucharlo.</p><audio id="beatPlayer" controls preload="metadata" style="width:100%"></audio><div class="row" style="margin-top:12px"><button id="openBeatFolder" class="alt" disabled>📁 Abrir ubicación</button></div><p class="muted">La lista se guarda automáticamente en este equipo. Quitar un audio solo lo elimina de la lista, no de tu PC.</p></article>
@@ -257,7 +257,7 @@
 <section id="scores" class="composition-detail" hidden>
   <div class="heading"><div><h1>Partituras</h1><p class="muted">Organizá tus partituras por colecciones y consultalas sin mover los archivos originales.</p></div><button id="addScores">＋ Agregar partituras</button></div>
   <p id="scoresStatus" class="muted" role="status">Cargando tus colecciones…</p>
-  <p class="insp-help comp-old">¿Querés ver tus partituras con versiones, asociadas a canciones y arreglos? <button class="link" onclick="compOpen('scores')">Ver partituras con versiones →</button></p>
+  <p class="insp-help comp-old"><button class="link" onclick="compGo('scores')">← Volver a Partituras</button></p>
   <div class="grid scores-layout">
     <article class="card"><div class="heading"><h2>Mis colecciones</h2><span id="scoresCount" class="muted">0 partituras</span></div>
       <div class="score-collection-tools"><select id="scoresCollectionSelect" aria-label="Seleccionar colección"></select><div class="row"><button id="newScoreCollection" class="alt">＋ Nueva</button><button id="renameScoreCollection" class="alt">Renombrar</button><button id="deleteScoreCollection" class="alt" disabled>Eliminar</button></div></div>
@@ -273,7 +273,7 @@
 <section id="lyrics" class="composition-detail" hidden>
   <div class="heading"><div><h1>Letras</h1><p class="muted">Organizá tus letras por colecciones y consultalas sin mover los archivos originales.</p></div><button id="addLyrics">＋ Agregar letras</button></div>
   <p id="lyricsStatus" class="muted" role="status">Cargando tus colecciones…</p>
-  <p class="insp-help comp-old">¿Querés ver las letras de tus canciones con versiones? <button class="link" onclick="compOpen('lyrics')">Ver letras con versiones →</button></p>
+  <p class="insp-help comp-old"><button class="link" onclick="compGo('lyrics')">← Volver a Letras</button></p>
   <div class="grid lyrics-layout">
     <article class="card"><div class="heading"><h2>Mis colecciones</h2><span id="lyricsCount" class="muted">0 letras</span></div>
       <div class="score-collection-tools"><select id="lyricsCollectionSelect" aria-label="Seleccionar colección de letras"></select><div class="row"><button id="newLyricCollection" class="alt">＋ Nueva</button><button id="renameLyricCollection" class="alt">Renombrar</button><button id="deleteLyricCollection" class="alt" disabled>Eliminar</button></div></div>
