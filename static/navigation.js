@@ -14,6 +14,7 @@ function display() {
     if (page === 'projectManager') loadGlobalProjects();
     if (page !== 'songPane' && page !== 'catalogPane') disposeWavePlayers();
     document.querySelectorAll('main audio').forEach(audio => audio.pause());
+    if (page !== 'composition' || comp.tab !== 'beats') comp.audio.pause();
     $('nav').hidden = page === 'home';
     $('sideHome').setAttribute('aria-current', page === 'home' ? 'page' : 'false');
     const peoplePage = ['manager', 'profile', 'editor', 'artistsPane'].includes(page) && !trail.includes('projectManager');
@@ -31,7 +32,7 @@ function display() {
     $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="openArtistManager(${projectPath})">${manager}</button>${artistLabel}`;
     if (page === 'arrangements' && $('crumbPath')) $('crumbPath').innerHTML = '<button onclick="go(\'home\')">Inicio</button> › Arreglos';
     if (compositionLabels[page]) {
-        $('crumbPath').innerHTML = page === 'composition' ? `<button onclick="go('home')">Inicio</button> › Composición › <button onclick="compLists('${comp.tab}')">${compositionLabels[comp.tab]}</button> › ${{beats:'Banco de beats',lyrics:'Editor de letras',scores:'Vista de trabajo'}[comp.tab]}` : `<button onclick="go('home')">Inicio</button> › Composición › ${compositionLabels[page]}`;
+        $('crumbPath').innerHTML = page === 'composition' ? `<button onclick="compLists('${comp.tab}')">${compositionLabels[comp.tab]}</button> › ${{beats:'Banco de beats',lyrics:'Editor de letras',scores:'Vista de trabajo'}[comp.tab]}` : `<button onclick="go('home')">Inicio</button> › Composición › ${compositionLabels[page]}`;
         if(page==='beats') loadBeats();
         if(page==='scores') loadScores();
         if(page==='lyrics') loadLyrics();
