@@ -10,7 +10,7 @@ App de escritorio para productores musicales (Windows y Mac). Python 3.12+ · Fl
 
 ## Comandos
 
-- Pruebas: `python -m unittest discover -s tests -q` (112 pruebas actuales; este entorno Windows tiene un fallo conocido de codificación en `test_clasifica_y_crea_sesiones_nuevas_sin_tocar_la_original`; Linux puede tener además el fallo conocido del almacén seguro).
+- Pruebas: `python -m unittest discover -s tests -q` (113 pruebas actuales; este entorno Windows tiene un fallo conocido de codificación en `test_clasifica_y_crea_sesiones_nuevas_sin_tocar_la_original`; Linux puede tener además el fallo conocido del almacén seguro).
 - App de escritorio: `python desktop.py`. Solo interfaz en navegador: `python app.py` → http://127.0.0.1:5000.
 - Sintaxis JS: `node --check static/<archivo>.js`.
 

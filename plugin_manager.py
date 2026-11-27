@@ -18,7 +18,7 @@ from flask import jsonify, request
 import plugin_catalog
 import plugin_downloads
 import plugin_inventory
-from runtime_paths import open_path
+from runtime_paths import open_path, reveal_path
 
 PLUGIN_EXT = {'.vst3': 'VST3', '.clap': 'CLAP', '.component': 'AU', '.vst': 'VST2', '.aaxplugin': 'AAX', '.dll': 'VST2'}
 
@@ -353,11 +353,17 @@ def register_plugin_manager(app, data_folder):
 
     @app.post('/api/plugins/mostrar')
     def plugins_reveal():
-        path = Path(str((request.get_json() or {}).get('ruta', '')))
-        roots = [r['ruta'] for r in roots_by_key().values()] + [disabled_dir()]
-        if not any(str(path).startswith(str(root)) for root in roots):
+        path = Path(os.path.normpath(str((request.get_json() or {}).get('ruta', ''))))
+        roots = [Path(os.path.normpath(str(r['ruta']))) for r in roots_by_key().values()] + [Path(os.path.normpath(str(disabled_dir())))]
+        key = lambda p: os.path.normcase(str(p))
+        if not any(key(path) == key(root) or key(path).startswith(key(root).rstrip('\\/') + os.sep) for root in roots):
             raise ValueError('Esa ruta no es una carpeta de plugins.')
-        open_path(str(path.parent if path.exists() else path.parent.parent))
+        if path.exists():
+            reveal_path(path)
+        elif path.parent.exists():
+            open_path(str(path.parent))
+        else:
+            raise ValueError('El plugin ya no está en esa carpeta. Volvé a escanear.')
         return jsonify(ok=True)
 
     # ---------- Instalación automática de gratuitos ----------

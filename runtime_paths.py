@@ -24,6 +24,17 @@ def open_path(path):
     return subprocess.Popen(['xdg-open', str(path)], shell=False)
 
 
+def reveal_path(path):
+    """Abre el explorador (o el Finder) en la carpeta del elemento y lo deja seleccionado."""
+    path = os.path.normpath(str(path))
+    if sys.platform == 'darwin':
+        return subprocess.Popen(['/usr/bin/open', '-R', path], shell=False)
+    if os.name == 'nt':
+        # explorer.exe trae la ventana al frente; os.startfile puede abrirla detrás de AudioTaller.
+        return subprocess.Popen(['explorer.exe', '/select,', path], shell=False)
+    return subprocess.Popen(['xdg-open', os.path.dirname(path)], shell=False)
+
+
 def launch_daw(executable, project, folder):
     if sys.platform == 'darwin' and Path(executable).suffix.lower() == '.app':
         return subprocess.Popen(['/usr/bin/open', '-a', str(executable), str(project)], shell=False, cwd=str(folder))

@@ -111,3 +111,24 @@ class DownloadsTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class RevealTest(unittest.TestCase):
+    def test_reveal_selects_the_plugin_inside_a_plugin_folder_only(self):
+        from unittest import mock
+        from flask import Flask
+        import plugin_manager
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'VST3'
+            plugin = root / 'Arturia' / 'Analog Lab V.vst3'
+            (plugin / 'Contents').mkdir(parents=True)
+            app = Flask(__name__)
+            app.register_error_handler(ValueError, lambda e: ({'error': str(e)}, 400))
+            with mock.patch.object(plugin_manager.plugin_inventory, 'plugin_roots', return_value=[('vst3', 'VST3', root, 'admin')]), \
+                    mock.patch.object(plugin_manager, 'reveal_path') as reveal:
+                plugin_manager.register_plugin_manager(app, lambda: temp)
+                client = app.test_client()
+                self.assertEqual(client.post('/api/plugins/mostrar', json={'ruta': str(plugin)}).status_code, 200)
+                reveal.assert_called_once_with(plugin)
+                self.assertEqual(client.post('/api/plugins/mostrar', json={'ruta': str(Path(temp) / 'otra' / 'x.vst3')}).status_code, 400)
+                self.assertEqual(client.post('/api/plugins/mostrar', json={'ruta': str(root) + 'X/fake.vst3'}).status_code, 400)
