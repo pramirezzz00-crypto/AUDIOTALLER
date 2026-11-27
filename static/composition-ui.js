@@ -36,6 +36,7 @@ function paintComposition() {
 }
 function compTab(tab) {
     if (comp.lyricDirty && !confirm('Hay cambios sin guardar en la letra. ¿Salir igual?')) return;
+    if (tab !== 'beats') comp.audio.pause();
     comp.tab = tab; comp.panel = false; comp.lyricDirty = false; renderCompositionPane();
 }
 function compNew() { comp.panel = !comp.panel; comp.scan = null; paintComposition(); }
@@ -53,9 +54,9 @@ function beatsView() {
       <div class="mk-chips"><button class="mk-chip ${!comp.beatState ? 'is-on' : ''}" onclick="comp.beatState='';paintComposition()">Todos <span>${comp.beats.length}</span></button>
         ${Object.entries(BEAT_COLORS).map(([st, c]) => `<button class="mk-chip ${comp.beatState === st ? 'is-on' : ''}" onclick="comp.beatState='${st}';paintComposition()"><i style="background:${c}"></i>${st} <span>${count(st)}</span></button>`).join('')}</div>
       <div class="beat-cards">${list.map(b => { const playing = comp.playing === b.id && !comp.audio.paused; return `<article class="beat-card ${b.id === comp.beat ? 'is-on' : ''} ${b.disponible ? '' : 'is-missing'}" onclick="if(!event.target.closest('button,a,input,select,label,canvas'))comp.beat=comp.beat==='${b.id}'?'':'${b.id}',paintComposition()">
-          <div class="beat-top"><button class="mk-play big ${playing ? 'is-on' : ''}" aria-label="${playing ? 'Pausar' : 'Escuchar'} ${esc(b.nombre)}" onclick="beatPlay('${b.id}')">${playing ? '❚❚' : '▶'}</button>
+          <div class="beat-top"><button data-beat-play="${b.id}" data-beat-name="${esc(b.nombre)}" class="mk-play big ${playing ? 'is-on' : ''}" aria-label="${playing ? 'Pausar' : 'Escuchar'} ${esc(b.nombre)}" onclick="beatPlay('${b.id}')">${playing ? '❚❚' : '▶'}</button>
             <span class="beat-name"><strong>${esc(b.nombre)}</strong><small class="mono">${[b.bpm ? b.bpm + ' BPM' : '', b.tonalidad].filter(Boolean).map(esc).join(' · ') || 'sin BPM'}</small></span>
-            <canvas class="beat-wave" data-beat-wave="${b.id}" onclick="beatSeek(event,'${b.id}')"></canvas>
+            <canvas class="beat-wave" data-beat-wave="${b.id}" onclick="beatSeek(event,'${b.id}')" onpointermove="beatHover(event)" onpointerleave="beatHover(event,true)"></canvas>
             <span class="beat-state"><b style="color:${BEAT_COLORS[b.estado]}">${esc(b.estado)}${b.estado !== 'Libre' && (b.cancion || b.para) ? ' · ' + esc(b.cancion || b.para) : ''}</b>
               <span>${b.etiquetas.map(t => `<span class="beat-tag">${esc(t)}</span>`).join('')}</span></span></div>
           <div class="beat-bottom"><button class="beat-drag" draggable="${b.disponible}" ondragstart="beatDrag(event,'${b.id}')" title="Arrastralo a una pista del DAW">⠿ Arrastrar al DAW</button>
@@ -65,34 +66,100 @@ function beatsView() {
       <p class="insp-help">Las marcas sobre la onda son los segmentos (intro, loop, drop): se pueden exportar sueltos. AudioTaller guarda la ruta, no mueve los archivos.</p>`;
 }
 const beatPeaks = new Map();
+const beatWaveData = new WeakMap();
+const beatHoverPositions = new WeakMap();
 async function drawBeatWaves() {
     for (const canvas of document.querySelectorAll('canvas[data-beat-wave]')) {
-        const id = canvas.dataset.beatWave, beat = comp.beats.find(b => b.id === id);
-        if (!beatPeaks.has(id)) beatPeaks.set(id, api('/api/composicion/beats/' + id + '/onda').catch(() => ({peaks: []})));
+        if (!canvas.isConnected) continue;
+        const id = canvas.dataset.beatWave;
+        if (!beatPeaks.has(id)) beatPeaks.set(id, api('/api/composicion/beats/' + id + '/onda').catch(() => { beatPeaks.delete(id); return {peaks: []}; }));
         const data = await beatPeaks.get(id);
         if (!canvas.isConnected) continue;
-        const box = canvas.getBoundingClientRect(), ratio = devicePixelRatio || 1;
-        canvas.width = box.width * ratio; canvas.height = box.height * ratio;
-        const ctx = canvas.getContext('2d'); ctx.scale(ratio, ratio);
-        const on = comp.playing === id || comp.beat === id, peaks = data.peaks || [], max = Math.max(...peaks, 0.01), bars = Math.floor(box.width / 7);
-        const duration = data.duration || 1, progress = comp.playing === id && comp.audio.duration ? comp.audio.currentTime / comp.audio.duration : 0;
-        for (let k = 0; k < bars; k++) {
-            const v = peaks.length ? peaks[Math.floor(k / bars * peaks.length)] / max : 0.3, h = Math.max(4, v * (box.height - 16));
-            ctx.fillStyle = on && (!progress || k / bars <= progress) ? '#2FD8BF' : on ? '#1F6F66' : '#3A3A42';
-            ctx.fillRect(k * 7, 12 + (box.height - 12 - h) / 2, 5, h);
-        }
-        ctx.font = '10px Inter, sans-serif';
-        for (const seg of beat?.segmentos || []) {
-            const x0 = seg.inicio / duration * box.width, x1 = seg.fin / duration * box.width;
-            ctx.fillStyle = '#8A8A94'; ctx.fillRect(x0, 1, x1 - x0 - 2, 1.5); ctx.fillText(seg.nombre, x0 + 1, 10);
+        beatWaveData.set(canvas, data);
+        paintBeatWave(canvas);
+    }
+}
+function paintBeatWave(canvas) {
+    const id = canvas.dataset.beatWave, data = beatWaveData.get(canvas) || {};
+    const beat = comp.beats.find(b => b.id === id);
+    const box = canvas.getBoundingClientRect(), ratio = devicePixelRatio || 1;
+    if (!box.width || !box.height) return;
+    const w = Math.round(box.width * ratio), hpx = Math.round(box.height * ratio);
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== hpx) canvas.height = hpx;
+    const ctx = canvas.getContext('2d'); ctx.setTransform(ratio,0,0,ratio,0,0);
+    ctx.clearRect(0,0,box.width,box.height);
+    const active = comp.playing === id, peaks = data.peaks || [], max = Math.max(...peaks, 0.01), bars = Math.max(1,Math.floor(box.width / 7));
+    const duration = active && Number.isFinite(comp.audio.duration) ? comp.audio.duration : data.duration;
+    const progress = active && duration > 0 ? comp.audio.currentTime / duration : 0;
+    const styles = getComputedStyle(canvas);
+    const accent = styles.getPropertyValue('--at-accent').trim() || '#2FD8BF';
+    const neutral = styles.getPropertyValue('--at-text3').trim() || '#8A8A94';
+    for (let k = 0; k < bars; k++) {
+        const v = peaks.length ? peaks[Math.floor(k / bars * peaks.length)] / max : 0.3;
+        const h = Math.max(3, v * (box.height - 28));
+        ctx.fillStyle = active && k / bars < progress ? accent : neutral;
+        ctx.fillRect(k * 7, 12 + (box.height - 26 - h) / 2, 5, h);
+    }
+    ctx.font = '10px Inter, sans-serif';
+    if (duration > 0) for (const seg of beat?.segmentos || []) {
+        const x0 = seg.inicio / duration * box.width, x1 = seg.fin / duration * box.width;
+        ctx.fillStyle = neutral; ctx.fillRect(x0,1,Math.max(0,x1-x0-2),1.5); ctx.fillText(seg.nombre,x0+1,10);
+    }
+    if (active && duration > 0) {
+        ctx.fillStyle = accent; ctx.fillRect(Math.min(box.width-1,progress*box.width),12,1,box.height-25);
+        ctx.fillText(clockText(comp.audio.currentTime) + ' / ' + clockText(duration), 0, box.height-2);
+    }
+    const hover = beatHoverPositions.get(canvas);
+    if (hover !== undefined) {
+        const x = Math.min(box.width-1,hover*box.width);
+        ctx.fillStyle = accent; ctx.fillRect(x,12,1,box.height-25);
+        if (duration > 0) {
+            const label = clockText(hover*duration), tw = ctx.measureText(label).width;
+            const tx = Math.max(0,Math.min(box.width-tw-4,x-tw/2));
+            ctx.fillStyle = styles.getPropertyValue('--at-panel').trim() || '#fff';
+            ctx.fillRect(tx,box.height-13,tw+4,13);
+            ctx.fillStyle = accent; ctx.fillText(label,tx+2,box.height-2);
         }
     }
 }
-function beatSeek(event, id) {
-    if (comp.playing !== id) return beatPlay(id);
+function beatFraction(event) {
     const box = event.currentTarget.getBoundingClientRect();
-    if (comp.audio.duration) comp.audio.currentTime = (event.clientX - box.left) / box.width * comp.audio.duration;
+    return Math.max(0,Math.min(1,(event.clientX-box.left)/Math.max(1,box.width)));
 }
+function beatHover(event, leave = false) {
+    const canvas = event.currentTarget;
+    if (leave) beatHoverPositions.delete(canvas); else beatHoverPositions.set(canvas,beatFraction(event));
+    paintBeatWave(canvas);
+}
+let pendingBeatSeek = null;
+function applyBeatSeek() {
+    if (pendingBeatSeek !== null && Number.isFinite(comp.audio.duration) && comp.audio.duration > 0) {
+        comp.audio.currentTime = pendingBeatSeek * comp.audio.duration;
+        pendingBeatSeek = null;
+    }
+}
+function beatSeek(event, id) {
+    const fraction = beatFraction(event);
+    if (comp.playing !== id) return beatPlay(id, fraction);
+    pendingBeatSeek = fraction; applyBeatSeek(); updateBeatPlayback();
+}
+function updateBeatPlayback() {
+    if (comp.tab !== 'beats' || $('composition')?.hidden) return;
+    for (const button of document.querySelectorAll('[data-beat-play]')) {
+        const playing = button.dataset.beatPlay === comp.playing && !comp.audio.paused && !comp.audio.ended;
+        button.classList.toggle('is-on',playing);
+        button.textContent = playing ? '❚❚' : '▶';
+        button.setAttribute('aria-label',(playing ? 'Pausar ' : 'Escuchar ') + button.dataset.beatName);
+    }
+    for (const canvas of document.querySelectorAll('canvas[data-beat-wave]')) paintBeatWave(canvas);
+}
+comp.audio.addEventListener('loadedmetadata', () => { applyBeatSeek(); updateBeatPlayback(); });
+for (const event of ['play','pause','ended','seeked']) comp.audio.addEventListener(event,updateBeatPlayback);
+comp.audio.addEventListener('timeupdate', () => {
+    if (comp.tab !== 'beats' || $('composition')?.hidden) return;
+    for (const canvas of document.querySelectorAll('canvas[data-beat-wave]')) if (canvas.dataset.beatWave === comp.playing) paintBeatWave(canvas);
+});
 function beatDetail(b) {
     return `<div class="beat-edit"><div class="cr-grid"><label class="fld">Nombre<input value="${esc(b.nombre)}" onchange="saveBeat('${b.id}',{titulo:this.value})"></label>
         <label class="fld">BPM<input value="${b.bpm || ''}" inputmode="numeric" onchange="saveBeat('${b.id}',{bpm:this.value})"></label>
@@ -115,10 +182,15 @@ async function saveBeat(id, changes) {
     await api('/api/composicion/beats/' + id, body(changes)).catch(report);
     await renderCompositionPane();
 }
-function beatPlay(id) {
-    if (comp.playing === id && !comp.audio.paused) { comp.audio.pause(); paintComposition(); return; }
-    comp.playing = id; comp.audio.src = '/api/beats/' + encodeURIComponent(id) + '/audio';
-    comp.audio.play().catch(report); comp.audio.onpause = comp.audio.onplay = () => paintComposition();
+function beatPlay(id, fraction = null) {
+    $('beatPlayer')?.pause();
+    if (comp.playing === id && !comp.audio.paused && fraction === null) { comp.audio.pause(); return; }
+    if (comp.playing !== id) {
+        comp.playing = id; pendingBeatSeek = fraction;
+        comp.audio.src = '/api/beats/' + encodeURIComponent(id) + '/audio';
+    } else if (fraction !== null) { pendingBeatSeek = fraction; applyBeatSeek(); }
+    comp.audio.play().catch(error => { if (error.name !== 'AbortError') report(error); updateBeatPlayback(); });
+    updateBeatPlayback();
 }
 function beatDrag(event, id) {
     const beat = comp.beats.find(b => b.id === id);
@@ -407,6 +479,7 @@ async function uploadScores() {
 // Pantalla principal de cada sección: la vista de trabajo (banco de beats, letras y partituras con versiones).
 function compGo(tab) {
     if (trail.at(-1) === 'composition' && comp.tab === 'lyrics' && tab !== 'lyrics' && comp.lyricDirty && !confirm('Hay cambios sin guardar en la letra. ¿Salir igual?')) return;
+    if (tab !== 'beats') comp.audio.pause();
     if (comp.tab !== tab) comp.lyricDirty = false;
     comp.tab = tab; comp.panel = false;
     if (trail.at(-1) === 'composition') renderCompositionPane(); else go('composition');
@@ -417,3 +490,6 @@ function compLists(tab) {
     if (comp.lyricDirty && !confirm('Hay cambios sin guardar en la letra. ¿Salir igual?')) return;
     comp.lyricDirty = false; comp.tab = tab; go(tab);
 }
+
+// Evitar reproducción simultánea entre Mis listas y Banco de beats.
+$('beatPlayer')?.addEventListener('play', () => comp.audio.pause());
