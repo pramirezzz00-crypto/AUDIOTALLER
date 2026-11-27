@@ -21,3 +21,15 @@ class PortalGuideTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class EntityGuidesTest(unittest.TestCase):
+    def test_guias_de_entidades_incluidas_con_marca(self):
+        try:
+            from pypdf import PdfReader
+        except ImportError:
+            self.skipTest('pypdf no instalado')
+        for abbr in ('DNDA', 'SADAIC', 'AADI', 'CAPIF', 'INAMU', 'AMA'):
+            path = ROOT / 'static' / 'docs' / 'entidades' / f'Guia-{abbr}-AudioTaller.pdf'
+            self.assertTrue(path.read_bytes().startswith(b'%PDF'), abbr)
+            self.assertIn('AudioTaller', PdfReader(path).pages[0].extract_text())

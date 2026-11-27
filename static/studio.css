@@ -968,3 +968,11 @@ html[data-theme="light"] .avx input[type=checkbox],html[data-theme="light"] .wz-
 .lyr-bar .mk-btn{padding:6px 10px!important;font-size:12.5px!important;white-space:nowrap}
 .lyr-bar .seg button{padding:5px 10px!important;font-size:12.5px!important}
 .lyr-bar .check{font-size:12.5px;white-space:nowrap}
+
+/* Manuales en PDF (Portal del artista y guías de entidades) */
+.pdf-ico{width:18px;height:18px;flex:none}
+.pl-manual{border-color:color-mix(in srgb,#E5484D 45%,var(--at-line3))!important}
+.ent-guide{display:flex;align-items:center;gap:12px;padding:12px 14px;margin:4px 0 14px;border:1px solid var(--at-line2);border-radius:10px;background:color-mix(in srgb,var(--at-accent) 6%,var(--at-panel))}
+.ent-guide .pdf-ico{width:30px;height:30px}
+.ent-guide>div{flex:1;min-width:0}.ent-guide strong{display:block;font-size:14px}.ent-guide small{display:block;color:var(--at-text2);font-size:12.5px;line-height:1.4;margin-top:2px}
+.ent-guide .btn-link{white-space:nowrap}

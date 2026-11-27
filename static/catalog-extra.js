@@ -134,6 +134,7 @@ function paintPlaylists() {
           ${o.publicacion?.url ? `<button class="mk-btn" onclick="navigator.clipboard.writeText('${esc(o.publicacion.url)}').then(()=>notify('Enlace copiado'))">Copiar enlace</button>` : ''}
           <button class="mk-btn" onclick="openFeedbackPane({playlist_id:'${cur.id}'}).catch(report)">Ver devoluciones ${open ? `<b class="side-count">${open}</b>` : ''}</button>
           <button class="mk-btn" onclick="publishWebDialog().catch(report)">Publicar cambios en el portal</button>
+          <button class="mk-btn pl-manual" onclick="downloadPortalGuide().catch(report)" title="Guía paso a paso para crear, conectar y mantener el Portal del artista">${PDF_ICON}Manual para generar el Portal del artista</button>
           <details class="menu"><summary class="menu-button">Más</summary><div class="menu-list">
             <button onclick="editPlaylistDialog()">Nombre y notas</button><button onclick="deliveryDialog().catch(report)">Vista local / entrega</button>
             <button onclick="portalSetupDialog().catch(report)">Conectar portal web</button><button onclick="portalGuideDialog()">Instructivo del portal (PDF)</button><button onclick="importCatalogAudio([], '${cur.id}').catch(report)">Incorporar audios desde la PC</button></div></details></div>

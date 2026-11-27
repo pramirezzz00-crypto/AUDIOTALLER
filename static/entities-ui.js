@@ -39,6 +39,9 @@ function paintEntities() {
           <div class="row-tight">${entLogo(cur, true)}<div><span class="insp-kicker">${esc(cur.kind)}</span><h2 style="margin:2px 0">${esc(cur.name)}</h2>
             <a href="${esc(cur.site)}" target="_blank" rel="noopener noreferrer">${esc(cur.site.replace(/^https?:\/\//, ''))} ↗</a></div></div>
           <p>${esc(cur.what)}</p>
+          <div class="ent-guide">${PDF_ICON}<div><strong>Guía de inscripción y gestión · ${esc(cur.abbr)}</strong>
+            <small>Ficha técnica completa: qué protege y qué liquida, documentación a presentar, pasos de alta y recomendaciones.</small></div>
+            <a class="btn-link btn-primary" href="/static/docs/entidades/Guia-${esc(cur.abbr)}-AudioTaller.pdf" download="Guia-${esc(cur.abbr)}-AudioTaller.pdf">Descargar PDF</a></div>
           <div class="ent-cols"><div><span class="insp-label">Qué te da</span><ul>${cur.gives.map(g => `<li>${esc(g)}</li>`).join('')}</ul></div>
             <div><span class="insp-label">Qué guarda AudioTaller</span><p class="muted">${esc(cur.stores)}</p></div></div>
           <span class="insp-label">Procedimientos</span>
