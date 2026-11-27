@@ -99,6 +99,7 @@ async function loadPlaylists() {
 async function selectPlaylist(id) {
     const [list, notes, news, opts] = await Promise.all([api('/api/playlists/' + id), api('/api/portal/devoluciones?playlist_id=' + id).catch(() => []),
         api('/api/playlists/' + id + '/novedades').catch(() => null), api('/api/playlists/' + id + '/opciones').catch(() => null)]);
+    if (plPlayback.listId && (plPlayback.listId !== list.id || !list.audios.some(a => a.id === plPlayback.audioId))) plStop();
     playlistCurrent = list; plx.notes = notes; plx.news = news; plx.opts = opts;
     paintPlaylists();
 }
@@ -129,7 +130,7 @@ function paintPlaylists() {
         <div class="pl-hero"><span class="pl-cover" style="${placeholderArt(cur.id, 'mezcla')}"></span>
           <div><span class="eyebrow">Playlist de escucha</span><h1>${esc(cur.nombre)}</h1>
             <p class="muted">${countLabel(cur.audios.length, 'audio', 'audios')} · creada el ${esc(new Date(String(cur.creado).replace(' ', 'T') + 'Z').toLocaleDateString('es-AR', {day: 'numeric', month: 'short'}))} · ${plStatus(meta)[0]}</p></div></div>
-        <div class="pl-actions"><button class="mk-bigplay" aria-label="Escuchar la playlist" onclick="plPlay(0)">▶</button>
+        <div class="pl-actions"><button class="mk-bigplay" id="plPlayButton" aria-label="Escuchar la playlist" onclick="plToggle()" ${cur.audios.length ? '' : 'disabled'}>▶</button>
           <a class="mk-btn wa" href="https://wa.me/?text=${msg}" target="_blank" rel="noopener noreferrer">✆ Compartir por WhatsApp</a>
           ${o.publicacion?.url ? `<button class="mk-btn" onclick="navigator.clipboard.writeText('${esc(o.publicacion.url)}').then(()=>notify('Enlace copiado'))">Copiar enlace</button>` : ''}
           <button class="mk-btn" onclick="openFeedbackPane({playlist_id:'${cur.id}'}).catch(report)">Ver devoluciones ${open ? `<b class="side-count">${open}</b>` : ''}</button>
@@ -156,6 +157,7 @@ function paintPlaylists() {
       </section>` : '<section class="pl-main"><p class="muted">Elegí una playlist o creá una nueva.</p></section>'}</div>`;
     root.querySelectorAll('#plVence,[data-opt]').forEach(el => el.onchange = () => api('/api/playlists/' + cur.id + '/opciones', body({vence: $('plVence').value,
         ...Object.fromEntries([...root.querySelectorAll('[data-opt]')].map(x => [x.dataset.opt, x.checked]))})).then(() => notify('Opciones guardadas: se aplican al publicar.')).catch(report));
+    plSyncButton();
     let drag = null;
     root.querySelectorAll('[data-pl]').forEach(row => {
         row.ondragstart = () => { drag = Number(row.dataset.pl); };
@@ -164,11 +166,43 @@ function paintPlaylists() {
     });
 }
 const plAudio = new Audio();
+const plPlayback = {listId: null, audioId: null};
+function plSyncButton() {
+    const button = $('plPlayButton');
+    if (!button) return;
+    const playing = plPlayback.listId === playlistCurrent?.id && !plAudio.paused && !plAudio.ended;
+    button.textContent = playing ? '❚❚' : '▶';
+    button.setAttribute('aria-label', playing ? 'Pausar la playlist' : 'Escuchar la playlist');
+}
+function plStop() {
+    plPlayback.listId = null; plPlayback.audioId = null;
+    plAudio.pause(); plAudio.removeAttribute('src'); plAudio.load();
+    plSyncButton();
+}
+function plToggle() {
+    if (!playlistCurrent?.audios.length) return;
+    if (plPlayback.listId === playlistCurrent.id && playlistCurrent.audios.some(a => a.id === plPlayback.audioId)) {
+        if (!plAudio.paused) plAudio.pause();
+        else plAudio.play().catch(error => { if (error.name !== 'AbortError') report(error); });
+        plSyncButton();
+    } else plPlay(0);
+}
 function plPlay(i) {
-    const a = playlistCurrent?.audios[i]; if (!a) return;
-    plAudio.src = '/api/produccion/archivo/' + a.id; plAudio.play().catch(report); plAudio.onended = () => plPlay(i + 1);
+    const a = playlistCurrent?.audios[i];
+    if (!a) { plStop(); return; }
+    plPlayback.listId = playlistCurrent.id; plPlayback.audioId = a.id;
+    plAudio.src = '/api/produccion/archivo/' + a.id;
+    plAudio.play().catch(error => { if (error.name !== 'AbortError') report(error); });
+    plSyncButton();
     notify('Sonando: ' + a.nombre);
 }
+plAudio.onplay = plAudio.onpause = plAudio.onerror = plSyncButton;
+plAudio.onended = () => {
+    if (plPlayback.listId !== playlistCurrent?.id) { plStop(); return; }
+    const i = playlistCurrent.audios.findIndex(a => a.id === plPlayback.audioId);
+    if (i < 0) plStop(); else plPlay(i + 1);
+};
+
 async function playlistSwap(current, newer, replace) {
     const ids = playlistCurrent.audios.map(a => a.id);
     const index = ids.indexOf(current);
