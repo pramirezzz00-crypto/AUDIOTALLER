@@ -1155,3 +1155,6 @@ body.pl-folded .sidebar .pl-sub{display:none!important}
 
 .bud-row-h span:nth-child(5){text-align:center}.bud-row-i input[type=number]{padding:6px 4px!important}
 @media (max-width:1250px){.bud-body{grid-template-columns:1fr}.bud-summary{position:static}}
+
+/* Banco de beats: navegacion sobre la forma de onda. */
+#composition .beat-wave{cursor:crosshair;height:60px;min-width:0}
