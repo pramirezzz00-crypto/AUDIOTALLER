@@ -1,7 +1,9 @@
 """Plugins sugeridos: análisis, procesamiento gratuito y referencias (en su mayoría pagas).
 
-Selección orientativa para mezcla. AudioTaller no descarga nada: cada ficha lleva al sitio oficial.
+Selección orientativa para mezcla. Los gratuitos marcados como automáticos los descarga AudioTaller del sitio oficial; el resto se descarga desde su ficha.
 """
+import plugin_downloads
+
 
 def item(nombre, fabricante, url, precio='Gratis', nota='', detectar=None):
     return dict(nombre=nombre, fabricante=fabricante, url=url, precio=precio, nota=nota, detectar=detectar or [nombre])
@@ -104,7 +106,7 @@ def with_installed(installed_names):
             for entry in group['items']:
                 keys = [norm(k) for k in entry['detectar'] if len(norm(k)) >= 3]
                 found = any(k in n for k in keys for n in names)
-                items.append(dict(entry, instalado=found))
+                items.append(dict(entry, instalado=found, automatico=plugin_downloads.available(entry["nombre"])))
             groups.append(dict(group, items=items))
         out.append(dict(section, grupos=groups))
     return out

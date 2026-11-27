@@ -124,6 +124,23 @@ def smoke_test(output):
         assert result.get('ok'), 'La ventana no completó la carga de la interfaz'
 
 
+def install_youlean(datos):
+    """Lo llama el instalador de Windows: instala Youlean Loudness Meter si no está. Sin red, no hace nada."""
+    import json as _json
+    import plugin_manager
+    result={'fecha':__import__('datetime').datetime.now().isoformat(timespec='seconds'),'ofrecido':True}
+    try:
+        if plugin_manager.youlean_installed():
+            result['estado']='ya estaba'
+        else:
+            state=plugin_manager.install_blocking(['Youlean Loudness Meter'])
+            result['estado']=state['plugins'][0]['estado'];result['detalle']=state['plugins'][0]['detalle']
+    except Exception as error:
+        result['estado']='error';result['detalle']=str(error)[:300]
+    logging.info('Youlean: %s',result)
+    (datos/'youlean.json').write_text(_json.dumps(result,ensure_ascii=False),encoding='utf-8')
+
+
 def main():
     if len(sys.argv)==3 and sys.argv[1]=='--smoke-test':
         smoke_test(sys.argv[2]);return
@@ -133,6 +150,8 @@ def main():
     datos = data_directory()
     datos.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(filename=datos / "inicio.log", encoding="utf-8", level=logging.INFO)
+    if len(sys.argv)==2 and sys.argv[1]=='--instalar-youlean':
+        install_youlean(datos);return
 
     import webview
     from app import app

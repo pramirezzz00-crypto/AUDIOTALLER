@@ -37,6 +37,7 @@ UninstallDisplayName=AudioTaller 0.3.0 beta
 Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 [Tasks]
 Name: "desktopicon"; Description: "Crear un acceso directo en el Escritorio"; GroupDescription: "Accesos directos:"
+Name: "youlean"; Description: "Instalar Youlean Loudness Meter (gratis, mide LUFS y dBTP) si no está instalado. Se descarga del sitio oficial y Windows pide permiso."; GroupDescription: "Plugins:"
 [Files]
 Source: "{#BuildRoot}\AudioTaller\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#ToolsRoot}\MicrosoftEdgeWebview2Setup.exe"; Flags: dontcopy
@@ -46,6 +47,7 @@ Name: "{autodesktop}\AudioTaller"; Filename: "{app}\AudioTaller.exe"; Tasks: des
 Name: "{group}\Instructivo del portal del artista"; Filename: "{app}\_internal\docs\AudioTaller_Instructivo_Portal_del_Artista.pdf"
 Name: "{group}\Desinstalar AudioTaller"; Filename: "{uninstallexe}"
 [Run]
+Filename: "{app}\AudioTaller.exe"; Parameters: "--instalar-youlean"; StatusMsg: "Instalando Youlean Loudness Meter (si no está)..."; Flags: waituntilterminated; Tasks: youlean
 Filename: "{app}\AudioTaller.exe"; Description: "Abrir AudioTaller"; Flags: nowait postinstall skipifsilent
 [Code]
 function HasWebView2: Boolean;

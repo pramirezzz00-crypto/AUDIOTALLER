@@ -220,6 +220,7 @@ def scan(roots=None):
             copyable = fmt != 'AAX' and info['licencia'] in ('gratis', 'desconocida', 'clave')
             items.append(dict(id=f'{key}:{relative.as_posix()}', nombre=path.stem, formato=fmt, raiz=key, relativo=relative.as_posix(),
                               ruta=str(path), acceso=access, tamano=bundle_size(path), copiable=copyable,
+                              version=read_version(path), modificado=binary_mtime(path),
                               copiar=copyable and info['licencia'] in ('gratis', 'desconocida'), **info))
     items.sort(key=lambda x: (x['fabricante'].lower(), x['nombre'].lower(), x['formato']))
     return items
@@ -249,3 +250,70 @@ def compare(previous, installed):
     """Qué plugins de la computadora vieja ya están en esta."""
     have = {(p['formato'], p['nombre'].lower()) for p in installed}
     return [dict(p, instalado=(p['formato'], p['nombre'].lower()) in have) for p in previous]
+
+
+def read_version(path):
+    """Versión declarada por el plugin, si la tiene (moduleinfo.json o Info.plist)."""
+    try:
+        if path.is_dir():
+            info = path / 'Contents' / 'Resources' / 'moduleinfo.json'
+            if info.is_file():
+                data = json.loads(re.sub(r',\s*([}\]])', r'\1', info.read_text(encoding='utf-8', errors='replace')))
+                if data.get('Version'):
+                    return str(data['Version'])[:20]
+            plist = path / 'Contents' / 'Info.plist'
+            if plist.is_file():
+                data = plistlib.loads(plist.read_bytes())
+                return str(data.get('CFBundleShortVersionString') or data.get('CFBundleVersion') or '')[:20]
+    except Exception:
+        return ''
+    return ''
+
+
+def binary_mtime(path):
+    """Fecha del binario del plugin (en un bundle, la del ejecutable de adentro)."""
+    try:
+        if path.is_dir():
+            for sub in ('x86_64-win', 'MacOS', 'arm64-win', 'x86-win'):
+                folder = path / 'Contents' / sub
+                if folder.is_dir():
+                    times = [f.stat().st_mtime for f in folder.iterdir() if f.is_file() or f.suffix]
+                    if times:
+                        return max(times)
+        return path.stat().st_mtime
+    except OSError:
+        return 0
+
+
+COPY_MARK = re.compile(r'(?i)(\s*[-_ ]?(\(\d+\)|copy|copia|\d+ ?copy|- copia|\(x64\)|x64|_64|64[- ]?bit|\(64[- ]?bit\)))+$')
+
+
+def duplicate_key(name):
+    base = COPY_MARK.sub('', name.strip())
+    return re.sub(r'[\s_\-.]+', '', base.lower())
+
+
+def version_tuple(text):
+    return tuple(int(n) for n in re.findall(r'\d+', text or '')[:4])
+
+
+def find_duplicates(items):
+    """Plugins repetidos dentro de un mismo formato (no cuenta el mismo plugin en VST3 y en AU).
+
+    Sugiere conservar la versión más nueva; ante empate, la de fecha más reciente.
+    """
+    groups = {}
+    for item in items:
+        groups.setdefault((item['formato'], duplicate_key(item['nombre'])), []).append(item)
+    out = []
+    for (fmt, _), group in groups.items():
+        if len(group) < 2:
+            continue
+        ranked = sorted(group, key=lambda i: (version_tuple(i.get('version')), i.get('modificado') or 0, -len(i['relativo'])), reverse=True)
+        keep = ranked[0]
+        out.append(dict(formato=fmt, nombre=keep['nombre'], conservar=keep['id'],
+                        copias=[dict(i, sugerido=i['id'] == keep['id']) for i in ranked],
+                        espacio=sum(i['tamano'] for i in ranked[1:]),
+                        central=next((i['central'] for i in ranked if i['licencia'] in ('central', 'ilok')), '')))
+    out.sort(key=lambda g: (g['nombre'].lower(), g['formato']))
+    return out

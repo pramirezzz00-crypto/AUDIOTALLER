@@ -1158,3 +1158,25 @@ body.pl-folded .sidebar .pl-sub{display:none!important}
 
 /* Banco de beats: navegacion sobre la forma de onda. */
 #composition .beat-wave{cursor:crosshair;height:60px;min-width:0}
+
+/* Plugins · optimizador de duplicados e instalador masivo */
+.plg-mass{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:0 0 16px}
+.plg-mass h2{margin:4px 0}.plg-mass p{margin:4px 0 0;max-width:760px}.plg-mass .btn-primary{flex:none}
+.plg-dup{margin:0 0 12px;padding:14px 16px}.plg-dup.is-off{opacity:.55}
+.plg-dup-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.plg-dup-head .mk-btn{margin-left:auto}
+.plg-fmt{font-size:11.5px;padding:2px 8px;border-radius:6px;background:var(--at-raised);color:var(--at-text2)}
+.plg-warn{font-size:12px;color:#E0A84A}
+.plg-dup tr.is-keep td{background:color-mix(in srgb,var(--at-accent) 7%,transparent)}
+.plg-dup label.chk,.plg-pick label.chk{display:inline-flex;align-items:center;gap:8px;cursor:pointer;margin:0}
+.plg-dup input[type=radio],.plg-dup input[type=checkbox],.plg-pick input{width:auto!important;margin:0!important;accent-color:var(--at-accent)}
+.plg-clean h2{margin:0 0 6px}
+.plg-danger{color:#E5484D!important}
+.plg-foot{justify-content:flex-end;margin-top:10px}
+.plg-auto{padding:5px 10px!important;font-size:12px!important}
+.plg-pick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 16px;max-height:340px;overflow:auto;margin:10px 0;padding:12px;border:1px solid var(--at-line);border-radius:10px;background:var(--at-deep)}
+.plg-job{margin:0 0 16px;border-color:color-mix(in srgb,var(--at-accent) 45%,transparent)}
+.plg-job.error{border-color:#E5484D}
+.plg-job-list{list-style:none;margin:6px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:4px 16px;font-size:13px}
+.plg-job-list li b{display:inline-block;width:16px;color:var(--at-text3)}
+.plg-job-list li.st-instalado b{color:var(--at-accent)}.plg-job-list li.st-error b{color:#E5484D}

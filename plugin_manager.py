@@ -16,6 +16,7 @@ from pathlib import Path
 from flask import jsonify, request
 
 import plugin_catalog
+import plugin_downloads
 import plugin_inventory
 from runtime_paths import open_path
 
@@ -101,6 +102,101 @@ def find_plugins(folder):
     return found
 
 
+def copy_into_roots(candidates):
+    """Copia plugins sueltos a la carpeta estándar de su formato. Nunca reemplaza uno instalado."""
+    installed, skipped, admin = [], [], []
+    for source in candidates:
+        fmt = PLUGIN_EXT[source.suffix.lower()]
+        if fmt == 'AAX':
+            skipped.append(dict(nombre=source.name, motivo='Los AAX se instalan con el instalador del fabricante.'))
+            continue
+        key, root = install_root(fmt)
+        if not root:
+            skipped.append(dict(nombre=source.name, motivo=f'No hay carpeta estándar de {fmt} en este sistema.'))
+            continue
+        target = root['ruta'] / source.name
+        if target.exists():
+            skipped.append(dict(nombre=source.name, motivo='Ya está instalado: no lo reemplazo.'))
+            continue
+        if needs_admin(target):
+            admin.append(('copy', source, target))
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            (shutil.copytree if source.is_dir() else shutil.copy2)(str(source), str(target), **({'symlinks': True} if source.is_dir() else {}))
+            installed.append(dict(nombre=source.stem, formato=fmt, ruta=str(target)))
+    if admin:
+        run_admin(admin)
+        for _, source, target in admin:
+            if Path(target).exists():
+                installed.append(dict(nombre=source.stem, formato=PLUGIN_EXT[source.suffix.lower()], ruta=str(target)))
+            else:
+                skipped.append(dict(nombre=source.name, motivo='Faltó el permiso de administrador.'))
+    return installed, skipped
+
+
+def install_worker(names):
+    def work(state):
+        with tempfile.TemporaryDirectory(prefix='audiotaller-plugins-') as temp:
+            found_plugins, found_installers, owners = [], [], {}
+            for row in state['plugins']:
+                name = row['nombre']
+                try:
+                    row['estado'], state['paso'] = 'descargando', f'Descargando {name}…'
+                    url = plugin_downloads.resolve(name)
+                    folder = Path(temp) / uuid.uuid4().hex[:6]
+                    folder.mkdir()
+
+                    def progress(done, total, row=row):
+                        row['detalle'] = f'{done / 1024 ** 2:.1f} MB' + (f' de {total / 1024 ** 2:.1f} MB' if total else '')
+                    path = plugin_downloads.download(url, folder, progress)
+                    row['estado'], row['detalle'] = 'preparando', path.name
+                    plugins, installers = plugin_downloads.prepare(path, folder, find_plugins)
+                    if not plugins and not installers:
+                        raise ValueError('La descarga no trae plugins para esta computadora.')
+                    found_plugins += plugins
+                    for item in installers:
+                        owners[str(item)] = row
+                    found_installers += installers
+                    row['estado'] = 'listo para instalar'
+                except Exception as error:
+                    row['estado'], row['detalle'] = 'error', str(error)[:200]
+            if found_plugins:
+                state['paso'] = 'Copiando plugins…'
+                done, skipped = copy_into_roots(found_plugins)
+                state['instalados'] += done
+                state['omitidos'] += skipped
+            if found_installers:
+                state['paso'] = ('Ejecutando los instaladores. Windows te va a pedir permiso una sola vez.' if sys.platform == 'win32'
+                                 else 'Ejecutando los instaladores. macOS te va a pedir tu contraseña una sola vez.')
+                ok = plugin_downloads.run_installers(found_installers)
+                if not ok:
+                    for item in found_installers:
+                        owners[str(item)]['estado'], owners[str(item)]['detalle'] = 'error', 'Se canceló el permiso o falló el instalador.'
+            state['paso'] = 'Revisando lo instalado…'
+            have = {i['nombre'] for i in plugin_inventory.scan()}
+            checked = {e['nombre']: e['instalado'] for s in plugin_catalog.with_installed(list(have)) for g in s['grupos'] for e in g['items']}
+            for row in state['plugins']:
+                if checked.get(row['nombre']):
+                    row['estado'], row['detalle'] = 'instalado', ''
+                elif row['estado'] != 'error':
+                    row['estado'], row['detalle'] = 'error', 'No aparece instalado. Probá descargarlo desde el sitio.'
+            ok = sum(r['estado'] == 'instalado' for r in state['plugins'])
+            state['paso'] = f'Listo: {ok} de {len(state["plugins"])} instalados. Volvé a escanear plugins en tu DAW.'
+    return work
+
+
+
+def youlean_installed():
+    return any('youlean' in p['nombre'].lower() for p in plugin_inventory.scan())
+
+
+def install_blocking(names):
+    """Instala y espera (lo usa el instalador de AudioTaller para Youlean)."""
+    state = dict(estado='trabajando', paso='', plugins=[dict(nombre=n, estado='en espera', detalle='') for n in names], instalados=[], omitidos=[])
+    install_worker(names)(state)
+    return state
+
+
 def register_plugin_manager(app, data_folder):
     def disabled_dir():
         return Path(data_folder()) / 'Plugins desactivados'
@@ -124,6 +220,7 @@ def register_plugin_manager(app, data_folder):
         roots = [dict(clave=k, formato=r['formato'], ruta=str(r['ruta']), existe=r['ruta'].is_dir()) for k, r in roots_by_key().items()]
         disabled = [dict(d, disponible=Path(d['guardado']).exists()) for d in read_index()]
         return jsonify(instalados=items, desactivados=disabled, carpetas=roots, sistema=sys.platform,
+                       duplicados=plugin_inventory.find_duplicates(items),
                        sugeridos=plugin_catalog.with_installed([i['nombre'] for i in items]))
 
     @app.post('/api/plugins/instalar')
@@ -131,7 +228,7 @@ def register_plugin_manager(app, data_folder):
         paths = (request.get_json() or {}).get('rutas', [])
         if not isinstance(paths, list) or not 0 < len(paths) <= 30:
             raise ValueError('Elegí entre 1 y 30 archivos o carpetas de plugins.')
-        installed, skipped, admin = [], [], []
+        installed, skipped = [], []
         with tempfile.TemporaryDirectory() as temp:
             candidates = []
             for value in paths:
@@ -161,55 +258,76 @@ def register_plugin_manager(app, data_folder):
                     skipped.append(dict(nombre=path.name, motivo='Es un instalador: abrilo con doble clic para instalarlo.'))
                 else:
                     skipped.append(dict(nombre=path.name, motivo='No es un plugin VST3, VST2, CLAP o AU.'))
-            for source in candidates:
-                fmt = PLUGIN_EXT[source.suffix.lower()]
-                if fmt == 'AAX':
-                    skipped.append(dict(nombre=source.name, motivo='Los AAX se instalan con el instalador del fabricante.'))
-                    continue
-                key, root = install_root(fmt)
-                if not root:
-                    skipped.append(dict(nombre=source.name, motivo=f'No hay carpeta estándar de {fmt} en este sistema.'))
-                    continue
-                target = root['ruta'] / source.name
-                if target.exists():
-                    skipped.append(dict(nombre=source.name, motivo='Ya está instalado: no lo reemplazo.'))
-                    continue
-                if needs_admin(target):
-                    admin.append(('copy', source, target))
-                else:
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    (shutil.copytree if source.is_dir() else shutil.copy2)(str(source), str(target))
-                    installed.append(dict(nombre=source.stem, formato=fmt, ruta=str(target)))
-            if admin:
-                run_admin(admin)
-                for _, source, target in admin:
-                    if Path(target).exists():
-                        installed.append(dict(nombre=source.stem, formato=PLUGIN_EXT[source.suffix.lower()], ruta=str(target)))
-                    else:
-                        skipped.append(dict(nombre=source.name, motivo='Faltó el permiso de administrador.'))
+            done, more = copy_into_roots(candidates)
+            installed += done
+            skipped += more
         return jsonify(instalados=installed, omitidos=skipped)
+
+    def disable_many(ids):
+        """Mueve plugins a «Plugins desactivados» (reversible), con un único pedido de permiso."""
+        scanned = {p['id']: p for p in plugin_inventory.scan()}
+        missing = [i for i in ids if i not in scanned]
+        if missing:
+            raise ValueError('Algún plugin ya no está en su carpeta. Volvé a escanear.')
+        moves, entries, admin = [], [], []
+        for identity in ids:
+            plugin = scanned[identity]
+            source = Path(plugin['ruta'])
+            uid = uuid.uuid4().hex[:10]
+            target = disabled_dir() / uid / source.name
+            moves.append((uid, plugin, source, target))
+            if needs_admin(source):
+                admin.append(('move', source, target))
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(source), str(target))
+        if admin:
+            run_admin(admin)
+        items = read_index()
+        done = []
+        for uid, plugin, source, target in moves:
+            if not target.exists():
+                continue
+            items.append(dict(uid=uid, nombre=plugin['nombre'], formato=plugin['formato'], fabricante=plugin['fabricante'], central=plugin.get('central', ''),
+                              origen=str(source), guardado=str(target), fecha=datetime.now().strftime('%Y-%m-%d %H:%M')))
+            done.append(uid)
+        write_index(items)
+        if len(done) < len(moves):
+            raise ValueError(f'Se movieron {len(done)} de {len(moves)}: hace falta el permiso de administrador.' if done else
+                             'No se pudo mover: hace falta el permiso de administrador.')
+        return done
 
     @app.post('/api/plugins/desactivar')
     def plugins_disable():
         identity = (request.get_json() or {}).get('id', '')
-        plugin = next((p for p in plugin_inventory.scan() if p['id'] == identity), None)
-        if not plugin:
-            raise ValueError('Ese plugin ya no está en la carpeta. Volvé a escanear.')
-        source = Path(plugin['ruta'])
-        uid = uuid.uuid4().hex[:10]
-        target = disabled_dir() / uid / source.name
-        if needs_admin(source):
-            ok = run_admin([('move', source, target)])
-            if not ok or not target.exists():
-                raise ValueError('No se pudo mover el plugin: hace falta el permiso de administrador.')
-        else:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(source), str(target))
-        items = read_index()
-        items.append(dict(uid=uid, nombre=plugin['nombre'], formato=plugin['formato'], fabricante=plugin['fabricante'], central=plugin.get('central', ''),
-                          origen=str(source), guardado=str(target), fecha=datetime.now().strftime('%Y-%m-%d %H:%M')))
-        write_index(items)
-        return jsonify(ok=True, uid=uid)
+        return jsonify(ok=True, uid=disable_many([identity])[0])
+
+    @app.post('/api/plugins/desactivar-varios')
+    def plugins_disable_many():
+        ids = (request.get_json() or {}).get('ids', [])
+        if not isinstance(ids, list) or not 0 < len(ids) <= 200 or len(set(ids)) != len(ids):
+            raise ValueError('Elegí qué copias quitar.')
+        return jsonify(ok=True, uids=disable_many([str(i) for i in ids]))
+
+    @app.post('/api/plugins/borrar')
+    def plugins_delete_disabled():
+        """Borra definitivamente plugins que ya están en «Plugins desactivados» (nunca de la carpeta de plugins)."""
+        uids = (request.get_json() or {}).get('uids', [])
+        if not isinstance(uids, list) or not uids:
+            raise ValueError('Elegí qué plugins borrar.')
+        items, base = read_index(), disabled_dir().resolve()
+        keep, deleted = [], 0
+        for entry in items:
+            if entry['uid'] not in uids:
+                keep.append(entry)
+                continue
+            folder = Path(entry['guardado']).parent.resolve()
+            if folder.parent != base:
+                raise ValueError('Ruta inesperada: no borro nada fuera de «Plugins desactivados».')
+            shutil.rmtree(folder, ignore_errors=True)
+            deleted += 1
+        write_index(keep)
+        return jsonify(ok=True, borrados=deleted)
 
     @app.post('/api/plugins/restaurar')
     def plugins_restore():
@@ -240,4 +358,42 @@ def register_plugin_manager(app, data_folder):
         if not any(str(path).startswith(str(root)) for root in roots):
             raise ValueError('Esa ruta no es una carpeta de plugins.')
         open_path(str(path.parent if path.exists() else path.parent.parent))
+        return jsonify(ok=True)
+
+    # ---------- Instalación automática de gratuitos ----------
+    jobs = plugin_downloads.Jobs()
+
+    @app.post('/api/plugins/instalar-gratis')
+    def plugins_install_free():
+        names = (request.get_json() or {}).get('nombres', [])
+        if not isinstance(names, list) or not 0 < len(names) <= 40:
+            raise ValueError('Elegí qué plugins instalar.')
+        names = [str(n) for n in dict.fromkeys(names)]
+        bad = [n for n in names if not plugin_downloads.available(n)]
+        if bad:
+            raise ValueError('Estos no se pueden instalar automáticamente en este sistema: ' + ', '.join(bad))
+        return jsonify(jobs.start(names, install_worker(names)))
+
+    @app.get('/api/plugins/trabajos/<job_id>')
+    def plugins_job(job_id):
+        state = jobs.get(job_id)
+        if not state:
+            raise ValueError('No encuentro esa instalación.')
+        return jsonify(state)
+
+    def youlean_flag():
+        return Path(data_folder()) / 'youlean.json'
+
+    @app.get('/api/plugins/youlean')
+    def plugins_youlean():
+        try:
+            flag = json.loads(youlean_flag().read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            flag = {}
+        return jsonify(instalado=youlean_installed(), ofrecido=bool(flag.get('ofrecido')),
+                       automatico=plugin_downloads.available('Youlean Loudness Meter'))
+
+    @app.post('/api/plugins/youlean/ofrecido')
+    def plugins_youlean_offered():
+        youlean_flag().write_text(json.dumps(dict(ofrecido=True, fecha=datetime.now().isoformat(timespec='seconds'))), encoding='utf-8')
         return jsonify(ok=True)
