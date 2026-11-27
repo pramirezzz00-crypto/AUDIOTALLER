@@ -359,6 +359,31 @@ function setTheme(theme) {
     api('/api/preferencias', body({tema: selected})).catch(() => notify('No se pudo guardar el tema. Probá de nuevo.'));
 }
 
+// Escala global de la interfaz, independiente del tema.
+const interfaceScales = [75, 80, 90, 100, 110, 125, 150];
+function applyInterfaceScale(value) {
+    const scale = interfaceScales.includes(Number(value)) ? Number(value) : 100;
+    document.documentElement.style.zoom = scale === 100 ? '' : String(scale / 100);
+    document.documentElement.dataset.interfaceScale = String(scale);
+    if ($('interfaceScale')) $('interfaceScale').value = String(scale);
+    window.dispatchEvent(new Event('resize'));
+    return scale;
+}
+async function setInterfaceScale(value) {
+    const scale = applyInterfaceScale(value);
+    try {
+        if (window.pywebview?.api?.save_interface_scale) {
+            if (!await window.pywebview.api.save_interface_scale(scale)) throw Error('guardado');
+        } else localStorage.setItem('audiotaller-interface-scale', String(scale));
+    } catch { notify('No se pudo guardar la escala. Probá de nuevo.'); }
+}
+async function restoreDesktopInterfaceScale() {
+    try { applyInterfaceScale(await window.pywebview.api.get_interface_scale()); } catch {}
+}
+try { applyInterfaceScale(localStorage.getItem('audiotaller-interface-scale')); } catch {}
+if (window.pywebview?.api?.get_interface_scale) restoreDesktopInterfaceScale();
+else window.addEventListener('pywebviewready', restoreDesktopInterfaceScale, {once: true});
+
 async function openConfig() {
     go('configPane');
     const c = await api('/api/asistente/config');
@@ -366,13 +391,19 @@ async function openConfig() {
     const profileCard = typeof profileCardHtml === 'function' ? await profileCardHtml().catch(() => '') : '';
     $('configPane').innerHTML = profileCard + `<section class="card appearance-settings" aria-labelledby="appearanceTitle">
         <div><div class="eyebrow">Interfaz</div><h2 id="appearanceTitle">Apariencia</h2>
-          <p class="muted">Elegí el tema claro u oscuro. La elección se guarda en este dispositivo.</p></div>
-        <label class="fld appearance-control" for="themeMode">Tema
+          <p class="muted">Elegí el tema y la escala de la interfaz. Las preferencias se guardan en este dispositivo.</p></div>
+        <div class="appearance-control"><label class="fld" for="themeMode">Tema
           <select id="themeMode" onchange="setTheme(this.value)">
             <option value="dark" ${currentTheme === 'dark' ? 'selected' : ''}>Oscuro</option>
             <option value="light" ${currentTheme === 'light' ? 'selected' : ''}>Claro</option>
           </select>
         </label>
+        <label class="fld" for="interfaceScale">Escala de interfaz
+          <select id="interfaceScale" onchange="setInterfaceScale(this.value)">
+            ${interfaceScales.map(n => `<option value="${n}" ${n === Number(document.documentElement.dataset.interfaceScale || 100) ? 'selected' : ''}>${n}%</option>`).join('')}
+          </select>
+        </label>
+        <button type="button" class="alt" onclick="setInterfaceScale(100)">Restablecer al 100%</button></div>
       </section><section class="card mig-card" aria-labelledby="migTitle">
         <div><div class="eyebrow">Computadora nueva</div><h2 id="migTitle">Migrar a otra computadora</h2>
           <p class="muted">Exportá en un solo archivo la biblioteca de AudioTaller, los proyectos del disco interno y los plugins gratuitos. En la computadora nueva lo importás y AudioTaller te dice qué plugins con licencia reinstalar y con qué central.</p></div>

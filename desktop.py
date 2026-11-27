@@ -147,6 +147,23 @@ def main():
     # pywebview sirve Flask en una dirección local y muestra la misma página
     # de bienvenida dentro de la ventana. Al cerrarla termina el proceso.
     class Dialogs:
+        # Preferencia visual local, separada de la biblioteca y de SQLite.
+        def get_interface_scale(self):
+            try:
+                value = int((datos / 'interface-scale.txt').read_text(encoding='utf-8'))
+                return value if value in (75, 80, 90, 100, 110, 125, 150) else 100
+            except (OSError, ValueError):
+                return 100
+
+        def save_interface_scale(self, value):
+            if type(value) is not int or value not in (75, 80, 90, 100, 110, 125, 150):
+                return False
+            try:
+                (datos / 'interface-scale.txt').write_text(str(value), encoding='utf-8')
+                return True
+            except OSError:
+                return False
+
         # Se devuelve la ubicación elegida, sin copiar ni mover el archivo.
         def choose_path(self, folder=False):
             kind = webview.FileDialog.FOLDER if folder else webview.FileDialog.OPEN
