@@ -1,5 +1,5 @@
 // Composición · Beats, Letras y Partituras en una sola pantalla.
-// La pantalla principal de cada sección es esta vista de trabajo (como el mockup).
+// La vista de trabajo es la segunda pantalla de cada sección.
 // Las listas y colecciones (páginas 'beats', 'lyrics', 'scores') se abren con compLists().
 const comp = {tab: 'beats', beats: [], lists: [], q: '', bpmMin: '', bpmMax: '', beatState: '', beat: '', panel: false, scan: null,
     songs: [], song: '', lyric: null, collapsed: new Set(), lyricDirty: false, sync: null, scores: [], audio: new Audio(), playing: ''};
@@ -21,7 +21,7 @@ function paintComposition() {
     const root = $('composition');
     const cta = {beats: '+ Importar carpeta de beats', lyrics: '+ Nueva letra', scores: '+ Cargar partitura'}[comp.tab];
     root.innerHTML = `
-      <header class="prod-head mk-comp-head"><div><div class="eyebrow">Composición</div><h1>${{beats: 'Beats', lyrics: 'Letras', scores: 'Partituras'}[comp.tab]}</h1>
+      <header class="prod-head mk-comp-head"><div><h1>${{beats: 'Beats', lyrics: 'Letras', scores: 'Partituras'}[comp.tab]}</h1>
         <p class="muted">${{beats: 'Tu banco de beats: organizados, segmentados y listos para llevar al DAW',
           lyrics: 'Las letras de tus canciones, con versiones y listas para publicar',
           scores: 'Partituras y particellas con versiones, asociadas a canciones y arreglos'}[comp.tab]}</p></div>
