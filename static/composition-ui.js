@@ -1,6 +1,7 @@
-// Composición · Beats, Letras y Partituras en una sola pantalla.
-// La pantalla principal de cada sección es esta vista de trabajo (como el mockup).
-// Las listas y colecciones (páginas 'beats', 'lyrics', 'scores') se abren con compLists().
+// Composición · Beats, Letras y Partituras.
+// Primer nivel de cada sección: sus listas y colecciones (páginas 'beats', 'lyrics', 'scores', con compGo).
+// Segundo nivel: esta herramienta de trabajo (página 'composition', con compOpen), con «Atrás» hacia las listas.
+const COMP_TOOL_LABELS = {beats: 'Banco de beats', lyrics: 'Editor de letras', scores: 'Vista de trabajo'};
 const comp = {tab: 'beats', beats: [], lists: [], q: '', bpmMin: '', bpmMax: '', beatState: '', beat: '', panel: false, scan: null,
     songs: [], song: '', lyric: null, collapsed: new Set(), lyricDirty: false, sync: null, scores: [], audio: new Audio(), playing: ''};
 const SECTION_LABELS = {intro: 'Intro', verse: 'Verso', pre: 'Pre-estribillo', chorus: 'Estribillo', bridge: 'Puente', inter: 'Interludio', outro: 'Final'};
@@ -21,14 +22,13 @@ function paintComposition() {
     const root = $('composition');
     const cta = {beats: '+ Importar carpeta de beats', lyrics: '+ Nueva letra', scores: '+ Cargar partitura'}[comp.tab];
     root.innerHTML = `
-      <header class="prod-head mk-comp-head"><div><div class="eyebrow">Composición</div><h1>${{beats: 'Beats', lyrics: 'Letras', scores: 'Partituras'}[comp.tab]}</h1>
+      <header class="prod-head mk-comp-head"><div><div class="eyebrow">Composición</div><h1>${COMP_TOOL_LABELS[comp.tab]}</h1>
         <p class="muted">${{beats: 'Tu banco de beats: organizados, segmentados y listos para llevar al DAW',
           lyrics: 'Las letras de tus canciones, con versiones y listas para publicar',
           scores: 'Partituras y particellas con versiones, asociadas a canciones y arreglos'}[comp.tab]}</p></div>
         <button class="btn-primary" onclick="compNew()">${cta}</button></header>
       <div id="compPanel"></div>
-      <div id="compBody">${comp.tab === 'beats' ? beatsView() : comp.tab === 'lyrics' ? lyricsView() : scoresView()}</div>
-      <p class="insp-help comp-old">¿Buscás tus listas y colecciones? <button class="link" onclick="compLists('${comp.tab}')">${comp.tab === 'beats' ? 'Ver mis listas de beats' : comp.tab === 'lyrics' ? 'Ver mis colecciones de letras' : 'Ver mis colecciones de partituras'}</button></p>`;
+      <div id="compBody">${comp.tab === 'beats' ? beatsView() : comp.tab === 'lyrics' ? lyricsView() : scoresView()}</div>`;
     if (comp.panel) paintCompPanel();
     if (comp.tab === 'lyrics') bindLyricEditor();
     if (comp.tab === 'beats') drawBeatWaves();
@@ -476,20 +476,22 @@ async function uploadScores() {
     notify(countLabel(paths.length, 'partitura cargada', 'partituras cargadas') + ': asociala a su canción y arreglo.');
 }
 
-// Pantalla principal de cada sección: la vista de trabajo (banco de beats, letras y partituras con versiones).
+// Pantalla principal de cada sección: sus listas y colecciones (menú lateral, «Atrás» y ruta).
 function compGo(tab) {
-    if (trail.at(-1) === 'composition' && comp.tab === 'lyrics' && tab !== 'lyrics' && comp.lyricDirty && !confirm('Hay cambios sin guardar en la letra. ¿Salir igual?')) return;
-    if (tab !== 'beats') comp.audio.pause();
-    if (comp.tab !== tab) comp.lyricDirty = false;
+    const fromTool = trail.at(-1) === 'composition';
+    if (fromTool && comp.tab === 'lyrics' && comp.lyricDirty && !confirm('Hay cambios sin guardar en la letra. ¿Salir igual?')) return;
+    comp.audio.pause();
+    comp.lyricDirty = false; comp.tab = tab; comp.panel = false;
+    // Desde la herramienta se vuelve a su lista (sin apilar pantallas); desde otra sección se entra a la lista.
+    if (fromTool && trail.at(-2) === tab) { trail.pop(); display(); } else go(tab);
+}
+// Herramienta de trabajo (banco de beats, editor de letras o vista de partituras), abierta desde su lista.
+function compOpen(tab) {
     comp.tab = tab; comp.panel = false;
-    if (trail.at(-1) === 'composition') renderCompositionPane(); else go('composition');
+    if (trail.at(-1) !== tab) trail.push(tab);   // así «Atrás» siempre vuelve a la lista de la sección
+    go('composition');
 }
-function compOpen(tab) { compGo(tab); }
-// Listas y colecciones de cada sección (pantallas anteriores, aporte de Zharelly).
-function compLists(tab) {
-    if (comp.lyricDirty && !confirm('Hay cambios sin guardar en la letra. ¿Salir igual?')) return;
-    comp.lyricDirty = false; comp.tab = tab; go(tab);
-}
+function compLists(tab) { compGo(tab); }
 
 // Evitar reproducción simultánea entre Mis listas y Banco de beats.
 $('beatPlayer')?.addEventListener('play', () => comp.audio.pause());
