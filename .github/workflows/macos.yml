@@ -39,3 +39,4 @@ jobs:
           path: output/macos/
           if-no-files-found: warn
           retention-days: 30
+# Reintento de prueba: hdiutil falló de forma intermitente en Mac Intel.
