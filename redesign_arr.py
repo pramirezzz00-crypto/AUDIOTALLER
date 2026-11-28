@@ -32,7 +32,8 @@ DEFAULT_PROFILE = dict(nombre='Mezcla (predeterminado)', buses=[
 
 
 def tokens():
-    return sys.modules['app'].take_tokens
+    # Con «python app.py» el servidor vive en __main__, no en el módulo «app».
+    return (sys.modules.get('app') or sys.modules['__main__']).take_tokens
 
 
 def path_from_token(token):

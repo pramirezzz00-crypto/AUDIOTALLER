@@ -159,7 +159,8 @@ function studioDisplayHook(page) {
     $('sideLaunches')?.setAttribute('aria-current', page === 'launchesPane' ? 'page' : 'false');
     $('sideConfig')?.setAttribute('aria-current', page === 'configPane' ? 'page' : 'false');
     if (page === 'artistsPane') { $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › Artistas`; paintArtists(); }
-    else if (typeof arr !== 'undefined' && arr.playing) arrStop();
+    // Salir de Arreglos (a cualquier sección) corta el multipista y libera la memoria de las pistas.
+    if (page !== 'arrangements' && typeof arr !== 'undefined' && (arr.playing || mt.tracks.size)) arrStop();
     if (page !== 'composition' && typeof comp !== 'undefined') { comp.audio.pause(); comp.sync?.audio.pause(); }
     if (page === 'exportPane') renderExport();
     if (page !== 'albumPane' && typeof albumPlayer !== 'undefined' && albumPlayer.index >= 0) albumPlayer.stop();

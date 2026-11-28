@@ -1,7 +1,7 @@
 // Arreglos · escuchar las pistas crudas de la canción (multipista con M/S y versiones del arreglo)
 // y armar una sesión nueva del DAW organizada por buses según un perfil editable.
 const arr = {songs: [], song: '', tab: 'listen', tracks: [], buses: [], versions: [], version: 'Base', muted: new Set(), solo: new Set(),
-    players: new Map(), playing: false, raf: 0, profiles: {}, profile: 'mezcla', meta: null, result: null, q: '', ab: false};
+    playing: false, loading: false, raf: 0, profiles: {}, profile: 'mezcla', meta: null, result: null, q: '', ab: false};
 const ARR_MAX = 32;
 
 async function openArrangements() {
@@ -94,73 +94,275 @@ function arrListen() {
       </section></div>`;
 }
 const arrPeaks = new Map();
-async function arrDrawWaves() {
-    const lead = [...arr.players.values()][0];
-    const progress = lead?.duration ? lead.currentTime / lead.duration : 0;
-    for (const canvas of document.querySelectorAll('canvas[data-wave]')) {
-        const token = canvas.dataset.wave;
-        if (!arrPeaks.has(token)) arrPeaks.set(token, api('/api/arreglos/onda/' + encodeURIComponent(token)).catch(() => ({peaks: []})));
-        const data = await arrPeaks.get(token);
-        if (!canvas.isConnected) continue;
-        const box = canvas.getBoundingClientRect(), ratio = devicePixelRatio || 1;
-        canvas.width = box.width * ratio; canvas.height = box.height * ratio;
-        const ctx = canvas.getContext('2d'); ctx.scale(ratio, ratio);
-        const color = getComputedStyle(canvas.closest('.arr-bus')).getPropertyValue('--c').trim() || '#8A8A94';
-        const peaks = data.peaks || [], max = Math.max(...peaks, 0.01), bars = Math.floor(box.width / 6);
-        const off = canvas.closest('.arr-row').classList.contains('is-off');
-        for (let i = 0; i < bars; i++) {
-            const v = peaks.length ? peaks[Math.floor(i / bars * peaks.length)] / max : 0.3;
-            const h = Math.max(3, v * (box.height - 4));
-            ctx.globalAlpha = off ? 0.18 : 1; ctx.fillStyle = color;
-            ctx.fillRect(i * 6, (box.height - h) / 2, 4, h);
+
+// ── Motor multipista ──
+// Cada pista se lee por tramos cortos (pedidos HTTP con rango) y se programa en Web Audio sobre un único reloj.
+// Así las pistas quedan alineadas al sample, silenciar o hacer solo no corta nada y no se agotan las conexiones:
+// con un <audio> por pista el navegador cargaba 6 a la vez, el resto quedaba mudo y las correcciones de
+// desfase trababan el sonido y la ventana. Los archivos originales solo se leen.
+const ARR_CHUNK = 3, ARR_AHEAD = 6, ARR_HEAD_BYTES = 262144;
+const mt = {ctx: null, tracks: new Map(), origin: 0, offset: 0, timer: 0, session: 0};
+
+function arrCtx() {
+    if (!mt.ctx) mt.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    return mt.ctx;
+}
+function arrActiveTracks() { return arr.tracks.filter(t => !arr.origin || t.origen === arr.origin).slice(0, ARR_MAX); }
+async function arrRange(url, from, to) {
+    const response = await fetch(url, {headers: {Range: `bytes=${from}-${to}`}});
+    if (!response.ok) throw Error('No se pudo leer la pista.');
+    const total = Number((response.headers.get('Content-Range') || '').split('/')[1]) || 0;
+    const buf = await response.arrayBuffer();
+    // Si el servidor ignorara el rango devolvería el archivo entero: se recorta acá.
+    return response.status === 206 ? {buf, total} : {buf: buf.slice(from, to + 1), total: buf.byteLength};
+}
+function arrFourCC(view, at) { return String.fromCharCode(view.getUint8(at), view.getUint8(at + 1), view.getUint8(at + 2), view.getUint8(at + 3)); }
+function arrExtended(view, at) {   // frecuencia de muestreo de AIFF (coma flotante de 80 bits)
+    const exp = (view.getUint16(at) & 0x7FFF) - 16383;
+    return Math.round(view.getUint32(at + 2) * Math.pow(2, exp - 31));
+}
+// Lee el encabezado WAV (PCM, coma flotante, extensible, RF64) o AIFF/AIFC; null si hay que decodificar entero.
+function arrParseHeader(buf, fileSize) {
+    const v = new DataView(buf);
+    if (buf.byteLength < 12) return null;
+    const kind = arrFourCC(v, 0), form = arrFourCC(v, 8);
+    const wav = (kind === 'RIFF' || kind === 'RF64') && form === 'WAVE', aiff = kind === 'FORM' && (form === 'AIFF' || form === 'AIFC');
+    if (!wav && !aiff) return null;
+    let pos = 12, fmt = null;
+    while (pos + 8 <= buf.byteLength) {
+        const id = arrFourCC(v, pos), size = v.getUint32(pos + 4, wav), body = pos + 8;
+        if (wav && id === 'fmt ' && body + 16 <= buf.byteLength) {
+            let code = v.getUint16(body, true);
+            if (code === 0xFFFE && size >= 26) code = v.getUint16(body + 24, true);
+            fmt = {code, channels: v.getUint16(body + 2, true), rate: v.getUint32(body + 4, true), bits: v.getUint16(body + 14, true), little: true, signed8: false};
+        } else if (aiff && id === 'COMM' && body + 18 <= buf.byteLength) {
+            let code = 1, little = false;
+            if (form === 'AIFC') {
+                const c = arrFourCC(v, body + 18);
+                if (c === 'sowt') little = true; else if (c === 'fl32' || c === 'FL32') code = 3; else if (c !== 'NONE') return null;
+            }
+            fmt = {code, channels: v.getUint16(body), bits: v.getUint16(body + 6), rate: arrExtended(v, body + 8), little, signed8: true};
+        } else if (fmt && (wav ? id === 'data' : id === 'SSND')) {
+            const skip = wav ? 0 : 8 + v.getUint32(body);
+            const start = body + skip, available = Math.max(0, fileSize - start);
+            const declared = wav && (size === 0 || size === 0xFFFFFFFF) ? available : size - (wav ? 0 : 8 + v.getUint32(body));
+            const bytes = Math.min(declared, available), frameBytes = fmt.bits / 8 * fmt.channels;
+            const ok = fmt.channels >= 1 && fmt.rate >= 3000 && fmt.rate <= 768000 &&
+                (fmt.code === 1 && [8, 16, 24, 32].includes(fmt.bits) || fmt.code === 3 && [32, 64].includes(fmt.bits));
+            return ok ? {...fmt, start, frames: Math.floor(bytes / frameBytes)} : null;
         }
-        if (progress) { ctx.globalAlpha = 1; ctx.fillStyle = '#EDEDF0'; ctx.fillRect(progress * box.width, 0, 1.5, box.height); }
+        pos = body + size + (size % 2);
+    }
+    return null;
+}
+function arrDecode(h, raw) {
+    const w = h.bits / 8, frames = Math.floor(raw.byteLength / (w * h.channels));
+    const out = arrCtx().createBuffer(h.channels, Math.max(1, frames), h.rate);
+    const v = new DataView(raw), le = h.little;
+    const chans = Array.from({length: h.channels}, (_, c) => out.getChannelData(c));
+    for (let f = 0, p = 0; f < frames; f++) {
+        for (let c = 0; c < h.channels; c++, p += w) {
+            let s;
+            if (h.code === 3) s = w === 4 ? v.getFloat32(p, le) : v.getFloat64(p, le);
+            else if (w === 2) s = v.getInt16(p, le) / 32768;
+            else if (w === 3) {
+                const n = le ? v.getUint8(p) | v.getUint8(p + 1) << 8 | v.getUint8(p + 2) << 16 : v.getUint8(p) << 16 | v.getUint8(p + 1) << 8 | v.getUint8(p + 2);
+                s = (n << 8 >> 8) / 8388608;
+            } else if (w === 4) s = v.getInt32(p, le) / 2147483648;
+            else s = h.signed8 ? v.getInt8(p) / 128 : (v.getUint8(p) - 128) / 128;
+            chans[c][f] = s;
+        }
+    }
+    return out;
+}
+function arrTrackState(track) {
+    let s = mt.tracks.get(track.token);
+    if (!s) {
+        const ctx = arrCtx(), gain = ctx.createGain();
+        gain.gain.value = arrAudible(track) ? 1 : 0;
+        gain.connect(ctx.destination);
+        s = {url: '/api/arreglos/audio/' + encodeURIComponent(track.token), gain, head: null, whole: null, duration: 0,
+             frame: 0, pos: null, busy: false, failed: false, sources: new Set()};
+        s.ready = arrLoadHeader(s);
+        mt.tracks.set(track.token, s);
+    }
+    return s;
+}
+async function arrLoadHeader(s) {
+    try {
+        const {buf, total} = await arrRange(s.url, 0, ARR_HEAD_BYTES - 1);
+        s.head = arrParseHeader(buf, total || buf.byteLength);
+        if (s.head) { s.duration = s.head.frames / s.head.rate; return; }
+        // FLAC u otro formato comprimido: se decodifica una vez entero (no se puede leer por tramos).
+        const full = await (await fetch(s.url)).arrayBuffer();
+        s.whole = await arrCtx().decodeAudioData(full);
+        s.duration = s.whole.duration;
+    } catch { s.failed = true; }
+}
+function arrPlace(s, t) {
+    s.pos = Math.min(t, s.duration);
+    if (s.head) s.frame = Math.min(s.head.frames, Math.floor(s.pos * s.head.rate));
+}
+async function arrFetch(s) {
+    if (s.busy || s.failed || s.pos == null || s.pos >= s.duration) return null;
+    s.busy = true;
+    const session = mt.session;
+    try {
+        if (s.whole) { const from = s.pos; s.pos = s.duration; return {buffer: s.whole, from, skip: from, len: s.duration - from}; }
+        const h = s.head, frameBytes = h.bits / 8 * h.channels;
+        const f0 = s.frame, f1 = Math.min(h.frames, f0 + Math.round(ARR_CHUNK * h.rate));
+        s.frame = f1; s.pos = f1 / h.rate;
+        const {buf} = await arrRange(s.url, h.start + f0 * frameBytes, h.start + f1 * frameBytes - 1);
+        if (session !== mt.session) return null;
+        return {buffer: arrDecode(h, buf), from: f0 / h.rate, skip: 0, len: (f1 - f0) / h.rate};
+    } catch { s.failed = true; return null; } finally { s.busy = false; }
+}
+function arrSchedule(s, chunk) {
+    const ctx = mt.ctx, when = mt.origin + chunk.from, now = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = chunk.buffer; src.connect(s.gain);
+    // Un tramo que llega tarde entra en su lugar exacto (se saltea lo ya pasado): nunca se desfasa.
+    if (when >= now) src.start(when, chunk.skip);
+    else if (now - when < chunk.len) src.start(now, chunk.skip + (now - when));
+    else { src.disconnect(); return; }
+    s.sources.add(src);
+    src.onended = () => { s.sources.delete(src); src.disconnect(); };
+}
+function arrSilence() {
+    mt.session++;
+    clearInterval(mt.timer);
+    for (const s of mt.tracks.values()) {
+        s.sources.forEach(src => { try { src.stop(); } catch {} src.disconnect(); });
+        s.sources.clear(); s.pos = null;
     }
 }
-function arrSeekWave(event) {
-    const lead = [...arr.players.values()][0];
-    if (!lead?.duration) { arrToggle(); return; }
-    const box = event.currentTarget.getBoundingClientRect();
-    const t = (event.clientX - box.left) / box.width * lead.duration;
-    arr.players.forEach(p => { p.currentTime = t; });
+function arrNow() { return arr.playing && !arr.loading && mt.ctx ? Math.max(0, mt.ctx.currentTime - mt.origin) : mt.offset; }
+function arrTotal() {
+    // Solo las pistas de la canción abierta (las ondas de otras canciones quedan guardadas en arrPeaks).
+    let total = 0;
+    for (const t of arrActiveTracks()) total = Math.max(total, mt.tracks.get(t.token)?.duration || 0, arrPeaks.get(t.token)?.done?.duration || 0);
+    return total;
+}
+async function arrPlayFrom(t) {
+    const ctx = arrCtx();
+    arrSilence();
+    const session = mt.session;
+    mt.offset = t; arr.playing = true; arr.loading = true;
+    await ctx.resume();
+    const states = arrActiveTracks().map(arrTrackState);
+    await Promise.all(states.map(s => s.ready));
+    if (session !== mt.session) return;
+    states.forEach(s => arrPlace(s, t));
+    // Se espera el primer tramo de todas las pistas para que arranquen juntas.
+    const first = await Promise.all(states.map(arrFetch));
+    if (session !== mt.session) return;
+    mt.origin = ctx.currentTime + 0.05 - t;
+    arr.loading = false;
+    states.forEach((s, i) => first[i] && arrSchedule(s, first[i]));
+    mt.timer = setInterval(arrPump, 250);
     arrTick();
+}
+function arrPump() {
+    if (!arr.playing || arr.loading) return;
+    const now = arrNow(), session = mt.session;
+    for (const t of arrActiveTracks()) {
+        const s = arrTrackState(t);
+        // Pista que se suma mientras suena (p. ej. al cambiar de sesión de origen): entra en el punto actual.
+        if (s.pos == null) { s.ready.then(() => { if (s.pos == null && session === mt.session) arrPlace(s, arrNow()); }); continue; }
+        if (s.pos < now + ARR_AHEAD) arrFetch(s).then(chunk => chunk && session === mt.session && arrSchedule(s, chunk));
+    }
+    const total = arrTotal();
+    if (total && now >= total) { arrSilence(); arr.playing = false; mt.offset = total; arrDrawWaves(); paintArrangements(); }
+}
+async function arrDrawWaves() {
+    if (arr.drawing) return;   // un solo dibujo a la vez: con 32 pistas los dibujos superpuestos trababan la ventana
+    arr.drawing = true;
+    try {
+        const canvases = [...document.querySelectorAll('canvas[data-wave]')];
+        const data = await Promise.all(canvases.map(canvas => {
+            const token = canvas.dataset.wave;
+            if (!arrPeaks.has(token)) {
+                const entry = api('/api/arreglos/onda/' + encodeURIComponent(token)).catch(() => ({peaks: []}));
+                entry.then(d => { entry.done = d; });
+                arrPeaks.set(token, entry);
+            }
+            return arrPeaks.get(token);
+        }));
+        const total = arrTotal(), progress = total ? arrNow() / total : 0;
+        canvases.forEach((canvas, n) => {
+            if (!canvas.isConnected) return;
+            const box = canvas.getBoundingClientRect(), ratio = devicePixelRatio || 1;
+            if (canvas.width !== Math.round(box.width * ratio)) { canvas.width = Math.round(box.width * ratio); canvas.height = Math.round(box.height * ratio); }
+            const ctx = canvas.getContext('2d'); ctx.setTransform(ratio, 0, 0, ratio, 0, 0); ctx.clearRect(0, 0, box.width, box.height);
+            const color = getComputedStyle(canvas.closest('.arr-bus')).getPropertyValue('--c').trim() || '#8A8A94';
+            const peaks = data[n].peaks || [], max = Math.max(...peaks, 0.01);
+            // Cada pista ocupa el ancho que le corresponde por su duración: una toma corta se ve corta.
+            const span = total && data[n].duration ? Math.min(1, data[n].duration / total) : 1;
+            const bars = Math.max(1, Math.floor(box.width * span / 6));
+            const off = canvas.closest('.arr-row').classList.contains('is-off');
+            ctx.globalAlpha = off ? 0.18 : 1; ctx.fillStyle = color;
+            for (let i = 0; i < bars; i++) {
+                const v = peaks.length ? peaks[Math.floor(i / bars * peaks.length)] / max : 0.3;
+                const h = Math.max(3, v * (box.height - 4));
+                ctx.fillRect(i * 6, (box.height - h) / 2, 4, h);
+            }
+            if (progress) { ctx.globalAlpha = 1; ctx.fillStyle = '#EDEDF0'; ctx.fillRect(progress * box.width, 0, 1.5, box.height); }
+        });
+    } finally { arr.drawing = false; }
+}
+function arrSeekTo(t) {
+    if (arr.playing) arrPlayFrom(t).catch(report);
+    else { mt.offset = t; arrTick(); arrDrawWaves(); }
+}
+function arrSeekWave(event) {
+    const total = arrTotal();
+    if (!total) { arrToggle(); return; }
+    const box = event.currentTarget.getBoundingClientRect();
+    arrSeekTo(Math.max(0, Math.min(total, (event.clientX - box.left) / box.width * total)));
 }
 function arrMS(kind, token) {
     const set = kind === 'm' ? arr.muted : arr.solo;
     set.has(token) ? set.delete(token) : set.add(token);
     arrApplyMix(); paintArrangements();
 }
-function arrEnsurePlayers() {
-    for (const t of arr.tracks.filter(t => !arr.origin || t.origen === arr.origin).slice(0, ARR_MAX)) {
-        if (!arr.players.has(t.token)) { const a = new Audio('/api/arreglos/audio/' + encodeURIComponent(t.token)); a.preload = 'auto'; arr.players.set(t.token, a); }
+function arrApplyMix() {
+    if (!mt.ctx) return;
+    for (const t of arr.tracks) {
+        const s = mt.tracks.get(t.token);
+        if (s) s.gain.gain.setTargetAtTime(arrAudible(t) ? 1 : 0, mt.ctx.currentTime, 0.015);
     }
 }
-function arrApplyMix() { for (const t of arr.tracks) { const p = arr.players.get(t.token); if (p) p.muted = !arrAudible(t); } }
 function arrToggle() {
-    arrEnsurePlayers(); arrApplyMix();
-    const players = [...arr.players.values()];
-    if (arr.playing) { players.forEach(p => p.pause()); arr.playing = false; cancelAnimationFrame(arr.raf); }
-    else { const t = players[0]?.currentTime || 0; players.forEach(p => { p.currentTime = t; p.play().catch(() => {}); }); arr.playing = true; arrTick(); }
+    if (arr.playing) { mt.offset = arrNow(); arrSilence(); arr.playing = false; arr.loading = false; cancelAnimationFrame(arr.raf); }
+    else {
+        const total = arrTotal();
+        // Al terminar, volver a reproducir arranca desde el principio.
+        arrPlayFrom(total && mt.offset >= total - 0.05 ? 0 : mt.offset).catch(error => { arr.playing = false; report(error); });
+        arrApplyMix();
+    }
     paintArrangements();
 }
 function arrTick() {
-    const lead = [...arr.players.values()][0];
-    if (!lead) return;
-    // Corrige el desfase entre pistas cada cuadro (las pistas de una sesión arrancan juntas en 0:00).
-    for (const p of arr.players.values()) if (Math.abs(p.currentTime - lead.currentTime) > 0.06 && !p.ended) p.currentTime = lead.currentTime;
-    if ($('arrClock')) $('arrClock').textContent = clockText(lead.currentTime);
-    if ($('arrTotal') && lead.duration) $('arrTotal').textContent = clockText(lead.duration);
-    arr.frame = (arr.frame || 0) + 1; if (arr.frame % 15 === 0) arrDrawWaves();
+    const now = arrNow(), total = arrTotal();
+    if ($('arrClock')) $('arrClock').textContent = clockText(now);
+    if ($('arrTotal') && total) $('arrTotal').textContent = clockText(total);
+    arr.frame = (arr.frame || 0) + 1; if (arr.frame % 30 === 0) arrDrawWaves();
+    cancelAnimationFrame(arr.raf);   // un único bucle aunque se salte en la onda mientras suena
     if (arr.playing) arr.raf = requestAnimationFrame(arrTick);
 }
 function arrSeek(event) {
-    const lead = [...arr.players.values()][0]; if (!lead?.duration) return;
+    const total = arrTotal(); if (!total) return;
     const box = event.currentTarget.getBoundingClientRect();
-    const t = (event.clientX - box.left) / box.width * lead.duration;
-    arr.players.forEach(p => { p.currentTime = t; });
-    arrTick();
+    arrSeekTo(Math.max(0, (event.clientX - box.left) / box.width * total));
 }
-function arrStop() { arr.players.forEach(p => p.pause()); arr.players.clear(); arr.playing = false; cancelAnimationFrame(arr.raf); }
+function arrStop() {
+    // Además de parar, se sueltan los tramos en memoria y se libera la salida de audio.
+    arrSilence();
+    mt.tracks.forEach(s => s.gain.disconnect());
+    mt.tracks.clear(); mt.offset = 0;
+    arr.playing = false; arr.loading = false; cancelAnimationFrame(arr.raf);
+    mt.ctx?.suspend().catch(() => {});
+}
 async function saveArrangementVersion() {
     const name = prompt('Nombre del arreglo (p. ej. «Arreglo de cuerdas», «Acústica»):');
     if (!name) return;
