@@ -155,11 +155,33 @@ function arrParseHeader(buf, fileSize) {
     }
     return null;
 }
+// Arma el AudioBuffer a la frecuencia del archivo (96 o 192 kHz incluidos). Si el motor no la acepta
+// (algunas versiones de Safari, que usa la app en Mac), se convierte a la frecuencia de la salida de audio.
+function arrMakeBuffer(chans, rate) {
+    const ctx = arrCtx(), frames = chans[0].length;
+    if (mt.rateOk?.[rate] !== false) {
+        try {
+            const out = ctx.createBuffer(chans.length, frames, rate);
+            chans.forEach((data, c) => out.copyToChannel(data, c));
+            (mt.rateOk ||= {})[rate] = true;
+            return out;
+        } catch { (mt.rateOk ||= {})[rate] = false; }
+    }
+    const target = ctx.sampleRate, n = Math.max(1, Math.round(frames * target / rate)), step = rate / target;
+    const out = ctx.createBuffer(chans.length, n, target);
+    chans.forEach((data, c) => {
+        const dst = out.getChannelData(c);
+        for (let i = 0; i < n; i++) {
+            const x = i * step, j = Math.floor(x), k = Math.min(frames - 1, j + 1), t = x - j;
+            dst[i] = data[Math.min(frames - 1, j)] * (1 - t) + data[k] * t;
+        }
+    });
+    return out;
+}
 function arrDecode(h, raw) {
-    const w = h.bits / 8, frames = Math.floor(raw.byteLength / (w * h.channels));
-    const out = arrCtx().createBuffer(h.channels, Math.max(1, frames), h.rate);
+    const w = h.bits / 8, frames = Math.max(1, Math.floor(raw.byteLength / (w * h.channels)));
     const v = new DataView(raw), le = h.little;
-    const chans = Array.from({length: h.channels}, (_, c) => out.getChannelData(c));
+    const chans = Array.from({length: h.channels}, () => new Float32Array(frames));
     for (let f = 0, p = 0; f < frames; f++) {
         for (let c = 0; c < h.channels; c++, p += w) {
             let s;
@@ -173,7 +195,12 @@ function arrDecode(h, raw) {
             chans[c][f] = s;
         }
     }
-    return out;
+    return arrMakeBuffer(chans, h.rate);
+}
+// Una pista que no se puede leer no queda muda en silencio: se avisa una vez con su nombre.
+function arrTrackFailed(s) {
+    s.failed = true;
+    notify(`No se pudo reproducir «${arrLabel(s.name || 'una pista')}». Revisá que el archivo siga en su carpeta.`);
 }
 function arrTrackState(track) {
     let s = mt.tracks.get(track.token);
@@ -181,8 +208,8 @@ function arrTrackState(track) {
         const ctx = arrCtx(), gain = ctx.createGain();
         gain.gain.value = arrAudible(track) ? 1 : 0;
         gain.connect(ctx.destination);
-        s = {url: '/api/arreglos/audio/' + encodeURIComponent(track.token), gain, head: null, whole: null, duration: 0,
-             frame: 0, pos: null, busy: false, failed: false, sources: new Set()};
+        s = {url: '/api/arreglos/audio/' + encodeURIComponent(track.token), name: track.nombre, gain, head: null, whole: null, duration: 0,
+             frame: 0, pos: null, busy: false, failed: false, errors: 0, sources: new Set()};
         s.ready = arrLoadHeader(s);
         mt.tracks.set(track.token, s);
     }
@@ -197,7 +224,7 @@ async function arrLoadHeader(s) {
         const full = await (await fetch(s.url)).arrayBuffer();
         s.whole = await arrCtx().decodeAudioData(full);
         s.duration = s.whole.duration;
-    } catch { s.failed = true; }
+    } catch { arrTrackFailed(s); }
 }
 function arrPlace(s, t) {
     s.pos = Math.min(t, s.duration);
@@ -206,16 +233,23 @@ function arrPlace(s, t) {
 async function arrFetch(s) {
     if (s.busy || s.failed || s.pos == null || s.pos >= s.duration) return null;
     s.busy = true;
-    const session = mt.session;
+    const session = mt.session, f0 = s.frame;
     try {
         if (s.whole) { const from = s.pos; s.pos = s.duration; return {buffer: s.whole, from, skip: from, len: s.duration - from}; }
         const h = s.head, frameBytes = h.bits / 8 * h.channels;
-        const f0 = s.frame, f1 = Math.min(h.frames, f0 + Math.round(ARR_CHUNK * h.rate));
+        const f1 = Math.min(h.frames, f0 + Math.round(ARR_CHUNK * h.rate));
         s.frame = f1; s.pos = f1 / h.rate;
         const {buf} = await arrRange(s.url, h.start + f0 * frameBytes, h.start + f1 * frameBytes - 1);
         if (session !== mt.session) return null;
-        return {buffer: arrDecode(h, buf), from: f0 / h.rate, skip: 0, len: (f1 - f0) / h.rate};
-    } catch { s.failed = true; return null; } finally { s.busy = false; }
+        const buffer = arrDecode(h, buf);
+        s.errors = 0;
+        return {buffer, from: f0 / h.rate, skip: 0, len: (f1 - f0) / h.rate};
+    } catch {
+        // Un tropiezo de lectura (disco externo ocupado, etc.) se reintenta; recién al tercero se avisa.
+        if (++s.errors >= 3) arrTrackFailed(s);
+        else if (s.head && session === mt.session) { s.frame = f0; s.pos = f0 / s.head.rate; }   // se vuelve a pedir el mismo tramo
+        return null;
+    } finally { s.busy = false; }
 }
 function arrSchedule(s, chunk) {
     const ctx = mt.ctx, when = mt.origin + chunk.from, now = ctx.currentTime;
