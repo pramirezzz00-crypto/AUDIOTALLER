@@ -369,6 +369,12 @@ def main():
                 webview.FileDialog.OPEN, allow_multiple=False, file_types=('Migración de AudioTaller (*.zip)', 'Todos los archivos (*.*)'))
             return str(result[0]) if result else ''
 
+        def reveal_plugin(self, path):
+            # Igual que open_pdf: se abre desde la ventana de la app, el camino que ya funciona en Windows y Mac.
+            import plugin_manager
+            folder = app.config.get('PLUGIN_DISABLED_DIR')
+            return plugin_manager.reveal_plugin(str(path or ''), folder() if folder else datos / 'Plugins desactivados')
+
         def show_in_folder(self, path):
             path = Path(path)
             open_path(str(path.parent if path.is_file() else path))

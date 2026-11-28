@@ -30,8 +30,14 @@ def reveal_path(path):
     if sys.platform == 'darwin':
         return subprocess.Popen(['/usr/bin/open', '-R', path], shell=False)
     if os.name == 'nt':
-        # explorer.exe trae la ventana al frente; os.startfile puede abrirla detrás de AudioTaller.
-        return subprocess.Popen(['explorer.exe', '/select,', path], shell=False)
+        # Forma documentada: explorer.exe /select,"ruta". Si no arranca, se abre la carpeta que lo contiene.
+        windir = os.environ.get('SystemRoot') or os.environ.get('WINDIR') or r'C:\Windows'
+        explorer = os.path.join(windir, 'explorer.exe')
+        try:
+            return subprocess.Popen(f'"{explorer}" /select,"{path}"', shell=False,
+                                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError:
+            return os.startfile(os.path.dirname(path))
     return subprocess.Popen(['xdg-open', os.path.dirname(path)], shell=False)
 
 

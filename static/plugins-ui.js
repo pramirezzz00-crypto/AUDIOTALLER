@@ -45,7 +45,7 @@ function plgRows() {
     return plgFiltered().map(p => `<tr><td><strong>${esc(p.nombre)}</strong><small class="mono">${esc(p.relativo)}</small></td><td>${esc(p.fabricante)}</td><td class="mono">${esc(p.formato)}</td>
         <td><span class="plg-lic ${PLG_LIC[p.licencia]?.[1] || 'u'}">${esc(PLG_LIC[p.licencia]?.[0] || p.licencia)}</span>${p.central && p.licencia !== 'gratis' ? `<small>${p.enlace ? `<a href="${esc(p.enlace)}" target="_blank" rel="noopener noreferrer">${esc(p.central)} ↗</a>` : esc(p.central)}</small>` : ''}</td>
         <td class="mono right">${plgSize(p.tamano)}</td>
-        <td class="right"><div class="row-tight plg-act"><button class="mk-btn" title="Mostrar en la carpeta" onclick="api('/api/plugins/mostrar',body({ruta:${esc(JSON.stringify(p.ruta))}})).catch(report)">📁</button>
+        <td class="right"><div class="row-tight plg-act"><button class="mk-btn" title="Mostrar en la carpeta" onclick="plgReveal(${esc(JSON.stringify(p.ruta))})">📁</button>
           <button class="mk-btn" onclick="disablePlugin(${esc(JSON.stringify(p.id))}).catch(report)">Desinstalar</button></div></td></tr>`).join('')
         || '<tr><td colspan="6" class="muted">Ningún plugin coincide con el filtro.</td></tr>';
 }
@@ -118,7 +118,7 @@ function plgOptimizer() {
         <table class="mk-table plg-table"><thead><tr><th>Conservar</th><th>Ubicación</th><th>Versión</th><th>Fecha</th><th class="right">Tamaño</th><th></th></tr></thead><tbody>
         ${g.copias.map(c => `<tr class="${c.id === keep ? 'is-keep' : ''}"><td><label class="chk"><input type="radio" name="keep${gi}" ${c.id === keep ? 'checked' : ''} ${off ? 'disabled' : ''} onchange="plg.keep[${gi}]=${esc(JSON.stringify(c.id))};paintPlugins()"> ${c.id === keep ? '<b>Se queda</b>' : '<span class="muted">Se quita</span>'}</label>${c.sugerido ? ' <span class="plg-lic g">Sugerido</span>' : ''}</td>
           <td><small class="mono">${esc(c.ruta)}</small></td><td class="mono">${esc(c.version || '—')}</td><td class="mono">${c.modificado ? new Date(c.modificado * 1000).toLocaleDateString('es-AR') : '—'}</td>
-          <td class="mono right">${plgSize(c.tamano)}</td><td class="right"><button class="mk-btn" title="Mostrar en la carpeta" onclick="api('/api/plugins/mostrar',body({ruta:${esc(JSON.stringify(c.ruta))}})).catch(report)">📁</button></td></tr>`).join('')}
+          <td class="mono right">${plgSize(c.tamano)}</td><td class="right"><button class="mk-btn" title="Mostrar en la carpeta" onclick="plgReveal(${esc(JSON.stringify(c.ruta))})">📁</button></td></tr>`).join('')}
         </tbody></table></section>`; }).join('')}`;
 }
 function plgDupChoice() {
@@ -200,3 +200,13 @@ async function maybeOfferYoulean() {
     plgPoll();
 }
 setTimeout(() => maybeOfferYoulean().catch(() => {}), 6000);
+
+// Mostrar el plugin en su carpeta (Explorador o Finder), con el plugin seleccionado.
+async function plgReveal(ruta) {
+    try {
+        const r = window.pywebview?.api?.reveal_plugin ? await window.pywebview.api.reveal_plugin(ruta)
+            : await api('/api/plugins/mostrar', body({ruta})).then(() => ({ok: true}));
+        if (r && r.ok === false) notify(r.motivo || 'No se pudo abrir la carpeta.');
+        else notify('Abriendo la carpeta del plugin…');
+    } catch (error) { notify(error.message || 'No se pudo abrir la carpeta.'); }
+}

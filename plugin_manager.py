@@ -186,6 +186,27 @@ def install_worker(names):
 
 
 
+def reveal_plugin(value, disabled_folder):
+    """Abre la carpeta del plugin con el plugin seleccionado. Solo rutas dentro de carpetas de plugins."""
+    import logging
+    path = Path(os.path.normpath(value))
+    roots = [Path(os.path.normpath(str(r['ruta']))) for r in roots_by_key().values()] + [Path(os.path.normpath(str(disabled_folder)))]
+    key = lambda p: os.path.normcase(str(p))
+    if not value or not any(key(path) == key(root) or key(path).startswith(key(root).rstrip('\\/') + os.sep) for root in roots):
+        return dict(ok=False, motivo='Esa ruta no es una carpeta de plugins.')
+    try:
+        if path.exists():
+            reveal_path(path)
+        elif path.parent.exists():
+            open_path(str(path.parent))
+        else:
+            return dict(ok=False, motivo='El plugin ya no está en esa carpeta. Volvé a escanear.')
+    except OSError as error:
+        logging.exception('No se pudo mostrar el plugin %s', path)
+        return dict(ok=False, motivo='No se pudo abrir la carpeta: ' + str(error))
+    return dict(ok=True)
+
+
 def youlean_installed():
     return any('youlean' in p['nombre'].lower() for p in plugin_inventory.scan())
 
@@ -353,18 +374,12 @@ def register_plugin_manager(app, data_folder):
 
     @app.post('/api/plugins/mostrar')
     def plugins_reveal():
-        path = Path(os.path.normpath(str((request.get_json() or {}).get('ruta', ''))))
-        roots = [Path(os.path.normpath(str(r['ruta']))) for r in roots_by_key().values()] + [Path(os.path.normpath(str(disabled_dir())))]
-        key = lambda p: os.path.normcase(str(p))
-        if not any(key(path) == key(root) or key(path).startswith(key(root).rstrip('\\/') + os.sep) for root in roots):
-            raise ValueError('Esa ruta no es una carpeta de plugins.')
-        if path.exists():
-            reveal_path(path)
-        elif path.parent.exists():
-            open_path(str(path.parent))
-        else:
-            raise ValueError('El plugin ya no está en esa carpeta. Volvé a escanear.')
+        result = reveal_plugin(str((request.get_json() or {}).get('ruta', '')), disabled_dir())
+        if not result['ok']:
+            raise ValueError(result['motivo'])
         return jsonify(ok=True)
+
+    app.config['PLUGIN_DISABLED_DIR'] = disabled_dir
 
     # ---------- Instalación automática de gratuitos ----------
     jobs = plugin_downloads.Jobs()
