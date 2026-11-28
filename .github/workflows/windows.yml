@@ -2,7 +2,7 @@ name: Instalador Windows
 on:
   workflow_dispatch:
   push:
-    branches: [redisenio-sala-de-control, main]
+    branches: [redisenio-sala-de-control, main, claude/beta-pruebas]
     paths:
       - '**.py'
       - 'requirements.txt'
