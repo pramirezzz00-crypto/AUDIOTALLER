@@ -32,7 +32,8 @@ function display() {
     $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="openArtistManager(${projectPath})">${manager}</button>${artistLabel}`;
     if (page === 'arrangements' && $('crumbPath')) $('crumbPath').innerHTML = '<button onclick="go(\'home\')">Inicio</button> › Arreglos';
     if (compositionLabels[page]) {
-        $('crumbPath').innerHTML = `<button onclick="go('home')">Inicio</button> › <button onclick="compGo('${page==='composition'?comp.tab:page}')">Composición</button>${page==='composition'?'':' › '+compositionLabels[page]}`;
+        // Las listas son el primer nivel (sin ruta); la herramienta de trabajo muestra «Atrás | Beats › Banco de beats».
+        $('crumbPath').innerHTML = page === 'composition' ? `<button onclick="compGo(comp.tab)">${compositionLabels[comp.tab]}</button> › ${COMP_TOOL_LABELS[comp.tab]}` : compositionLabels[page];
         if(page==='beats') loadBeats();
         if(page==='scores') loadScores();
         if(page==='lyrics') loadLyrics();
@@ -67,6 +68,10 @@ function go(page) {
 function back() {
     if (trail.at(-1) === 'songPane' && hasUnsavedSongNotes() &&
         !confirm('Hay notas sin guardar. Se conservarán como borrador mientras esta ventana siga abierta. ¿Querés volver?')) return;
+    if (trail.at(-1) === 'composition' && typeof comp !== 'undefined' && comp.lyricDirty) {
+        if (!confirm('Hay cambios sin guardar en la letra. ¿Salir igual?')) return;
+        comp.lyricDirty = false;
+    }
     if (trail.length > 1) trail.pop();
     display();
 }
